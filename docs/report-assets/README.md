@@ -2,6 +2,8 @@
 
 日期：2026-09-15。
 
+此报告是正式命名为 AI Gateway 之前的说明快照，标题和 PDF 文件名保留原名称。现行名称、路径和验证结果以 [项目说明](../../README.md) 与 [交接说明](../../HANDOFF.md) 为准。
+
 ## 成果
 
 - PDF：`../../output/pdf/local-ai-gateway-report.pdf`

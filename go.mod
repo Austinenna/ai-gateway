@@ -1,4 +1,4 @@
-module local-ai-gateway
+module ai-gateway
 
 go 1.26.0
 

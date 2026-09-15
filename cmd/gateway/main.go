@@ -1,11 +1,11 @@
 package main
 
 import (
+	"ai-gateway/internal/gateway"
+	"ai-gateway/web"
 	"context"
 	"flag"
 	"fmt"
-	"local-ai-gateway/internal/gateway"
-	"local-ai-gateway/web"
 	"log"
 	"net"
 	"net/http"
@@ -24,6 +24,7 @@ func main() {
 		log.Fatal(e)
 	}
 	addr := flag.String("addr", "127.0.0.1:8317", "监听地址")
+	// Preserve the original default location for existing direct-binary users.
 	data := flag.String("data-dir", filepath.Join(configDir, "local-ai-gateway"), "数据目录")
 	public := flag.String("public-url", "", "管理页面对外地址（无路径），远程部署必须为 HTTPS")
 	localPasswordless := flag.Bool("local-no-password", false, "临时本地模式：首次输入原密码后，可留空解锁；仅允许回环地址")
@@ -70,7 +71,7 @@ func main() {
 			_ = server.Close()
 		}
 	}()
-	fmt.Printf("本地网关 v0.1.0\n管理页面：%s\n数据目录：%s\n", origin, *data)
+	fmt.Printf("AI Gateway v0.1.0\n管理页面：%s\n数据目录：%s\n", origin, *data)
 	if e = server.ListenAndServe(); e != nil && e != http.ErrServerClosed {
 		log.Fatal(e)
 	}
