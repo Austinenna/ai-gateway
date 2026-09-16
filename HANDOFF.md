@@ -78,6 +78,8 @@ SQLite 升至版本 5，将旧连接的单协议端点与模型的原协议迁�
 
 ## 下一步起点
 
+2026-09-16 Messages 默认设置调整：按用户要求，通过管理 API 移除当前 MiniMax-M3 的 `defaults.thinking`，Messages 改为“不补充参数”；Chat 的 `reasoning_split: true` 保留。新建模型及其他 MiniMax 模型原本就不补充 Messages 参数，无需改代码。已回读确认其他模型、连接、项目与请求数量不变，新请求立即生效，无需重启，未调用真实厂商。验证结果见 `output/messages-default-qa/configuration-verification.json`；此项更新覆盖下方先前为 M3 开启 Messages 思考的运行配置。
+
 2026-09-16 MiniMax 思考默认参数：模型编辑新增 Chat“思考拆分”和 Messages“思考模式”，支持开启／关闭／不补充。现有 `defaults_json` 存储 `reasoning_split` 布尔值和 `thinking: {"type":"adaptive"|"disabled"}`，转发只在 MiniMax 的对应协议补缺失字段；调用方显式值优先，包括 `false`、`null` 和整个 `thinking` 对象。其他厂商不自动补这两项，管理员测试与项目调用共用逻辑。请求输入仍记录补参前正文，响应和计时解析未改；当前尚未新增 `<think>` 或仅 `reasoning_details` 的解析，后续应结合实际拆分响应判断。
 
 45 项 Go 测试含竞态检测、11 项前端单测、3 项相关浏览器测试及 TypeScript／Vite／本机二进制构建通过，覆盖双协议普通／流式补参、显式覆盖、厂商隔离、校验拒绝、页面保存回显与取消设置；桌面／390px 手机截图已核对。确认无进行中调用后重启 8317，通过管理 API 为当前 MiniMax-M3 启用 `reasoning_split: true` 和 `thinking: {"type":"adaptive"}`；其他模型、连接、项目与原 89 条历史记录保持不变，静态资源与构建一致。验收、配置快照和重启记录在 `output/model-thinking-qa/`。仅使用模拟上游与临时数据库验证转发，不读取真实 Key、不自动调用厂商；等待用户实际试调用。
