@@ -48,7 +48,7 @@ export function ModelCatalogField({ connection, value, onChange, onSelect }: {
   return <div className="model-catalog-field">
     <label className="field"><span>厂商模型 ID</span>
       <input required value={value} onChange={e => onChange(e.target.value)} placeholder="厂商提供的模型 ID"/>
-      <small>可从厂商获取后选择，也可手动填写。</small>
+      <small>选择列表模型会自动填写名称、别名和 ID，填入后仍可修改。</small>
     </label>
     <div className="catalog-source">
       {protocols.length > 1 && <label><span>获取协议</span><select aria-label="获取协议" value={protocol} onChange={e => {
