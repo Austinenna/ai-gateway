@@ -1,12 +1,11 @@
-import { Activity, Eye, KeyRound, Pencil, Trash2 } from 'lucide-react';
+import { Eye, KeyRound, Pencil, Trash2 } from 'lucide-react';
 
 type ConnectionInfo = { id: string; name: string; provider: string; protocol: string; base_url: string; enabled: boolean; has_token?: boolean };
 const providerName = (provider: string) => ({ zhipu: '智谱', minimax: 'MiniMax', custom: '自定义', demo: '本地演示' }[provider] || provider);
 
-export function ConnectionList<T extends ConnectionInfo>({ connections, onEdit, onTest, onReveal, onDelete }: {
+export function ConnectionList<T extends ConnectionInfo>({ connections, onEdit, onReveal, onDelete }: {
   connections: T[];
   onEdit: (connection: T) => void;
-  onTest: (connection: T) => void;
   onReveal: (connection: T) => void;
   onDelete: (connection: T) => void;
 }) {
@@ -24,7 +23,6 @@ export function ConnectionList<T extends ConnectionInfo>({ connections, onEdit, 
         <td className="connection-state"><span className={'model-state ' + (c.enabled ? 'is-enabled' : '')}>{c.enabled ? '已启用' : '已停用'}</span></td>
         <td className="connection-operations"><div className="connection-actions">
           <button onClick={() => onEdit(c)}><Pencil size={15}/>编辑</button>
-          <button onClick={() => onTest(c)} disabled={!c.enabled}><Activity size={15}/>测试</button>
           <button className="danger" onClick={() => onDelete(c)}><Trash2 size={15}/>删除</button>
         </div></td>
       </tr>)}</tbody>

@@ -3,7 +3,7 @@
 .connections-table .connection-name-col{width:20%}
 .connections-table .connection-credential-col{width:9rem}
 .connections-table .connection-state-col{width:6.5rem}
-.connections-table .connection-actions-col{width:13.5rem}
+.connections-table .connection-actions-col{width:10rem}
 .connections-table th{padding:15px 20px;font-size:.8125rem;font-weight:500;background:var(--bg);white-space:normal}
 .connections-table td{padding:21px 20px;white-space:normal;overflow-wrap:anywhere;line-height:1.55}
 .connections-table .connection-actions-heading{text-align:right;padding-right:26px}
@@ -39,7 +39,7 @@
 @container (max-width:28rem){
  .connections-table .connection-row{grid-template-areas:'identity state' 'endpoint endpoint' 'credential credential' 'operations operations';padding:19px 17px;gap:16px 10px}
  .connection-token{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
- .connection-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .connection-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
  .connection-actions button{border-color:var(--line);font-size:.8125rem;min-height:38px;padding:8px 6px;margin:0!important;white-space:normal}
 }
 
