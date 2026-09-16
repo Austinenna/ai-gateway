@@ -80,8 +80,9 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
     expect(old.status()).toBe(401);
     await navigate('请求记录');
     await expect(page.getByLabel('网关项目凭证')).toHaveValue('');
-    await page.getByLabel('按项目筛选').selectOption(projectID);
-    await expect(page.getByLabel('按项目筛选').locator('option:checked')).toHaveText('删除测试项目（已删除）');
+    await page.getByRole('combobox', { name: '按项目筛选' }).click();
+    await page.getByRole('option', { name: '删除测试项目（已删除）', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: '按项目筛选' })).toHaveText('删除测试项目（已删除）');
     await page.locator('.request-item').filter({ hasText: '删除测试项目' }).click();
     await expect(page.locator('.request-detail')).toContainText('模型授权已通过');
   });
