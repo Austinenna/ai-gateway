@@ -42,7 +42,7 @@ test('桌面仅滚动工作区，侧栏和滚动边界固定，窄屏及登录�
     await workspace.evaluate(el => el.scrollTop = 0);
     const positions = await sidePositions();
     await page.screenshot({ path: testInfo.outputPath(`scroll-${width}-top.png`) });
-    // Use the workspace gutter, outside the long message's own scroll area.
+    // Exercise the workspace gutter independently of message preview controls.
     const maxScroll = await workspace.evaluate(el => el.scrollHeight - el.clientHeight);
     expect(maxScroll).toBeGreaterThan(0);
     await page.mouse.move(width - 20, 560);

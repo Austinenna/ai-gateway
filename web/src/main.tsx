@@ -8,6 +8,7 @@ import { ModelList } from './ModelList';
 import { ProjectList } from './ProjectList';
 import { ConnectionDeleteContent } from './ConnectionDeleteContent';
 import { ResponseDetails } from './ResponseDetails';
+import { TextPreview } from './TextPreview';
 import { responseDetails, responsePlaceholder } from './response-details.mjs';
 import './style.css';
 import './configuration.css';
@@ -181,23 +182,23 @@ function MessageBlock({label,assistant=false,children}:{label:string;assistant?:
 }
 function MessageContent({content}:{content:unknown}){
  const blocks=Array.isArray(content)?content:[content];
- return <div className="message-text">{blocks.map((block,i)=>{
+ return <TextPreview>{blocks.map((block,i)=>{
   if(typeof block==='string')return <p key={i}>{block}</p>;
   if(block&&typeof block==='object'&&'type' in block&&block.type==='text'&&'text' in block&&typeof block.text==='string')return <p key={i}>{block.text}</p>;
   return <pre key={i}>{readable(block)}</pre>;
- })}</div>;
+ })}</TextPreview>;
 }
 function Messages({record,onResponseDetails}:{record:RequestRecord;onResponseDetails:()=>void}){
  const messages=messageList(record.input||'{}');
  return <div className="messages">
   {messages.map((m,i)=><MessageBlock key={i} label={m.role.toUpperCase()}>
    <MessageContent content={m.content}/>
-   {Boolean(m.tool_calls)&&<details><summary>工具调用</summary><pre>{readable(m.tool_calls)}</pre></details>}
+   {Boolean(m.tool_calls)&&<details><summary>工具调用</summary><TextPreview><pre>{readable(m.tool_calls)}</pre></TextPreview></details>}
   </MessageBlock>)}
   <MessageBlock label="ASSISTANT · 本次响应" assistant>
-   <p>{responseText(record.output||'')||responsePlaceholder(responseDetails(record.output||''))}</p>
+   <TextPreview><p>{responseText(record.output||'')||responsePlaceholder(responseDetails(record.output||''))}</p></TextPreview>
    <button type="button" className="link response-details-link" onClick={onResponseDetails}>查看响应详情<ArrowRight size={14}/></button>
-   <details><summary>完整内容（包含工具、思考与其他返回字段）</summary><pre>{pretty(record.output||'')}</pre></details>
+   <details><summary>完整内容（包含工具、思考与其他返回字段）</summary><TextPreview><pre>{pretty(record.output||'')}</pre></TextPreview></details>
   </MessageBlock>
  </div>
 }

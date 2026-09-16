@@ -25,7 +25,8 @@ test.beforeEach(async ({ page }) => {
   ].map(frame => 'data: ' + JSON.stringify(frame) + '\n\n').join('') + 'data: [DONE]\n\n';
   const records = [record, { ...record, id: 'timing-old', project_name: '旧记录', timing_version: undefined, first_token_ms: undefined },
     { ...record, id: 'timing-empty', project_name: '空响应', first_token_ms: null, first_text_ms: null },
-    { ...record, id: 'tools', project_name: '工具调用演示', first_text_ms: null, output: toolOutput }];
+    { ...record, id: 'tools', project_name: '工具调用演示', first_text_ms: null, output: toolOutput },
+    { ...record, id: 'preview', project_name: '长消息预览', output: JSON.stringify({ choices: [{ message: { content: Array.from({ length: 40 }, (_, i) => `回答第 ${i + 1} 行：这是用于预览与全文展开验收的本地模拟内容。`).join('\n') } }] }) }];
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname;
     const json = path === '/api/status' ? { configured: true, authenticated: true, locked: false } :
@@ -118,4 +119,55 @@ test('消息块独立折叠、键盘展开及切换请求后恢复默认状态',
   await expect(system).toHaveAttribute('aria-expanded', 'true');
   await system.click();
   await expect(blocks.nth(0)).toBeHidden();
+});
+
+test('长消息预览和全文都随页面滚动，支持键盘展开及切换请求后重置', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator('.request-item').filter({ hasText: '长消息预览' }).click();
+  await expect(page.locator('.detail-head h2')).toHaveText('长消息预览');
+  const workspace = page.getByRole('region', { name: '工作区', exact: true });
+  const system = page.locator('.message').first();
+  const preview = system.locator('.text-preview-window');
+  const toggle = system.getByRole('button', { name: '展开全文', exact: true });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.message').nth(1).locator('.text-preview-toggle')).toHaveCount(0);
+
+  const wheelOverText = async () => {
+    await preview.evaluate(el => el.scrollIntoView({ block: 'start', behavior: 'instant' }));
+    const before = await workspace.evaluate(el => el.scrollTop);
+    const rect = (await preview.boundingBox())!;
+    await page.mouse.move(rect.x + rect.width / 2, Math.max(20, rect.y + 65));
+    await page.mouse.wheel(0, 120);
+    await expect.poll(() => workspace.evaluate(el => el.scrollTop)).toBeGreaterThan(before + 30);
+    expect(await preview.evaluate(el => el.scrollTop)).toBe(0);
+  };
+  await wheelOverText();
+  await toggle.focus();
+  await toggle.press('Enter');
+  await expect(system.getByRole('button', { name: '收起全文', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect.poll(() => preview.evaluate(el => el.clientHeight)).toBeGreaterThan(400);
+  await wheelOverText();
+  await system.getByRole('button', { name: '收起全文', exact: true }).click();
+  await expect.poll(() => preview.evaluate(el => el.clientHeight)).toBeLessThan(250);
+
+  const assistant = page.locator('.message.assistant');
+  await assistant.getByRole('button', { name: '展开全文', exact: true }).click();
+  await expect.poll(() => assistant.locator('.text-preview-window').first().evaluate(el => el.clientHeight)).toBeGreaterThan(800);
+  await assistant.getByRole('button', { name: '收起全文', exact: true }).click();
+  await assistant.locator('summary').click();
+  await expect(assistant.locator('details .text-preview-toggle')).toBeVisible();
+  expect(await assistant.locator('details pre').evaluate(el => getComputedStyle(el).overflowY)).toBe('visible');
+  await assistant.locator('summary').click();
+
+  await system.getByRole('button', { name: '展开全文', exact: true }).click();
+  await page.locator('.request-item').filter({ hasText: '旧记录' }).click();
+  await expect(page.locator('.detail-head h2')).toHaveText('旧记录');
+  await page.locator('.request-item').filter({ hasText: '长消息预览' }).click();
+  await expect(page.locator('.detail-head h2')).toHaveText('长消息预览');
+  await expect(system.getByRole('button', { name: '展开全文', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await workspace.evaluate(el => el.scrollTop = 0);
+  await page.screenshot({ path: testInfo.outputPath('message-preview-desktop.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: testInfo.outputPath('message-preview-mobile.png'), fullPage: true, animations: 'disabled' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
