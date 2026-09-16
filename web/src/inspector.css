@@ -1,5 +1,8 @@
 /* Request details use their own available width, including beside the request rail. */
 .request-detail { container: request-detail / inline-size; }
+/* Trackpad gestures stay vertical, including at the edges of each pane. */
+html:has(.requests-workspace), body:has(.requests-workspace), .requests-workspace { overscroll-behavior-x: none; }
+.request-items, .request-detail { min-width: 0; overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y pinch-zoom; }
 .request-detail .detail-head { padding: 22px 24px 18px; }
 .detail-head > .detail-identity { justify-content: flex-start; margin: 0; gap: 12px; }
 .detail-identity h2 { font-size: 18px; line-height: 1.5; overflow-wrap: anywhere; }
@@ -68,6 +71,9 @@
 
 .request-item { gap: 8px; padding-top: 13px; padding-bottom: 13px; }
 .request-item.selected { background: var(--accent-bg); }
+.request-item > span { min-width: 0; }
+.request-item > span > b, .request-item > span > code { min-width: 0; overflow-wrap: anywhere; }
+.request-item > span > small { flex: none; }
 .request-item > span:first-child b { overflow-wrap: anywhere; }
 .request-item > span:first-child small { flex: none; }
 
@@ -117,8 +123,8 @@
   .requests-workspace .inspector { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
   .requests-workspace .request-rail { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .requests-workspace .rail-head { flex: none; }
-  .requests-workspace .request-items { flex: 1; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
-  .requests-workspace .request-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  .requests-workspace .request-items { flex: 1; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
+  .requests-workspace .request-detail { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
   .requests-workspace .detail-tabs { position: sticky; top: 0; z-index: 2; }
   .requests-workspace > .app-footer { padding: 0 24px 12px; font-size: 10px; }
   .request-items:focus-visible, .request-detail:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
