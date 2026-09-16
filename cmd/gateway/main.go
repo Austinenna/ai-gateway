@@ -27,7 +27,7 @@ func main() {
 	// Preserve the original default location for existing direct-binary users.
 	data := flag.String("data-dir", filepath.Join(configDir, "local-ai-gateway"), "数据目录")
 	public := flag.String("public-url", "", "管理页面对外地址（无路径），远程部署必须为 HTTPS")
-	localPasswordless := flag.Bool("local-no-password", false, "临时本地模式：首次输入原密码后，可留空解锁；仅允许回环地址")
+	localPasswordless := flag.Bool("local-no-password", false, "本地模式：首次输入原密码后，启动自动解锁，管理页可留空登录；仅允许回环地址")
 	flag.Parse()
 	host, _, e := net.SplitHostPort(*addr)
 	if e != nil {

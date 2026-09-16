@@ -8,7 +8,7 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
   await page.goto('/');
   await page.getByLabel('管理密码', { exact: true }).fill(password);
   if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill(password);
-  await page.getByRole('button', { name: status.configured ? '解锁并进入' : '创建并进入', exact: true }).click();
+  await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
   await expect(page.locator('nav')).toBeVisible();
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const create = async (path: string, data: object) => {

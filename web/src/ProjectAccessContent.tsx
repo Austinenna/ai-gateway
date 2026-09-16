@@ -68,7 +68,7 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
         {project.has_saved_token && <span className="access-saved"><ShieldCheck size={13}/>已加密保管</span>}
       </div>
       <div className="access-copy-row"><code className="access-token"><KeyRound size={16}/>{project.token_prefix || 'gw_'}••••••••</code><button disabled={busy || !project.has_saved_token} onClick={() => copy('token')}><Copy size={15}/>复制 Token</button></div>
-      {project.has_saved_token ? <p className="access-hint">复制的是完整 Token。重新打开页面并解锁后，仍可在这里复制。</p> : <div className="access-legacy">
+      {project.has_saved_token ? <p className="access-hint">复制的是完整 Token。重新登录管理页面后，仍可在这里复制。</p> : <div className="access-legacy">
         <p>此项目由旧版本创建，尚未保存可复制的 Token。粘贴已有 Token 保存后，即可随时复制。</p>
         <form onSubmit={e => { e.preventDefault(); action(async () => { await saveToken(existing); if (alive.current) { setExisting(''); setNotice('已有 Token 已加密保存，正在使用的凭证保持有效'); } }); }}>
           <label className="field" htmlFor="existing-project-token">已有项目 Token<input id="existing-project-token" type="password" autoComplete="off" spellCheck={false} required value={existing} disabled={busy} onChange={e => setExisting(e.target.value)} placeholder="粘贴此项目完整的 gw_ 开头 Token"/></label>

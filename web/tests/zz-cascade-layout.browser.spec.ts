@@ -11,7 +11,7 @@ test('关联模型逐个删除与厂商级联删除，检查桌面和窄屏布�
   await page.goto('/');
   await page.getByLabel('管理密码', { exact: true }).fill(password);
   if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill(password);
-  await page.getByRole('button', { name: status.configured ? '解锁并进入' : '创建并进入', exact: true }).click();
+  await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
   await expect(page.locator('nav')).toBeVisible();
   const create = async (path: string, data: object) => {
     const response = await page.request.post('/api/admin/' + path, { headers, data });

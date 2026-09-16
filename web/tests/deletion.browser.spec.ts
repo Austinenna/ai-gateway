@@ -15,7 +15,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
     await page.goto('/');
     await page.getByLabel('管理密码', { exact: true }).fill(password);
     if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill(password);
-    await page.getByRole('button', { name: status.configured ? '解锁并进入' : '创建并进入', exact: true }).click();
+    await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
     await expect(page.locator('nav')).toBeVisible();
     const connection = await page.request.post('/api/admin/connections', { headers, data: { name: '删除测试连接', provider: 'demo', protocol: 'chat', base_url: 'demo://local', enabled: true } });
     expect(connection.status()).toBe(200);

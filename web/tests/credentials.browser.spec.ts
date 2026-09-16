@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('项目试调用的凭证填入、校验、加密取回与锁定', async ({ page }, testInfo) => {
+test('项目试调用的凭证填入、校验、加密取回与退出管理', async ({ page }, testInfo) => {
   const password = 'isolated-ui-test-password-2026';
   const key = page.getByLabel('网关项目凭证');
   const guide = page.getByRole('dialog');
@@ -77,10 +77,10 @@ test('项目试调用的凭证填入、校验、加密取回与锁定', async ({
     await expect.poll(async () => (await key.inputValue()) === rotatedKey).toBe(true);
   });
 
-  await test.step('锁定后重新登录清除缓存；停用项目引导查看权限', async () => {
-    await page.getByRole('button', { name: '锁定网关', exact: true }).click();
+  await test.step('退出后重新登录清除缓存；停用项目引导查看权限', async () => {
+    await page.getByRole('button', { name: '退出管理', exact: true }).click();
     await page.getByLabel('管理密码', { exact: true }).fill(password);
-    await page.getByRole('button', { name: '解锁并进入', exact: true }).click();
+    await page.getByRole('button', { name: '进入管理页面', exact: true }).click();
     await expect(key).toHaveValue('');
     await openGuide();
     await expect(guide.getByRole('button', { name: '填入这个项目的凭证', exact: true })).toBeVisible();

@@ -155,6 +155,14 @@ func (g *Gateway) Handler(assets fs.FS) http.Handler {
 	})
 	mux.HandleFunc("POST /api/setup", g.auth)
 	mux.HandleFunc("POST /api/login", g.auth)
+	mux.HandleFunc("POST /api/admin/logout", g.admin(func(w http.ResponseWriter, r *http.Request) {
+		cookie, _ := r.Cookie("gateway_admin") // Validated by the admin middleware.
+		g.mu.Lock()
+		delete(g.sessions, digest(cookie.Value))
+		g.mu.Unlock()
+		http.SetCookie(w, &http.Cookie{Name: "gateway_admin", Path: "/api", MaxAge: -1, HttpOnly: true, Secure: g.secure, SameSite: http.SameSiteStrictMode})
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
 	mux.HandleFunc("POST /api/admin/lock", g.admin(func(w http.ResponseWriter, r *http.Request) {
 		g.lock()
 		http.SetCookie(w, &http.Cookie{Name: "gateway_admin", Path: "/api", MaxAge: -1, HttpOnly: true, Secure: g.secure, SameSite: http.SameSiteStrictMode})

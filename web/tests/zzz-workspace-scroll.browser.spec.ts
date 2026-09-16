@@ -7,7 +7,7 @@ test('桌面仅滚动工作区，侧栏和滚动边界固定，窄屏及登录�
   await page.goto('/');
   await page.getByLabel('管理密码', { exact: true }).fill(password);
   if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill(password);
-  await page.getByRole('button', { name: status.configured ? '解锁并进入' : '创建并进入', exact: true }).click();
+  await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
   await expect(page.locator('nav')).toBeVisible();
   const create = async (path: string, data: object) => {
     const response = await page.request.post('/api/admin/' + path, { headers, data });
@@ -76,8 +76,8 @@ test('桌面仅滚动工作区，侧栏和滚动边界固定，窄屏及登录�
   await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
   await nav('请求记录');
   await page.setViewportSize({ width: 1024, height: 420 });
-  await page.getByRole('button', { name: '锁定网关', exact: true }).scrollIntoViewIfNeeded();
-  await expect(page.getByRole('button', { name: '锁定网关', exact: true })).toBeInViewport();
+  await page.getByRole('button', { name: '退出管理', exact: true }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole('button', { name: '退出管理', exact: true })).toBeInViewport();
   await checkRoot();
   await page.setViewportSize({ width: 390, height: 844 });
   // Roll over the page margin, outside the request list's own scroll area.
@@ -86,11 +86,11 @@ test('桌面仅滚动工作区，侧栏和滚动边界固定，窄屏及登录�
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
   await page.screenshot({ path: testInfo.outputPath('scroll-mobile.png') });
   await page.setViewportSize({ width: 1024, height: 420 });
-  await page.getByRole('button', { name: '锁定网关', exact: true }).click();
+  await page.getByRole('button', { name: '退出管理', exact: true }).click();
   await expect(page.locator('.login-page')).toBeVisible();
   await page.mouse.move(900, 300);
   await page.mouse.wheel(0, 500);
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
-  await page.getByRole('button', { name: '解锁并进入', exact: true }).scrollIntoViewIfNeeded();
-  await expect(page.getByRole('button', { name: '解锁并进入', exact: true })).toBeInViewport();
+  await page.getByRole('button', { name: '进入管理页面', exact: true }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole('button', { name: '进入管理页面', exact: true })).toBeInViewport();
 });
