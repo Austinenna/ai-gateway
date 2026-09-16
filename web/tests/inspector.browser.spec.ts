@@ -125,7 +125,7 @@ test('长消息预览和全文都随页面滚动，支持键盘展开及切换�
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator('.request-item').filter({ hasText: '长消息预览' }).click();
   await expect(page.locator('.detail-head h2')).toHaveText('长消息预览');
-  const workspace = page.getByRole('region', { name: '工作区', exact: true });
+  const detail = page.getByRole('region', { name: '请求详情', exact: true });
   const system = page.locator('.message').first();
   const preview = system.locator('.text-preview-window');
   const toggle = system.getByRole('button', { name: '展开全文', exact: true });
@@ -134,11 +134,11 @@ test('长消息预览和全文都随页面滚动，支持键盘展开及切换�
 
   const wheelOverText = async () => {
     await preview.evaluate(el => el.scrollIntoView({ block: 'start', behavior: 'instant' }));
-    const before = await workspace.evaluate(el => el.scrollTop);
+    const before = await detail.evaluate(el => el.scrollTop);
     const rect = (await preview.boundingBox())!;
     await page.mouse.move(rect.x + rect.width / 2, Math.max(20, rect.y + 65));
     await page.mouse.wheel(0, 120);
-    await expect.poll(() => workspace.evaluate(el => el.scrollTop)).toBeGreaterThan(before + 30);
+    await expect.poll(() => detail.evaluate(el => el.scrollTop)).toBeGreaterThan(before + 30);
     expect(await preview.evaluate(el => el.scrollTop)).toBe(0);
   };
   await wheelOverText();
@@ -165,7 +165,7 @@ test('长消息预览和全文都随页面滚动，支持键盘展开及切换�
   await page.locator('.request-item').filter({ hasText: '长消息预览' }).click();
   await expect(page.locator('.detail-head h2')).toHaveText('长消息预览');
   await expect(system.getByRole('button', { name: '展开全文', exact: true })).toHaveAttribute('aria-expanded', 'false');
-  await workspace.evaluate(el => el.scrollTop = 0);
+  await detail.evaluate(el => el.scrollTop = 0);
   await page.screenshot({ path: testInfo.outputPath('message-preview-desktop.png'), animations: 'disabled' });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath('message-preview-mobile.png'), fullPage: true, animations: 'disabled' });

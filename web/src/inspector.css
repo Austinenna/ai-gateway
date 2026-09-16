@@ -108,3 +108,35 @@
 @container request-detail (max-width: 340px) {
   .detail-identity time { flex-basis: 100%; margin-left: 0; }
 }
+
+/* The two panes share the available viewport height; messages never own a scrollbar. */
+@media (min-width: 761px) {
+  .workspace.requests-workspace { overflow: hidden; }
+  .requests-workspace > .requests-main { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; padding: 20px 24px 16px; }
+  .requests-main > .page-head { flex: none; margin-bottom: 18px; }
+  .requests-workspace .page-head .eyebrow { display: none; }
+  .requests-workspace .page-head h1 { font-size: 23px; }
+  .requests-workspace .page-head p { margin-top: 4px; font-size: 11px; }
+  .requests-main > .error { flex: none; }
+  .requests-workspace .inspector { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .requests-workspace .request-rail { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .requests-workspace .rail-head { flex: none; }
+  .requests-workspace .request-items { flex: 1; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  .requests-workspace .request-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  .requests-workspace .detail-tabs { position: sticky; top: 0; z-index: 2; }
+  .requests-workspace > .app-footer { padding: 0 24px 12px; font-size: 10px; }
+  .request-items:focus-visible, .request-detail:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+}
+@media (min-width: 761px) and (max-height: 600px) {
+  .requests-workspace > .topbar { height: 45px; }
+  .requests-workspace > .requests-main { padding: 10px 18px 12px; }
+  .requests-workspace .page-head { margin-bottom: 10px; }
+  .requests-workspace .page-head h1 { font-size: 19px; }
+  .requests-workspace .page-head p, .requests-workspace > .app-footer { display: none; }
+  .requests-workspace .rail-head { padding: 12px; gap: 8px; }
+}
+@media (max-width: 760px) {
+  .requests-main .inspector { grid-template-columns: minmax(0, 1fr); }
+  .requests-main .request-rail { border-right: 0; border-bottom: 1px solid var(--line); }
+  .requests-main .request-items { max-height: 230px; }
+}
