@@ -69,7 +69,7 @@ test('本地空白解锁：页面提示、退出重入、凭证保留和厂商�
 
   await test.step('厂商凭据查看沿用本地空白密码，原值不变', async () => {
     await page.locator('nav').getByRole('button', { name: /^厂商连接/ }).click();
-    await page.locator('.connection-card').filter({ hasText: '免密验证连接' }).getByRole('button', { name: '解锁查看', exact: true }).click();
+    await page.locator('.connection-row').filter({ hasText: '免密验证连接' }).getByRole('button', { name: '解锁查看', exact: true }).click();
     const modal = page.getByRole('dialog');
     await expect(modal.getByLabel('再次输入管理密码')).toHaveValue('');
     await modal.getByRole('button', { name: '解锁查看', exact: true }).click();

@@ -69,7 +69,7 @@ test('关联模型逐个删除与厂商级联删除，检查桌面和窄屏布�
 
   await test.step('删除窗口直接列出模型和项目，并验证滚动及窄屏按钮可达', async () => {
     await nav('厂商连接');
-    await page.locator('.connection-card').filter({ hasText: '智谱 · 开发环境' }).getByRole('button', { name: '删除', exact: true }).click();
+    await page.locator('.connection-row').filter({ hasText: '智谱 · 开发环境' }).getByRole('button', { name: '删除', exact: true }).click();
     await expect(modal.locator('.linked-model')).toHaveCount(8);
     await expect(modal).toContainText('代码助手项目');
     for (const [name, width, height] of [['desktop', 1440, 1000], ['compact', 1024, 760], ['mobile', 390, 844]] as const) {
@@ -104,7 +104,7 @@ test('关联模型逐个删除与厂商级联删除，检查桌面和窄屏布�
   await test.step('一键删除厂商及剩余模型，保留项目、其他连接和模型', async () => {
     await modal.getByRole('button', { name: '删除厂商及 7 个模型', exact: true }).click();
     await expect(modal).toHaveCount(0);
-    await expect(page.locator('.connection-card').filter({ hasText: '智谱 · 开发环境' })).toHaveCount(0);
+    await expect(page.locator('.connection-row').filter({ hasText: '智谱 · 开发环境' })).toHaveCount(0);
     const state = await (await page.request.get('/api/admin/state')).json();
     expect(state.models.some((m: { connection_id: string }) => m.connection_id === connection.id)).toBe(false);
     expect(state.projects.find((p: { id: string }) => p.id === project.project.id).model_ids).toEqual([keep.id]);

@@ -5,7 +5,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
   const headers = { 'X-Gateway-Admin': '1' };
   const navigate = (name: string) => page.locator('nav').getByRole('button', { name: new RegExp('^' + name) }).click();
   const dialog = (name: string) => page.getByRole('dialog').filter({ has: page.getByRole('heading', { name, exact: true }) });
-  const connectionCard = page.locator('.connection-card').filter({ hasText: '删除测试连接' });
+  const connectionRow = page.locator('.connection-row').filter({ hasText: '删除测试连接' });
   const modelRow = page.getByRole('row').filter({ hasText: '删除测试模型' });
   const projectCard = page.locator('.project-card').filter({ hasText: '删除测试项目' });
   let connectionID = '', modelID = '', projectID = '', token = '';
@@ -40,7 +40,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
 
   await test.step('有引用的连接列出模型并提供级联入口，取消不做修改', async () => {
     await navigate('厂商连接');
-    await connectionCard.getByRole('button', { name: '删除', exact: true }).click();
+    await connectionRow.getByRole('button', { name: '删除', exact: true }).click();
     await expect(dialog('删除厂商连接')).toContainText('删除测试模型');
     await expect(dialog('删除厂商连接').getByRole('button', { name: '删除厂商及 1 个模型', exact: true })).toBeEnabled();
     await page.screenshot({ path: testInfo.outputPath('connection-reference.png') });
@@ -88,18 +88,18 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
 
   await test.step('无引用连接允许删除；服务失败保留配置并可重试', async () => {
     await navigate('厂商连接');
-    await connectionCard.getByRole('button', { name: '删除', exact: true }).click();
+    await connectionRow.getByRole('button', { name: '删除', exact: true }).click();
     const url = '**/api/admin/connections/' + connectionID + '?cascade=true';
     await page.route(url, route => route.fulfill({ status: 500, json: { error: { message: '模拟删除失败，请重试' } } }));
     await dialog('删除厂商连接').getByRole('button', { name: '删除厂商连接', exact: true }).click();
     await expect(dialog('删除厂商连接').getByRole('alert')).toContainText('模拟删除失败');
-    await expect(connectionCard).toBeVisible();
+    await expect(connectionRow).toBeVisible();
     await page.unroute(url);
     await dialog('删除厂商连接').getByRole('button', { name: '删除厂商连接', exact: true }).click();
-    await expect(connectionCard).toHaveCount(0);
+    await expect(connectionRow).toHaveCount(0);
     await page.reload();
     await navigate('厂商连接');
-    await expect(connectionCard).toHaveCount(0);
+    await expect(connectionRow).toHaveCount(0);
     const state = await (await page.request.get('/api/admin/state')).json();
     expect(state.connections.some((c: { id: string }) => c.id === connectionID)).toBe(false);
     expect(state.request_count).toBeGreaterThan(0);
