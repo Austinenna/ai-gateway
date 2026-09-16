@@ -1,0 +1,104 @@
+/* Request details use their own available width, including beside the request rail. */
+.request-detail { container: request-detail / inline-size; }
+.request-detail .detail-head { padding: 22px 24px 18px; }
+.detail-head > .detail-identity { justify-content: flex-start; margin: 0; gap: 12px; }
+.detail-identity h2 { font-size: 18px; line-height: 1.5; overflow-wrap: anywhere; }
+.detail-identity .result-label { flex: none; padding: 4px 8px; border-radius: 5px; background: var(--bg); }
+.detail-identity .result-complete { background: var(--green-bg); }
+.detail-identity time { margin-left: auto; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.detail-metadata { display: flex; justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: 9px 0 0; font-size: 11px; line-height: 1.6; color: var(--muted); }
+.detail-metadata > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.detail-metadata b, .detail-metadata code { font-size: 11px; font-weight: 400; color: var(--ink); overflow-wrap: anywhere; }
+.detail-metadata .detail-mode { border-left: 1px solid var(--line); padding-left: 14px; }
+.detail-metadata .detail-request-id { font-size: 10px; color: var(--muted); margin-left: auto; user-select: all; }
+.detail-head .request-outcome-note { margin: 12px 0 0; font-size: 11px; }
+
+.detail-head > .detail-metric-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 18px 0 0; padding: 13px 0; gap: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.detail-metric-grid > div { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 0 14px; border-left: 1px solid var(--line); }
+.detail-metric-grid > div:first-child { border-left: 0; }
+.detail-metric-grid span { font-size: 10px; line-height: 1.5; color: var(--muted); }
+.detail-metric-grid b { font-size: 18px; line-height: 1.25; letter-spacing: -.4px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.detail-metric-grid em { font-style: normal; font-size: 10px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
+.detail-metric-grid > div:nth-child(-n+2) b { color: var(--accent); }
+.request-detail .detail-tabs { gap: 24px; padding: 0 24px; background: var(--surface); }
+.request-detail .detail-tabs button { padding: 12px 1px; font-size: 12px; }
+.request-detail .detail-content { padding: 22px 24px 28px; }
+
+/* Clear message boundaries, without an extra timeline around every paragraph. */
+.messages { display: grid; gap: 12px; }
+.message, .message.assistant { margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.message .message-toggle { padding: 11px 14px; margin: 0; gap: 9px; border-radius: 0; background: var(--bg); color: var(--muted); }
+.message .message-toggle:hover { background: var(--soft); }
+.message .message-toggle:focus-visible { outline-offset: -3px; }
+.message .message-role { color: var(--ink); font-size: 10px; letter-spacing: .3px; }
+.message .message-chevron { margin-left: 0; order: 2; }
+.message .message-toggle-hint { margin-left: auto; font-size: 10px; }
+.message .message-content { border-radius: 0; border-top: 1px solid var(--line); padding: 15px 16px; background: var(--surface); }
+.message .message-content p { font-size: 12px; line-height: 1.9; white-space: pre-wrap; }
+.message .message-text { max-height: 320px; overflow: auto; scrollbar-gutter: stable; }
+.message-text > * + * { margin-top: 12px !important; }
+.message .message-content pre { background: var(--bg); padding: 12px; border-radius: 5px; }
+.message.assistant { border-color: color-mix(in srgb, var(--green) 22%, var(--line)); }
+.message.assistant .message-toggle { background: var(--green-bg); }
+.message.assistant .message-role { color: var(--green); }
+.message details { margin-top: 14px; }
+.message details summary { margin-bottom: 0; }
+.message details[open] summary { margin-bottom: 12px; }
+.message .response-details-link { margin-top: 10px; font-size: 11px; }
+
+.request-metrics-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.request-metrics-detail > section { margin: 0; padding: 18px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.request-metrics-detail h3 { font-size: 13px; margin: 0; }
+.request-metrics-detail .timing-title { display: grid; gap: 7px; }
+.request-metrics-detail .timeline { gap: 23px; margin-bottom: 16px; }
+.request-metrics-detail .timeline > div { gap: 10px; padding-left: 16px; }
+.request-metrics-detail .timeline b { min-width: 63px; font-size: 11px; }
+.request-metrics-detail .timeline strong { font-size: 11px; }
+.request-metrics-detail .usage-breakdown { grid-template-columns: 1fr 1fr; gap: 20px 12px; }
+.request-metrics-detail .usage-breakdown dd { font-size: 18px; }
+.request-metrics-detail .metric-explanation { font-size: 11px; line-height: 1.8; }
+.request-metrics-detail .usage-state { margin-bottom: 20px; }
+.request-metrics-detail .cache-ratio { margin-top: 22px; }
+
+.request-item { gap: 8px; padding-top: 13px; padding-bottom: 13px; }
+.request-item.selected { background: var(--accent-bg); }
+.request-item > span:first-child b { overflow-wrap: anywhere; }
+.request-item > span:first-child small { flex: none; }
+
+@container request-detail (max-width: 820px) {
+  .detail-head > .detail-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0; }
+  .detail-metric-grid > div { padding: 12px 14px; }
+  .detail-metric-grid > div:nth-child(4) { border-left: 0; }
+  .detail-metric-grid > div:nth-child(n+4) { border-top: 1px solid var(--line); }
+  .request-metrics-detail { grid-template-columns: minmax(0, 1fr); }
+  .request-metrics-detail .usage-breakdown { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .request-metrics-detail .detail-speed .usage-breakdown,
+  .request-metrics-detail .detail-outcome .usage-breakdown { grid-template-columns: 1fr 1fr; }
+  .detail-metadata .detail-request-id { flex-basis: 100%; margin-left: 0; }
+}
+@container request-detail (max-width: 520px) {
+  .request-detail .detail-head { padding: 18px 16px 16px; }
+  .detail-identity { flex-wrap: wrap; gap: 8px; }
+  .detail-identity h2 { font-size: 17px; }
+  .detail-identity time { font-size: 10px; }
+  .detail-metadata { gap: 7px 12px; }
+  .detail-head > .detail-metric-grid { margin-top: 14px; }
+  .detail-metric-grid > div { padding: 11px 10px; gap: 6px; }
+  .detail-metric-grid b { font-size: 16px; }
+  .detail-metric-grid span { font-size: 9px; }
+  .detail-metric-grid em { font-size: 9px; }
+  .request-detail .detail-content { padding: 16px; }
+  .request-detail .detail-tabs { padding: 0 16px; gap: 20px; }
+  .request-detail .detail-tabs button { font-size: 11px; }
+  .request-metrics-detail > section { padding: 15px; }
+  .request-metrics-detail .usage-breakdown { grid-template-columns: 1fr 1fr; }
+}
+@container request-detail (max-width: 420px) {
+  .detail-head > .detail-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail-metric-grid > div { border-left: 0; }
+  .detail-metric-grid > div:nth-child(even) { border-left: 1px solid var(--line); }
+  .detail-metric-grid > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+}
+@container request-detail (max-width: 340px) {
+  .detail-identity time { flex-basis: 100%; margin-left: 0; }
+}

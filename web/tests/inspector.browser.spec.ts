@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
     upstream_model: 'demo', protocol: 'chat', started: 1789527606098, duration_ms: 29954,
     timing_version: 1, first_token_ms: 1200, first_text_ms: 25123, status: 200, state: 'complete',
     input_tokens: 12, output_tokens: 8, truncated: false,
-    input: JSON.stringify({ messages: [{ role: 'system', content: Array.from({ length: 20 }, (_, i) => `本地模拟指令第 ${i + 1} 行，用于检查长消息折叠。`).join('\n') }, { role: 'user', content: [{ type: 'text', text: '你好' }] }] }),
+    input: JSON.stringify({ messages: [{ role: 'system', content: Array.from({ length: 20 }, (_, i) => `本地模拟指令第 ${i + 1} 行，用于检查长消息折叠。`).join('\n') }, { role: 'user', content: [{ type: 'text', text: '你好\n请用两句话回答。' }] }] }),
     output: JSON.stringify({ choices: [{ message: { content: '你好呀' } }] }),
   };
   const toolOutput = [
@@ -106,6 +106,8 @@ test('消息块独立折叠、键盘展开及切换请求后恢复默认状态',
   await user.press('Space');
   await expect(blocks.nth(1)).toBeVisible();
   await expect(blocks.nth(1)).toContainText('你好');
+  await expect(blocks.nth(1).locator('p')).toHaveText('你好\n请用两句话回答。');
+  await expect(blocks.nth(1).locator('pre')).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath('messages-mobile.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

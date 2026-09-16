@@ -42,9 +42,12 @@ test('桌面仅滚动工作区，侧栏和滚动边界固定，窄屏及登录�
     await workspace.evaluate(el => el.scrollTop = 0);
     const positions = await sidePositions();
     await page.screenshot({ path: testInfo.outputPath(`scroll-${width}-top.png`) });
-    await page.mouse.move(width - 70, 560);
+    // Use the workspace gutter, outside the long message's own scroll area.
+    const maxScroll = await workspace.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(maxScroll).toBeGreaterThan(0);
+    await page.mouse.move(width - 20, 560);
     await page.mouse.wheel(0, 650);
-    await expect.poll(scrollTop).toBeGreaterThan(400);
+    await expect.poll(scrollTop).toBeGreaterThan(Math.min(400, maxScroll - 1));
     expect(await sidePositions()).toEqual(positions);
     await checkRoot();
     await page.screenshot({ path: testInfo.outputPath(`scroll-${width}-middle.png`) });
@@ -57,7 +60,7 @@ test('桌面仅滚动工作区，侧栏和滚动边界固定，窄屏及登录�
     for (const bottom of [true, false]) {
       await workspace.evaluate((el, end) => el.scrollTop = end ? el.scrollHeight : 0, bottom);
       const boundary = await scrollTop();
-      await page.mouse.move(width - 70, 560);
+      await page.mouse.move(width - 20, 560);
       await page.mouse.wheel(0, bottom ? 1800 : -1800);
       await settleWheel();
       expect(await scrollTop()).toBe(boundary);
