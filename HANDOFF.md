@@ -82,6 +82,8 @@ SQLite 升至版本 5，将旧连接的单协议端点与模型的原协议迁�
 
 ## 下一步起点
 
+2026-09-16 OpenClaw 执行审批迁移修复：用户在接入网关后触发 `ExecApprovalsMigrationRequiredError`。确认旧 `exec-approvals.json` 与当前 SQLite 均无自定义审批规则，但内部 socket Token 不同；首次 `doctor --fix --non-interactive` 因冲突保留旧文件，退出成功仍未解除运行时阻塞。备份后仅将旧文件对齐为当前 SQLite 的完整权威表示，再执行官方修复，迁移记录已完成并移除旧文件，未扩大执行权限。本机及运行中 Gateway 的 `approvals get --json` 均通过，startup／ready 正常，唯一模型仍为 `ai-gateway/MiniMax-M3`。Doctor 将现有网关项目 Token 同步到 `ai-gateway:default` 认证项，未恢复旧厂商凭据；主配置仅额外补入空的 UI 偏好。备份位于 `~/.openclaw/backups/exec-approvals-repair-20260916-222500/`，脱敏验收记录在 `output/openclaw-exec-approvals-qa/verification.json`。未发起模型调用，未执行 Agent 命令；此前接入验证未覆盖执行审批链路，本次已补验读取入口。
+
 2026-09-16 OpenClaw 统一接入网关：按用户要求，在现有网关中新建 `OpenClaw` 项目，仅授权 `MiniMax-M3`，使用该项目凭证接入 `http://127.0.0.1:8317` 的 Anthropic Messages 协议。OpenClaw 改为 `models.mode=replace`，唯一模型、默认模型及允许列表均为 `ai-gateway/MiniMax-M3`，无备用模型；移除旧模型定义、5 组直连认证与3组插件模型目录缓存，根目录旧认证文件移入备份。通过 OpenClaw API 清除全部 7 个已有会话的模型选择和旧认证覆盖，保留全部 118 条会话事件及现有渠道设置。
 
 迁移前已停止 OpenClaw 并备份配置及两份一致 SQLite 快照，位于 `~/.openclaw/backups/gateway-m3-20260916-221647/`。配置校验、重启后的 startup／ready 状态、唯一模型可用性与项目 Token 的 `/v1/models` 授权检查通过；未发起真实模型调用，生成响应与完整工具循环尚未验证。凭证仅保存在本机配置和受限备份内，未写入本文或 Git。迁移脚本及脱敏验证结果在 `output/openclaw-gateway-m3-qa/`；网关现有其他模型、连接与项目保持原配置。
