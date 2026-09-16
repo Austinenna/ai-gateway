@@ -392,8 +392,8 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 				return
 			}
 		}
-		// Some Chat providers close normally after finish_reason=stop without
-		// sending [DONE]. Still drain the body for final content, usage and errors.
+		// Some Chat providers close normally after finish_reason=stop/tool_calls
+		// without [DONE]. Still drain the body for final content, usage and errors.
 		done = done || (c.Protocol == "chat" && chatEnd.complete())
 		if ctx.Err() != nil || isTimeout(scanner.Err()) {
 			classifyTransport(rec, r.Context(), ctx, scanner.Err())

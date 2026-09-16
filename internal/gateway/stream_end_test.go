@@ -20,6 +20,9 @@ func TestStreamStopCompatibility(t *testing.T) {
 	const done = "data: [DONE]\n\n"
 	const second = "data: {\"choices\":[{\"index\":1,\"delta\":{\"content\":\"second answer\"}}]}\n\n"
 	const secondStop = "data: {\"choices\":[{\"index\":1,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+	const tool = `data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"fake-call","type":"function","function":{"name":"lookup","arguments":"{\"query\":"}}]},"finish_reason":null}]}` + "\n\n"
+	const toolTail = `data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"test\"}"}}]},"finish_reason":"tool_calls"}]}` + "\n\n"
+	const toolEnd = `data: {"choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":"tool_calls"}]}` + "\n\n"
 	for _, tc := range []struct {
 		name, protocol, body, state, kind string
 		n                                 int
@@ -42,6 +45,16 @@ func TestStreamStopCompatibility(t *testing.T) {
 		{name: "length is not normal stop", body: text + "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"length\"}]}\n\n", state: "truncated", kind: "stream_interrupted"},
 		{name: "messages still requires message stop", protocol: "messages", body: "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n", state: "complete"},
 		{name: "chat stop cannot end messages", protocol: "messages", body: stop, state: "truncated", kind: "stream_interrupted"},
+		{name: "tool calls with last argument and trailing usage", body: text + tool + toolTail + usage, state: "complete", wantUsage: true},
+		{name: "minimax separate tool end without done", body: text + tool + strings.ReplaceAll(toolTail, `"finish_reason":"tool_calls"`, `"finish_reason":null`) + toolEnd + usage, state: "complete", wantUsage: true},
+		{name: "zhipu tool calls with done", body: tool + toolTail + usage + done, state: "complete", wantUsage: true},
+		{name: "tool calls read failure is not completion", body: tool + toolTail, readErr: io.ErrUnexpectedEOF, state: "truncated", kind: "stream_interrupted"},
+		{name: "tool calls timeout is not completion", body: tool + toolTail, readErr: context.DeadlineExceeded, state: "timeout", kind: "timeout"},
+		{name: "tool calls cannot hide upstream error", body: tool + toolTail + "data: {\"error\":{\"type\":\"rate_limit_error\"}}\n\n", state: "error", kind: "rate_limit"},
+		{name: "tool and text choices both finished", body: tool + second + toolTail + secondStop + usage, n: 2, state: "complete", wantUsage: true},
+		{name: "tool end cannot hide unfinished choice", body: tool + second + toolTail, n: 2, state: "truncated", kind: "stream_interrupted"},
+		{name: "tool payload alone is not completion", body: tool, state: "truncated", kind: "stream_interrupted"},
+		{name: "tool end cannot end messages", protocol: "messages", body: toolEnd, state: "truncated", kind: "stream_interrupted"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)

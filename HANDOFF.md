@@ -78,6 +78,10 @@ SQLite 升至版本 5，将旧连接的单协议端点与模型的原协议迁�
 
 ## 下一步起点
 
+2026-09-16 工具调用结束兼容：Chat 正常 EOF 的兜底判定新增 `finish_reason: "tool_calls"`，与 `stop` 并列；按协议通用处理，不依赖厂商或模型名称。结束事件仍完整转发，继续读取后续用量，多候选均需结束，读写错误／超时／流内错误仍优先；Messages 的 `message_stop`、思考默认设置与历史记录均不改。排查确认近期智谱工具调用在 `tool_calls` 后另发 `[DONE]`，MiniMax 两次仅发 `tool_calls` 和用量，之前因此误报中断。
+
+新增 10 个回归场景，26 个结束兼容场景及全部 45 项 Go 测试（含竞态检测）通过；本机二进制构建通过。确认无进行中调用后重启 8317，自动解锁、嵌入资源与现有构建一致，配置数量／授权及原 94 条历史记录保持不变。当前 MiniMax-M3 仍为 Chat 默认拆分、Messages 不补参。厂商差异元数据和重启验证在 `output/tool-calls-end-qa/`，未调用真实厂商；修复对后续请求生效，不重算历史状态。
+
 2026-09-16 Messages 默认设置调整：按用户要求，通过管理 API 移除当前 MiniMax-M3 的 `defaults.thinking`，Messages 改为“不补充参数”；Chat 的 `reasoning_split: true` 保留。新建模型及其他 MiniMax 模型原本就不补充 Messages 参数，无需改代码。已回读确认其他模型、连接、项目与请求数量不变，新请求立即生效，无需重启，未调用真实厂商。验证结果见 `output/messages-default-qa/configuration-verification.json`；此项更新覆盖下方先前为 M3 开启 Messages 思考的运行配置。
 
 2026-09-16 MiniMax 思考默认参数：模型编辑新增 Chat“思考拆分”和 Messages“思考模式”，支持开启／关闭／不补充。现有 `defaults_json` 存储 `reasoning_split` 布尔值和 `thinking: {"type":"adaptive"|"disabled"}`，转发只在 MiniMax 的对应协议补缺失字段；调用方显式值优先，包括 `false`、`null` 和整个 `thinking` 对象。其他厂商不自动补这两项，管理员测试与项目调用共用逻辑。请求输入仍记录补参前正文，响应和计时解析未改；当前尚未新增 `<think>` 或仅 `reasoning_details` 的解析，后续应结合实际拆分响应判断。
