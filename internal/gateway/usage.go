@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"math"
 	"strings"
 )
 
@@ -81,15 +82,47 @@ func (rec *Record) readUsage(data []byte) {
 				rec.outputFinal = true
 			}
 		}
-		// Messages separates ordinary input, cache reads and cache writes. An
-		// omitted cache field cannot be assumed to mean zero.
-		if rec.InputUncached != nil && rec.CacheRead != nil && rec.CacheWrite != nil {
-			n := *rec.InputUncached + *rec.CacheRead + *rec.CacheWrite
-			if n >= *rec.InputUncached && n >= *rec.CacheRead && n >= *rec.CacheWrite {
-				rec.InputTotal = &n
-				rec.InputTokens = n
-			}
+		rec.normalizeMessagesInput()
+	}
+}
+
+func (rec *Record) minimaxAutoCache() bool {
+	return rec.Provider == "minimax" && rec.Protocol == "messages" && strings.EqualFold(rec.UpstreamModel, "MiniMax-M3")
+}
+
+// M3 automatic caching counts new input at the ordinary input rate; it does
+// not require a separately reported cache creation bucket. Preserve the raw
+// missing/zero distinction instead of fabricating a cache write measurement.
+// https://platform.minimax.io/docs/api-reference/text-prompt-caching
+func (rec *Record) normalizeMessagesInput() {
+	rec.InputTotal, rec.InputTotalBasis = nil, ""
+	auto := rec.minimaxAutoCache() && (rec.CacheWrite == nil || *rec.CacheWrite == 0)
+	if auto {
+		rec.InputTotalBasis = "minimax_auto_cache"
+	}
+	if rec.InputUncached == nil || rec.CacheRead == nil || (!auto && rec.CacheWrite == nil) {
+		return
+	}
+	parts := []*int64{rec.InputUncached, rec.CacheRead}
+	if rec.CacheWrite != nil {
+		parts = append(parts, rec.CacheWrite)
+	}
+	var total int64
+	for _, part := range parts {
+		if *part < 0 || *part > math.MaxInt64-total {
+			return
 		}
+		total += *part
+	}
+	rec.InputTotal, rec.InputTokens = &total, total
+}
+
+// Recompute only derived input fields when reading existing monitored M3
+// records. Do not rewrite raw responses or infer final output from an old
+// summary: older versions did not persist the output-final flag.
+func (rec *Record) normalizeStoredUsage() {
+	if rec.MetricsVersion > 0 && rec.minimaxAutoCache() {
+		rec.normalizeMessagesInput()
 	}
 }
 

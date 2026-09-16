@@ -26,9 +26,11 @@ const record = {
 const missing = { ...record, id: 'monitor-missing', project_name: '用量未报告', input_total_tokens: null, input_uncached_tokens: null, cache_read_tokens: null, output_reported: false, output_tokens: 0, usage_status: 'unknown', output_tps: null, tpot_ms: null };
 const zero = { ...record, id: 'monitor-zero', project_name: '明确零用量', stream: false, first_token_ms: null, first_text_ms: null, input_total_tokens: 0, input_uncached_tokens: 0, cache_read_tokens: 0, input_tokens: 0, output_tokens: 0, output_tps: null, tpot_ms: null };
 const errored = { ...record, id: 'monitor-error', project_name: '流内错误', state: 'error', error_type: 'rate_limit', usage_status: 'partial', output_tps: null, tpot_ms: null };
+const minimax = { ...record, id: 'monitor-minimax', project_name: '自动缓存未单列写入', provider: 'minimax', upstream_model: 'MiniMax-M3', protocol: 'messages', alias: 'MiniMax-M3', input_tokens: 18838, input_total_tokens: 18838, input_uncached_tokens: 117, cache_read_tokens: 18721, cache_write_tokens: null, input_total_basis: 'minimax_auto_cache', output_tokens: 185, usage_status: 'partial', output_tps: null, tpot_ms: null };
+const minimaxZero = { ...minimax, id: 'monitor-minimax-zero', project_name: '自动缓存明确零写入', cache_write_tokens: 0, usage_status: 'complete' };
 
 test.beforeEach(async ({ page }) => {
-  const records = [record, missing, zero, errored];
+  const records = [record, missing, zero, errored, minimax, minimaxZero];
   await page.route('**/api/**', route => {
     const url = new URL(route.request().url()), path = url.pathname;
     const all = url.searchParams.get('window') === 'all', since = now - 14 * 24 * 3600000;
@@ -145,4 +147,25 @@ test('用量未知与零、非流式、HTTP 200 流内错误有明确区别', as
   await page.locator('.request-item').filter({ hasText: '流内错误' }).click();
   await expect(page.locator('.detail-head .result-label')).toHaveText('失败');
   await expect(page.locator('.request-outcome-note')).toContainText('上游限流 · 429 · HTTP 200');
+});
+
+test('MiniMax 自动缓存显示总输入、命中率并区分未单列与零', async ({ page }, info) => {
+  await page.getByRole('button', { name: '查看请求 monitor-minimax', exact: true }).click();
+  await expect(page.locator('.detail-head')).toContainText('18,838 / 185');
+  await page.getByRole('button', { name: '性能与用量', exact: true }).click();
+  const usage = page.locator('.detail-usage');
+  await expect(usage.locator('dd')).toHaveText(['18,838', '117', '18,721', '未单列（自动缓存）', '185', '19,023']);
+  await expect(page.locator('.cache-ratio')).toContainText('99.4%');
+  await expect(usage).toContainText('输入总量＝普通输入＋缓存读取');
+  await expect(page.locator('.usage-state')).toHaveText('输入与输出已报告 · 最终用量未确认');
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath(`minimax-usage-${width}.png`), fullPage: width === 390 });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator('.request-item').filter({ hasText: '自动缓存明确零写入' }).click();
+  await page.getByRole('button', { name: '性能与用量', exact: true }).click();
+  await expect(usage.locator('dd').nth(3)).toHaveText('0');
+  await expect(page.locator('.usage-state')).toHaveText('输入与最终输出已报告');
 });

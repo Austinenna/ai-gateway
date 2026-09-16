@@ -15,27 +15,28 @@ import (
 // Metrics are persisted separately from the bounded, asynchronous body log.
 // Missing usage is represented by nil, never silently converted to zero.
 type MetricsFields struct {
-	MetricsVersion int      `json:"metrics_version,omitempty"`
-	ConnectionID   string   `json:"connection_id,omitempty"`
-	ConnectionName string   `json:"connection_name,omitempty"`
-	Provider       string   `json:"provider,omitempty"`
-	Stream         *bool    `json:"stream"`
-	Forwarded      bool     `json:"forwarded"`
-	ForwardOffset  int64    `json:"forward_offset_ms"`
-	LastToken      *int64   `json:"last_token_ms"`
-	ContentChunks  int      `json:"content_chunks"`
-	ErrorType      string   `json:"error_type,omitempty"`
-	UpstreamStatus int      `json:"upstream_status,omitempty"`
-	InputTotal     *int64   `json:"input_total_tokens"`
-	InputUncached  *int64   `json:"input_uncached_tokens"`
-	CacheRead      *int64   `json:"cache_read_tokens"`
-	CacheWrite     *int64   `json:"cache_write_tokens"`
-	OutputReported bool     `json:"output_reported"`
-	UsageStatus    string   `json:"usage_status"`
-	OutputTPS      *float64 `json:"output_tps"`
-	TPOT           *float64 `json:"tpot_ms"`
-	RecordMissing  bool     `json:"record_missing,omitempty"`
-	outputFinal    bool
+	MetricsVersion  int      `json:"metrics_version,omitempty"`
+	ConnectionID    string   `json:"connection_id,omitempty"`
+	ConnectionName  string   `json:"connection_name,omitempty"`
+	Provider        string   `json:"provider,omitempty"`
+	Stream          *bool    `json:"stream"`
+	Forwarded       bool     `json:"forwarded"`
+	ForwardOffset   int64    `json:"forward_offset_ms"`
+	LastToken       *int64   `json:"last_token_ms"`
+	ContentChunks   int      `json:"content_chunks"`
+	ErrorType       string   `json:"error_type,omitempty"`
+	UpstreamStatus  int      `json:"upstream_status,omitempty"`
+	InputTotal      *int64   `json:"input_total_tokens"`
+	InputTotalBasis string   `json:"input_total_basis,omitempty"`
+	InputUncached   *int64   `json:"input_uncached_tokens"`
+	CacheRead       *int64   `json:"cache_read_tokens"`
+	CacheWrite      *int64   `json:"cache_write_tokens"`
+	OutputReported  bool     `json:"output_reported"`
+	UsageStatus     string   `json:"usage_status"`
+	OutputTPS       *float64 `json:"output_tps"`
+	TPOT            *float64 `json:"tpot_ms"`
+	RecordMissing   bool     `json:"record_missing,omitempty"`
+	outputFinal     bool
 }
 
 type callKey struct{}
@@ -394,6 +395,7 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 		buckets[i].Started = from + int64(float64(i)*width)
 	}
 	for _, rec := range records {
+		rec.normalizeStoredUsage()
 		options["projects"][rec.ProjectID] = rec.ProjectName
 		if rec.ConnectionID != "" {
 			options["connections"][rec.ConnectionID] = rec.ConnectionName

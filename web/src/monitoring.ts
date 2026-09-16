@@ -11,6 +11,7 @@ export type RequestRecord = {
   stream?: boolean | null; forwarded?: boolean; forward_offset_ms?: number;
   last_token_ms?: number | null; content_chunks?: number; error_type?: string; upstream_status?: number;
   input_total_tokens?: number | null; input_uncached_tokens?: number | null;
+  input_total_basis?: string;
   cache_read_tokens?: number | null; cache_write_tokens?: number | null;
   output_reported?: boolean; usage_status?: string; output_tps?: number | null; tpot_ms?: number | null;
   record_missing?: boolean;

@@ -362,6 +362,7 @@ func (g *Gateway) listRecords(w http.ResponseWriter, r *http.Request) {
 		}
 		rec.Input = ""
 		rec.Output = ""
+		rec.normalizeStoredUsage()
 		out = append(out, rec)
 	}
 	writeJSON(w, 200, out)
@@ -372,6 +373,7 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 	g.metricsMu.Unlock()
 	if running {
 		active.RecordMissing = true
+		active.normalizeStoredUsage()
 		writeJSON(w, 200, active)
 		return
 	}
@@ -387,11 +389,17 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rec.RecordMissing = true
+		rec.normalizeStoredUsage()
 		writeJSON(w, 200, rec)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(s))
+	var rec Record
+	if json.Unmarshal([]byte(s), &rec) != nil {
+		problem(w, 500, "读取记录失败")
+		return
+	}
+	rec.normalizeStoredUsage()
+	writeJSON(w, 200, rec)
 }
 func (g *Gateway) seedDemo(w http.ResponseWriter, r *http.Request) {
 	key := g.key()

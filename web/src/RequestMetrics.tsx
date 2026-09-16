@@ -32,6 +32,8 @@ export function RequestMetrics({ record: r }: { record: RequestRecord }) {
 export function RequestTiming({ record: r }: { record: RequestRecord }) {
   const modern = !!r.metrics_version, offset = modern ? r.forward_offset_ms || 0 : 0;
   const input = inputTotal(r), output = outputTotal(r);
+  const autoCache = r.input_total_basis === 'minimax_auto_cache';
+  const usageState = !modern ? '旧记录 · 原始上报值' : r.usage_status === 'complete' ? '输入与最终输出已报告' : r.usage_status === 'partial' ? input != null && output != null ? '输入与输出已报告 · 最终用量未确认' : '用量不完整 · 已保留收到的部分' : '厂商未报告用量';
   const ratio = input != null && input > 0 && r.cache_read_tokens != null && r.cache_read_tokens <= input ? 100 * r.cache_read_tokens / input : null;
   const milestones = [
     ...(modern ? [{ time: 0, name: '网关收到请求', text: dateTime(r.started) }] : []),
@@ -50,10 +52,10 @@ export function RequestTiming({ record: r }: { record: RequestRecord }) {
     {r.stream === false && <p className="metric-explanation">非流式响应一次性返回，无法测量 TTFT、TTFC 和输出阶段速度。</p>}
     {!modern && <p className="metric-explanation">旧记录按原口径展示；非流式首字可能是完整响应到达时间，缓存、准确输入总量和输出速度未采集。</p>}
     </section>
-    <section className="detail-usage"><h3>Token 用量</h3><div className="usage-state">{!modern ? '旧记录 · 原始上报值' : r.usage_status === 'complete' ? '输入与最终输出已报告' : r.usage_status === 'partial' ? '用量不完整 · 已保留收到的部分' : '厂商未报告用量'}</div>
-      <dl className="usage-breakdown"><div><dt>输入总量</dt><dd>{number(input)}</dd></div><div><dt>普通输入</dt><dd>{number(r.input_uncached_tokens)}</dd></div><div><dt>缓存读取（命中）</dt><dd>{number(r.cache_read_tokens)}</dd></div><div><dt>缓存写入</dt><dd>{number(r.cache_write_tokens)}</dd></div><div><dt>输出总量</dt><dd>{number(output)}</dd></div><div><dt>输入＋输出合计</dt><dd>{number(input != null && output != null ? input + output : null)}</dd></div></dl>
+    <section className="detail-usage"><h3>Token 用量</h3><div className="usage-state">{usageState}</div>
+      <dl className="usage-breakdown"><div><dt>输入总量</dt><dd>{number(input)}</dd></div><div><dt>普通输入</dt><dd>{number(r.input_uncached_tokens)}</dd></div><div><dt>缓存读取（命中）</dt><dd>{number(r.cache_read_tokens)}</dd></div><div><dt>缓存写入</dt><dd>{autoCache && r.cache_write_tokens == null ? <small>未单列（自动缓存）</small> : number(r.cache_write_tokens)}</dd></div><div><dt>输出总量</dt><dd>{number(output)}</dd></div><div><dt>输入＋输出合计</dt><dd>{number(input != null && output != null ? input + output : null)}</dd></div></dl>
       <div className="cache-ratio"><span>缓存命中占输入总量</span><b>{percent(ratio)}</b><div><i style={{ width: `${ratio || 0}%` }}/></div></div>
-      <p className="metric-explanation">{r.protocol === 'messages' ? '输入总量＝普通输入＋缓存读取＋缓存写入。' : '缓存读取是输入总量的一部分，不重复相加。'} 未报告显示“—”，明确上报零才显示 0。输出采用厂商口径，可能包含思考及工具调用。</p>
+      <p className="metric-explanation">{autoCache ? 'MiniMax M3 自动缓存：输入总量＝普通输入＋缓存读取。缓存写入未单列时不影响总量；上报 0 不代表后台没有建立缓存。' : r.protocol === 'messages' ? '输入总量＝普通输入＋缓存读取＋缓存写入。' : '缓存读取是输入总量的一部分，不重复相加。'} 未报告的数量不当作零。输出采用厂商口径，可能包含思考及工具调用。</p>
     </section>
     <section className="detail-speed"><h3>输出阶段</h3><dl className="usage-breakdown"><div><dt>估算速度</dt><dd>{number(r.output_tps, 1)} <small>Token/s</small></dd></div><div><dt>估算 TPOT</dt><dd>{number(r.tpot_ms, 2)} <small>ms/Token</small></dd></div></dl><p className="metric-explanation">按首段到末段有效内容的时间与厂商输出用量估算。仅流式完整结束、用量完整且样本足够时计算；分片可能包含多个 Token，因此不是模型内部逐 Token 测量。</p></section>
     <section className="detail-outcome"><h3>请求结果</h3><dl className="usage-breakdown"><div><dt>最终结果</dt><dd>{recordStatus(r)}</dd></div><div><dt>客户端 HTTP / 上游 HTTP</dt><dd>{r.status || '—'} / {r.upstream_status || '—'}</dd></div></dl>{r.error_type && <p className="metric-explanation">{errorName(r.error_type)}。流式请求可能在 HTTP 200 后发生错误，最终结果以传输是否完整结束为准。</p>}</section>
