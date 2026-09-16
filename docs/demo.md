@@ -5,7 +5,7 @@
 这是可以在本机运行的 Go＋React／TypeScript＋Vite＋SQLite 应用。前端构建后嵌入 Go 可执行文件，运行时不需要 Node 服务。
 
 1. 首次打开设置管理密码。当前本机启用自动解锁：已有密钥库仅首次切换需要原密码，之后每次启动即可调用；管理页可留空登录。
-2. 在“厂商连接”新增智谱或 MiniMax 连接，填写 API 基础端点与厂商 Token。可以编辑、停用或重新验证密码查看 Token。
+2. 在“厂商连接”选择智谱、MiniMax 或自定义连接，选择 Chat Completions／Anthropic Messages 协议并填写 API 基础端点与厂商 Token。可以编辑、停用或重新验证密码查看 Token。
 3. 在“模型配置”设置显示名称、调用别名、厂商模型 ID、关联连接和默认参数。
 4. 在“项目权限”创建项目，勾选可调用模型，取得单独的项目凭证。在项目列表的“接入信息”中复制网关端点、完整 Token 或整份接入配置。
 5. 程序用网关端点、项目凭证和模型别名调用。可以在页面的“试调用”里直接验证。
@@ -106,11 +106,16 @@ bash scripts/start.sh
 | 厂商／协议 | 基础端点示例 | 网关添加 |
 | --- | --- | --- |
 | 智谱 Chat Completions | `https://open.bigmodel.cn/api/paas/v4` | `/chat/completions` |
+| 智谱 Anthropic Messages | `https://open.bigmodel.cn/api/anthropic/v1` | `/messages` |
 | MiniMax Chat Completions（中国站） | `https://api.minimax.cn/v1` | `/chat/completions` |
 | MiniMax Messages（中国站） | `https://api.minimax.cn/anthropic/v1` | `/messages` |
 | MiniMax 国际站 | 使用账号对应的 `api.minimax.io` 端点 | 同协议路径 |
+| 自定义 Chat Completions | 例如 `https://example.com/v1`，按服务文档填写 | `/chat/completions` |
+| 自定义 Anthropic Messages | 例如 `https://example.com/anthropic/v1`，按服务文档填写 | `/messages` |
 
-套餐、地域与账号权限可能不同；编码套餐端点不能直接假设等同于通用端点。模型 ID 手动填写自己账号实际开通的值。MiniMax 接口模板与协议参考 [中国站 Messages 文档](https://platform.minimax.cn/docs/api-reference/text-anthropic-api)、[中国站 Chat Completions 文档](https://platform.minimax.cn/docs/api-reference/text-openai-api)，智谱参考 [API 快速开始](https://docs.bigmodel.cn/cn/api/introduction)。本次没有使用用户真实 Token 进行厂商联调。
+套餐、地域与账号权限可能不同；编码套餐端点不能直接假设等同于通用端点。模型 ID 手动填写自己账号实际开通的值。MiniMax 接口模板与协议参考 [中国站 Messages 文档](https://platform.minimax.cn/docs/api-reference/text-anthropic-api)、[中国站 Chat Completions 文档](https://platform.minimax.cn/docs/api-reference/text-openai-api)，智谱参考 [API 快速开始](https://docs.bigmodel.cn/cn/api/introduction) 与 [Claude API 兼容说明](https://docs.bigmodel.cn/cn/guide/develop/claude/introduction)。本次没有使用用户真实 Token 进行厂商联调。
+
+自定义连接需要提供兼容所选协议与当前鉴权方式的服务：Chat 使用 Bearer Token；Messages 还发送 `x-api-key`、`anthropic-version` 并允许透传 `anthropic-beta`。远程地址使用 HTTPS，本机可用回环 HTTP。切换协议只会更新未修改的模板地址，手填端点保持不变；保存连接不会调用上游。客户端入口必须匹配连接协议，不自动转换 Chat／Messages。
 
 模型的调用别名是程序使用的 `model` 值。显示名称可以自由改；修改调用别名后需修改程序配置。保留别名、更换关联的真实模型时，已授权项目后续会使用新模型。
 

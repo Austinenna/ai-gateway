@@ -1,7 +1,7 @@
 import { Activity, Eye, KeyRound, Pencil, Trash2 } from 'lucide-react';
 
 type ConnectionInfo = { id: string; name: string; provider: string; protocol: string; base_url: string; enabled: boolean; has_token?: boolean };
-const providerName = (provider: string) => ({ zhipu: '智谱', minimax: 'MiniMax', demo: '本地演示' }[provider] || provider);
+const providerName = (provider: string) => ({ zhipu: '智谱', minimax: 'MiniMax', custom: '自定义', demo: '本地演示' }[provider] || provider);
 
 export function ConnectionList<T extends ConnectionInfo>({ connections, onEdit, onTest, onReveal, onDelete }: {
   connections: T[];

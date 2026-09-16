@@ -18,13 +18,10 @@ func validEndpoint(c Connection) bool {
 	if c.Provider == "demo" {
 		return c.BaseURL == "demo://local" && c.Protocol == "chat"
 	}
-	if c.Provider != "zhipu" && c.Provider != "minimax" {
+	if c.Provider != "zhipu" && c.Provider != "minimax" && c.Provider != "custom" {
 		return false
 	}
 	if c.Protocol != "chat" && c.Protocol != "messages" {
-		return false
-	}
-	if c.Provider == "zhipu" && c.Protocol != "chat" {
 		return false
 	}
 	u, e := url.Parse(c.BaseURL)
