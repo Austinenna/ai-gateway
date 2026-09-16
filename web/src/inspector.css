@@ -133,3 +133,12 @@
   .requests-main .request-rail { border-right: 0; border-bottom: 1px solid var(--line); }
   .requests-main .request-items { max-height: 230px; }
 }
+
+/* Keep all three filters together without taking another full row per field. */
+.rail-head .request-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; }
+.request-project-filter { grid-column: 1 / -1; min-width: 0; }
+.rail-head .filter-tabs { gap: 4px; }
+.filter-tabs .request-reset { margin-left: auto; color: var(--accent); padding-inline: 4px; }
+@media (max-width: 760px) {
+  .rail-head .search, .rail-head .request-filters { grid-column: 1 / -1; }
+}
