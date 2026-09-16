@@ -58,6 +58,8 @@ type Record struct {
 	Started       int64  `json:"started"`
 	Duration      int64  `json:"duration_ms"`
 	FirstText     *int64 `json:"first_text_ms"`
+	FirstToken    *int64 `json:"first_token_ms"`
+	TimingVersion int    `json:"timing_version,omitempty"`
 	Status        int    `json:"status"`
 	State         string `json:"state"`
 	Input         string `json:"input,omitempty"`

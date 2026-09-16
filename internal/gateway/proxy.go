@@ -193,6 +193,7 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	original, _ := json.Marshal(body)
 	rec := Record{ID: id("req_"), ProjectID: p.ID, ProjectName: p.Name, ModelID: m.ID, Alias: m.Alias, UpstreamModel: m.UpstreamModel, Protocol: c.Protocol, Started: time.Now().UnixMilli(), State: "error", Status: 502, Input: redact(string(original), string(secret), projectCredential(r))}
 	start := time.Now()
+	rec.TimingVersion = 1
 	var captured capture
 	defer func() {
 		rec.Duration = time.Since(start).Milliseconds()
@@ -282,7 +283,11 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 			}
 			s := redact(event.String(), string(secret), projectCredential(r))
 			event.Reset()
-			text, ended, in, out := eventStats(s, c.Protocol)
+			text, token, ended, in, out := eventStats(s, c.Protocol)
+			if token && rec.FirstToken == nil {
+				v := time.Since(start).Milliseconds()
+				rec.FirstToken = &v
+			}
 			if text && rec.FirstText == nil {
 				v := time.Since(start).Milliseconds()
 				rec.FirstText = &v
@@ -344,7 +349,11 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	captured.add(data)
 	if rec.Status >= 200 && rec.Status < 300 {
 		rec.State = "complete"
-		text, _, in, out := jsonStats(data, c.Protocol)
+		text, token, _, in, out := jsonStats(data, c.Protocol)
+		if token {
+			v := time.Since(start).Milliseconds()
+			rec.FirstToken = &v
+		}
 		if text {
 			v := time.Since(start).Milliseconds()
 			rec.FirstText = &v
@@ -358,7 +367,7 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	_, _ = w.Write(data)
 	_ = http.NewResponseController(w).Flush()
 }
-func eventStats(s, protocol string) (bool, bool, int64, int64) {
+func eventStats(s, protocol string) (bool, bool, bool, int64, int64) {
 	var values []string
 	for _, line := range strings.Split(s, "\n") {
 		if strings.HasPrefix(line, "data:") {
@@ -367,29 +376,45 @@ func eventStats(s, protocol string) (bool, bool, int64, int64) {
 	}
 	data := strings.Join(values, "\n")
 	if data == "[DONE]" {
-		return false, true, 0, 0
+		return false, false, true, 0, 0
 	}
 	return jsonStats([]byte(data), protocol)
 }
-func jsonStats(b []byte, protocol string) (bool, bool, int64, int64) {
+
+// First token means the first non-empty generated content, including reasoning
+// and tool output. Role-only, usage, heartbeat and end events do not qualify.
+func jsonStats(b []byte, protocol string) (bool, bool, bool, int64, int64) {
+	type toolFunction struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	}
+	type chatContent struct {
+		Content          string `json:"content"`
+		ReasoningContent string `json:"reasoning_content"`
+		Reasoning        string `json:"reasoning"`
+		ToolCalls        []struct {
+			Function toolFunction `json:"function"`
+		} `json:"tool_calls"`
+		FunctionCall toolFunction `json:"function_call"`
+	}
+	type contentBlock struct {
+		Text     string `json:"text"`
+		Thinking string `json:"thinking"`
+		Type     string `json:"type"`
+		Name     string `json:"name"`
+	}
 	var v struct {
 		Type  string `json:"type"`
 		Delta struct {
-			Text string `json:"text"`
+			Text        string `json:"text"`
+			Thinking    string `json:"thinking"`
+			PartialJSON string `json:"partial_json"`
 		} `json:"delta"`
-		ContentBlock struct {
-			Text string `json:"text"`
-		} `json:"content_block"`
-		Content []struct {
-			Text string `json:"text"`
-		} `json:"content"`
-		Choices []struct {
-			Delta struct {
-				Content string `json:"content"`
-			} `json:"delta"`
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
+		ContentBlock contentBlock   `json:"content_block"`
+		Content      []contentBlock `json:"content"`
+		Choices      []struct {
+			Delta   chatContent `json:"delta"`
+			Message chatContent `json:"message"`
 		} `json:"choices"`
 		Usage struct {
 			Input      int64 `json:"input_tokens"`
@@ -405,14 +430,25 @@ func jsonStats(b []byte, protocol string) (bool, bool, int64, int64) {
 		} `json:"message"`
 	}
 	if json.Unmarshal(b, &v) != nil {
-		return false, false, 0, 0
+		return false, false, false, 0, 0
 	}
 	text := v.Delta.Text != "" || v.ContentBlock.Text != ""
+	blockToken := func(c contentBlock) bool {
+		return c.Text != "" || c.Thinking != "" || (c.Type == "tool_use" && c.Name != "")
+	}
+	token := text || v.Delta.Thinking != "" || v.Delta.PartialJSON != "" || blockToken(v.ContentBlock)
 	for _, c := range v.Content {
 		text = text || c.Text != ""
+		token = token || blockToken(c)
 	}
 	for _, c := range v.Choices {
 		text = text || c.Delta.Content != "" || c.Message.Content != ""
+		for _, part := range []chatContent{c.Delta, c.Message} {
+			token = token || part.Content != "" || part.ReasoningContent != "" || part.Reasoning != "" || part.FunctionCall.Name != "" || part.FunctionCall.Arguments != ""
+			for _, call := range part.ToolCalls {
+				token = token || call.Function.Name != "" || call.Function.Arguments != ""
+			}
+		}
 	}
 	in, out := v.Usage.Input, v.Usage.Output
 	if protocol == "chat" {
@@ -421,7 +457,7 @@ func jsonStats(b []byte, protocol string) (bool, bool, int64, int64) {
 	if v.Type == "message_start" {
 		in, out = v.Message.Usage.Input, v.Message.Usage.Output
 	}
-	return text, v.Type == "message_stop", in, out
+	return text, token, v.Type == "message_stop", in, out
 }
 func (g *Gateway) demoResponse(w http.ResponseWriter, r *http.Request, m Model, body map[string]json.RawMessage, stream bool, rec *Record, captured *capture, start time.Time) {
 	reply := "这是一条本地模拟响应。项目凭证已验证，模型授权已通过。这次调用不会访问外部厂商，也不会消耗真实额度。你可以在请求记录中查看输入、响应与耗时。"
@@ -433,6 +469,7 @@ func (g *Gateway) demoResponse(w http.ResponseWriter, r *http.Request, m Model, 
 		writeJSON(w, 200, json.RawMessage(b))
 		v := time.Since(start).Milliseconds()
 		rec.FirstText = &v
+		rec.FirstToken = &v
 		rec.State = "complete"
 		_ = http.NewResponseController(w).Flush()
 		return
@@ -458,6 +495,7 @@ func (g *Gateway) demoResponse(w http.ResponseWriter, r *http.Request, m Model, 
 		if rec.FirstText == nil {
 			v := time.Since(start).Milliseconds()
 			rec.FirstText = &v
+			rec.FirstToken = &v
 		}
 		if _, e := io.WriteString(w, s); e != nil {
 			rec.State = "canceled"

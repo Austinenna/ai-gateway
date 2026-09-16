@@ -406,7 +406,7 @@ func TestSSECompletionAndUsage(t *testing.T) {
 	if rec.State != "complete" || rec.InputTokens != 7 || rec.OutputTokens != 5 || rec.FirstText == nil {
 		t.Fatal("bad SSE metrics", rec)
 	}
-	text, _, _, _ := eventStats("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"hidden\"}}]}\n\n", "chat")
+	text, _, _, _, _ := eventStats("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"hidden\"}}]}\n\n", "chat")
 	if text {
 		t.Fatal("reasoning counted as visible first text")
 	}
