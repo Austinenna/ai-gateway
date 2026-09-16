@@ -1,0 +1,43 @@
+/* One compact heading and primary action across the management workspace. */
+.page-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex: none;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.page-head-inner {
+  width: 100%;
+  max-width: 1450px;
+  min-height: 64px;
+  margin: 0 auto;
+  padding: 12px 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.page-head h1 { font-size: 20px; line-height: 1.4; letter-spacing: -.4px; }
+.page-head button { flex: none; font-size: 13px; }
+.request-page-head .page-head-inner { max-width: none; padding-inline: 24px; }
+.gateway-status { display: grid; gap: 8px; min-width: 0; }
+.gateway-address { color: var(--muted); font-size: 10px; line-height: 1.6; user-select: all; }
+.form-intro { color: var(--muted); font-size: 12px; line-height: 1.8; margin-bottom: 20px; }
+
+@media (max-width: 1100px) {
+  .page-head-inner { padding-inline: 23px; }
+  .request-page-head .page-head-inner { padding-inline: 24px; }
+}
+@media (min-width: 761px) and (max-height: 600px) {
+  .page-head-inner { min-height: 56px; padding-block: 8px; }
+  .request-page-head .page-head-inner { padding-inline: 18px; }
+}
+@media (max-width: 760px) {
+  .page-head-inner, .request-page-head .page-head-inner { min-height: 60px; padding: 10px 20px; }
+  .page-head h1 { font-size: 18px; }
+  .page-head button { font-size: 12px; }
+}
+@media (max-width: 550px) {
+  .page-head-inner, .request-page-head .page-head-inner { padding-inline: 14px; }
+}

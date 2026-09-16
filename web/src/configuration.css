@@ -1,8 +1,3 @@
-.models-main .eyebrow{display:none}
-.models-main .page-head{margin-bottom:24px}
-.models-main .page-head h1{font-size:1.65rem;letter-spacing:-.04em}
-.models-main .page-head p{font-size:.875rem;margin-top:8px}
-.models-main .page-head>button{font-size:.875rem;padding:10px 15px}
 .models-panel{overflow:hidden;container-type:inline-size;border-radius:12px}
 .models-table{table-layout:fixed;width:100%;font-size:.875rem}
 .models-table .col-model{width:24%}.models-table .col-upstream{width:24%}.models-table .col-connection{width:17%}.models-table .col-status{width:12%}.models-table .col-actions{width:23%}
@@ -98,7 +93,6 @@
  .connection-delete-footer{padding:14px 0 18px;gap:8px}
  .connection-delete-footer button{padding:10px 12px}
  .connection-delete-footer .danger-solid{flex:1}
- .models-main .page-head h1{font-size:1.5rem}
 }
 @container (max-width:24.375rem){
  .models-table tr{padding:17px;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'identity status' 'upstream upstream' 'connection connection' 'operations operations';gap:14px 10px}
@@ -142,11 +136,6 @@
 @container (max-width:25rem){.access-copy-row{flex-wrap:wrap;gap:9px;padding:12px}.access-copy-row>code{flex-basis:100%}.access-copy-row>button{margin-left:auto}.access-field-heading{gap:7px}.access-reset{gap:8px}}
 @media(max-width:550px){.project-access-content{padding:20px}.project-access-modal .modal-head h2{font-size:1rem}.access-legacy input,.access-field>select{font-size:16px}.project-list{min-width:0}.project-title>div{min-width:0}.project-title h2{overflow-wrap:anywhere}}
 
-.projects-main .eyebrow{display:none}
-.projects-main .page-head{margin-bottom:24px}
-.projects-main .page-head h1{font-size:1.65rem;letter-spacing:-.04em}
-.projects-main .page-head p{font-size:.875rem;margin-top:8px}
-.projects-main .page-head>button{font-size:.875rem;padding:10px 15px}
 .projects-panel{container-type:inline-size;overflow:hidden;border-radius:12px}
 .projects-table{table-layout:fixed;width:100%;font-size:.875rem}
 .projects-table .project-name-col{width:27%}
@@ -200,4 +189,3 @@
  .project-row-actions>button:not(.project-access-action){border-color:var(--line)}
  .project-identity strong{font-size:.875rem}
 }
-@media(max-width:600px){.projects-main .page-head h1{font-size:1.5rem}}
