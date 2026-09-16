@@ -48,6 +48,7 @@ type Project struct {
 	ModelIDs      []string `json:"model_ids"`
 }
 type Record struct {
+	MetricsFields
 	ID            string `json:"id"`
 	ProjectID     string `json:"project_id"`
 	ProjectName   string `json:"project_name"`
@@ -70,6 +71,10 @@ type Record struct {
 }
 type session struct{ Expires time.Time }
 type Gateway struct {
+	metricsMu         sync.Mutex
+	inflight          map[string]Record
+	metricsErrors     atomic.Int64
+	monitoringSince   int64
 	active            sync.WaitGroup
 	db                *sql.DB
 	mu                sync.RWMutex
@@ -162,7 +167,7 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	if e = db.QueryRow("PRAGMA user_version").Scan(&v); e != nil {
 		return fail(e)
 	}
-	if v > 3 {
+	if v > 4 {
 		return fail(errors.New("database was created by a newer gateway"))
 	}
 	_, e = db.Exec(`
@@ -195,6 +200,9 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 		return fail(e)
 	}
 	g := &Gateway{db: db, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient()}
+	if e = g.initMetrics(); e != nil {
+		return fail(e)
+	}
 	go func() {
 		defer close(g.writerDone)
 		for rec := range g.records {

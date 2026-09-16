@@ -322,7 +322,17 @@ func (g *Gateway) listRecords(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 	var s string
 	if g.db.QueryRow("SELECT record FROM requests WHERE id=?", r.PathValue("id")).Scan(&s) != nil {
-		problem(w, 404, "记录不存在")
+		if g.db.QueryRow("SELECT summary FROM request_metrics WHERE id=?", r.PathValue("id")).Scan(&s) != nil {
+			problem(w, 404, "记录不存在")
+			return
+		}
+		var rec Record
+		if json.Unmarshal([]byte(s), &rec) != nil {
+			problem(w, 500, "读取记录失败")
+			return
+		}
+		rec.RecordMissing = true
+		writeJSON(w, 200, rec)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

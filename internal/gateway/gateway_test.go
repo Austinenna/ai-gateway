@@ -169,7 +169,7 @@ func TestProjectAuthorizationAndCredentialSeparation(t *testing.T) {
 	if upstreamBody["model"] != "upstream-test-model" || upstreamBody["temperature"] != float64(0) || upstreamBody["project_id"] != nil || upstreamBody["connection_id"] != nil || upstreamBody["tools"] == nil {
 		t.Fatal("routing, defaults, or tool passthrough failed")
 	}
-	logs := h.records(1)
+	logs := h.records(2) // The preceding authorization rejection is now recorded too.
 	if logs[0].ProjectID != pa.Project.ID || logs[0].InputTokens != 3 {
 		t.Fatal("log ownership or usage incorrect")
 	}
@@ -463,7 +463,7 @@ func TestMigrateV1RequestSummary(t *testing.T) {
 	}
 	var version int
 	_ = g.db.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 3 {
+	if version != 4 {
 		t.Fatal("migration version not updated")
 	}
 }

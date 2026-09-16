@@ -88,11 +88,14 @@ func (g *Gateway) route(alias, projectID string, admin bool) (Model, Connection,
 	return m, c, encrypted, e
 }
 func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
+	t := traceOf(r)
 	p, ok := g.project(r)
 	if !ok {
 		problem(w, 401, "项目凭证无效或项目已停用")
 		return
 	}
+	t.rec.ProjectID, t.rec.ProjectName = p.ID, p.Name
+	g.snapshotCall(t)
 	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, 2*1024*1024))
 	if e != nil {
 		problem(w, 413, "请求超过 2 MB 上限")
@@ -108,6 +111,12 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "缺少模型别名")
 		return
 	}
+	var stream bool
+	if v, exists := body["stream"]; exists && (string(v) == "null" || json.Unmarshal(v, &stream) != nil) {
+		problem(w, 400, "stream 必须为布尔值")
+		return
+	}
+	t.rec.Stream = &stream
 	m, c, enc, e := g.route(alias, p.ID, false)
 	if e != nil {
 		problem(w, 403, "此项目未获模型授权，或模型／连接已停用")
@@ -124,6 +133,9 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	g.forward(w, r, p, m, c, enc, body)
 }
 func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
+	t := traceOf(r)
+	t.rec.ProjectID, t.rec.ProjectName = "admin-test", "管理员测试"
+	g.snapshotCall(t)
 	var in struct {
 		Message string `json:"message"`
 	}
@@ -174,6 +186,11 @@ func redact(s string, secrets ...string) string {
 	return s
 }
 func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m Model, c Connection, encrypted []byte, body map[string]json.RawMessage) {
+	t := traceOf(r)
+	rec := &t.rec
+	rec.ProjectID, rec.ProjectName, rec.ModelID, rec.Alias, rec.UpstreamModel, rec.Protocol = p.ID, p.Name, m.ID, m.Alias, m.UpstreamModel, c.Protocol
+	rec.ConnectionID, rec.ConnectionName, rec.Provider = c.ID, c.Name, c.Provider
+	g.snapshotCall(t)
 	key := g.key()
 	defer wipe(key)
 	if len(key) == 0 {
@@ -191,19 +208,17 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 		delete(body, k)
 	}
 	original, _ := json.Marshal(body)
-	rec := Record{ID: id("req_"), ProjectID: p.ID, ProjectName: p.Name, ModelID: m.ID, Alias: m.Alias, UpstreamModel: m.UpstreamModel, Protocol: c.Protocol, Started: time.Now().UnixMilli(), State: "error", Status: 502, Input: redact(string(original), string(secret), projectCredential(r))}
+	rec.Input = redact(string(original), string(secret), projectCredential(r))
 	start := time.Now()
-	rec.TimingVersion = 1
+	rec.ForwardOffset = time.Since(t.start).Milliseconds()
 	var captured capture
 	defer func() {
-		rec.Duration = time.Since(start).Milliseconds()
 		rec.Truncated = captured.truncated
 		rec.Output = redact(string(captured.data), string(secret), projectCredential(r))
 		if len(rec.Input) > maxLog {
 			rec.Input = rec.Input[:maxLog]
 			rec.Truncated = true
 		}
-		g.enqueue(rec)
 	}()
 	for k, v := range m.Defaults {
 		if _, ok := body[k]; !ok {
@@ -217,13 +232,16 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 		problem(w, 400, "stream 必须为布尔值")
 		return
 	}
+	rec.Stream = &stream
 	if c.Protocol == "messages" {
 		if _, ok := body["max_tokens"]; !ok {
 			body["max_tokens"] = json.RawMessage("1024")
 		}
 	}
 	if c.Provider == "demo" {
-		g.demoResponse(w, r, m, body, stream, &rec, &captured, start)
+		rec.Forwarded = true
+		g.snapshotCall(t)
+		g.demoResponse(w, r, m, body, stream, rec, &captured, start)
 		return
 	}
 	payload, _ := json.Marshal(body)
@@ -247,25 +265,41 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 			req.Header.Set("anthropic-beta", beta)
 		}
 	}
+	rec.Forwarded = true
+	g.snapshotCall(t)
 	res, e := g.client.Do(req)
 	if e != nil {
-		if ctx.Err() != nil {
-			rec.State = "canceled"
-			rec.Status = 499
+		classifyTransport(rec, r.Context(), ctx, e)
+		status := 502
+		if rec.State == "timeout" {
+			status = 504
 		}
-		problem(w, 502, "上游连接失败、超时或请求已取消")
+		if rec.State == "canceled" {
+			status = 499
+		}
+		problem(w, status, "上游连接失败、超时或请求已取消")
 		return
 	}
 	defer res.Body.Close()
 	rec.Status = res.StatusCode
+	rec.UpstreamStatus = res.StatusCode
+	if res.StatusCode >= 400 {
+		rec.State = "error"
+		rec.ErrorType = "upstream_error"
+		if res.StatusCode == 429 {
+			rec.ErrorType = "rate_limit"
+		}
+	}
 	if res.StatusCode >= 300 && res.StatusCode < 400 {
 		rec.Status = 502
+		rec.ErrorType = "upstream_protocol"
 		problem(w, 502, "上游返回重定向，网关已拒绝转发凭据")
 		return
 	}
 	if stream && res.StatusCode >= 200 && res.StatusCode < 300 {
 		if !strings.HasPrefix(res.Header.Get("Content-Type"), "text/event-stream") {
 			rec.Status = 502
+			rec.ErrorType = "upstream_protocol"
 			problem(w, 502, "上游未返回预期的 SSE 事件流")
 			return
 		}
@@ -283,7 +317,12 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 			}
 			s := redact(event.String(), string(secret), projectCredential(r))
 			event.Reset()
-			text, token, ended, in, out := eventStats(s, c.Protocol)
+			text, token, ended, _, _ := eventStats(s, c.Protocol)
+			payload := eventData(s)
+			if kind := responseError(payload); kind != "" {
+				rec.ErrorType = kind
+			}
+			rec.readUsage(payload)
 			if token && rec.FirstToken == nil {
 				v := time.Since(start).Milliseconds()
 				rec.FirstToken = &v
@@ -292,11 +331,10 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 				v := time.Since(start).Milliseconds()
 				rec.FirstText = &v
 			}
-			if in > 0 {
-				rec.InputTokens = in
-			}
-			if out > 0 {
-				rec.OutputTokens = out
+			if token {
+				v := time.Since(start).Milliseconds()
+				rec.LastToken = &v
+				rec.ContentChunks++
 			}
 			done = done || ended
 			captured.add([]byte(s))
@@ -314,11 +352,13 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 			event.WriteByte('\n')
 			if event.Len() > maxLog {
 				rec.State = "truncated"
+				rec.ErrorType = "upstream_protocol"
 				return
 			}
 			if line == "" {
 				if !send() {
 					rec.State = "canceled"
+					rec.ErrorType = "client_canceled"
 					return
 				}
 			}
@@ -327,13 +367,17 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 			event.WriteByte('\n')
 			if !send() {
 				rec.State = "canceled"
+				rec.ErrorType = "client_canceled"
 				return
 			}
 		}
-		if ctx.Err() != nil {
-			rec.State = "canceled"
+		if ctx.Err() != nil || isTimeout(scanner.Err()) {
+			classifyTransport(rec, r.Context(), ctx, scanner.Err())
+		} else if rec.ErrorType != "" {
+			rec.State = "error"
 		} else if scanner.Err() != nil || !done {
 			rec.State = "truncated"
+			rec.ErrorType = "stream_interrupted"
 		} else {
 			rec.State = "complete"
 		}
@@ -341,31 +385,39 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	}
 	data, e := io.ReadAll(io.LimitReader(res.Body, 8*1024*1024+1))
 	if e != nil || len(data) > 8*1024*1024 {
-		rec.Status = 502
-		problem(w, 502, "上游响应读取失败或超过 8 MB 上限")
+		classifyTransport(rec, r.Context(), ctx, e)
+		status := 502
+		if rec.State == "timeout" {
+			status = 504
+		}
+		if rec.State == "canceled" {
+			status = 499
+		}
+		problem(w, status, "上游响应读取失败或超过 8 MB 上限")
 		return
 	}
 	data = []byte(redact(string(data), string(secret), projectCredential(r)))
 	captured.add(data)
 	if rec.Status >= 200 && rec.Status < 300 {
 		rec.State = "complete"
-		text, token, _, in, out := jsonStats(data, c.Protocol)
-		if token {
-			v := time.Since(start).Milliseconds()
-			rec.FirstToken = &v
+		if kind := responseError(data); kind != "" {
+			rec.State = "error"
+			rec.ErrorType = kind
 		}
-		if text {
-			v := time.Since(start).Milliseconds()
-			rec.FirstText = &v
-		}
-		rec.InputTokens = in
-		rec.OutputTokens = out
+		rec.readUsage(data)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Request-ID", rec.ID)
 	w.WriteHeader(rec.Status)
-	_, _ = w.Write(data)
-	_ = http.NewResponseController(w).Flush()
+	if _, err := w.Write(data); err != nil {
+		rec.State = "canceled"
+		rec.ErrorType = "client_canceled"
+		return
+	}
+	if http.NewResponseController(w).Flush() != nil {
+		rec.State = "canceled"
+		rec.ErrorType = "client_canceled"
+	}
 }
 func eventStats(s, protocol string) (bool, bool, bool, int64, int64) {
 	var values []string
@@ -460,6 +512,9 @@ func jsonStats(b []byte, protocol string) (bool, bool, bool, int64, int64) {
 	return text, token, v.Type == "message_stop", in, out
 }
 func (g *Gateway) demoResponse(w http.ResponseWriter, r *http.Request, m Model, body map[string]json.RawMessage, stream bool, rec *Record, captured *capture, start time.Time) {
+	zero := int64(0)
+	rec.InputTotal, rec.InputUncached, rec.CacheRead = &zero, &zero, &zero
+	rec.OutputReported, rec.outputFinal = true, true
 	reply := "这是一条本地模拟响应。项目凭证已验证，模型授权已通过。这次调用不会访问外部厂商，也不会消耗真实额度。你可以在请求记录中查看输入、响应与耗时。"
 	rec.Status = 200
 	w.Header().Set("X-Request-ID", rec.ID)
@@ -467,9 +522,6 @@ func (g *Gateway) demoResponse(w http.ResponseWriter, r *http.Request, m Model, 
 		b, _ := json.Marshal(map[string]any{"id": rec.ID, "object": "chat.completion", "model": m.Alias, "choices": []any{map[string]any{"index": 0, "message": map[string]string{"role": "assistant", "content": reply}, "finish_reason": "stop"}}, "usage": map[string]int{"prompt_tokens": 0, "completion_tokens": 0}})
 		captured.add(b)
 		writeJSON(w, 200, json.RawMessage(b))
-		v := time.Since(start).Milliseconds()
-		rec.FirstText = &v
-		rec.FirstToken = &v
 		rec.State = "complete"
 		_ = http.NewResponseController(w).Flush()
 		return
@@ -486,6 +538,7 @@ func (g *Gateway) demoResponse(w http.ResponseWriter, r *http.Request, m Model, 
 		select {
 		case <-r.Context().Done():
 			rec.State = "canceled"
+			rec.ErrorType = "client_canceled"
 			return
 		case <-time.After(35 * time.Millisecond):
 		}
@@ -497,18 +550,31 @@ func (g *Gateway) demoResponse(w http.ResponseWriter, r *http.Request, m Model, 
 			rec.FirstText = &v
 			rec.FirstToken = &v
 		}
+		v := time.Since(start).Milliseconds()
+		rec.LastToken = &v
+		rec.ContentChunks++
 		if _, e := io.WriteString(w, s); e != nil {
 			rec.State = "canceled"
+			rec.ErrorType = "client_canceled"
 			return
 		}
 		if http.NewResponseController(w).Flush() != nil {
 			rec.State = "canceled"
+			rec.ErrorType = "client_canceled"
 			return
 		}
 	}
 	tail := fmt.Sprintf("data: {\"id\":%q,\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n", rec.ID)
 	captured.add([]byte(tail))
-	_, _ = io.WriteString(w, tail)
-	_ = http.NewResponseController(w).Flush()
+	if _, err := io.WriteString(w, tail); err != nil {
+		rec.State = "canceled"
+		rec.ErrorType = "client_canceled"
+		return
+	}
+	if http.NewResponseController(w).Flush() != nil {
+		rec.State = "canceled"
+		rec.ErrorType = "client_canceled"
+		return
+	}
 	rec.State = "complete"
 }
