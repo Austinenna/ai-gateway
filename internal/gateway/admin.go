@@ -320,6 +320,14 @@ func (g *Gateway) listRecords(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
+	g.metricsMu.Lock()
+	active, running := g.inflight[r.PathValue("id")]
+	g.metricsMu.Unlock()
+	if running {
+		active.RecordMissing = true
+		writeJSON(w, 200, active)
+		return
+	}
 	var s string
 	if g.db.QueryRow("SELECT record FROM requests WHERE id=?", r.PathValue("id")).Scan(&s) != nil {
 		if g.db.QueryRow("SELECT summary FROM request_metrics WHERE id=?", r.PathValue("id")).Scan(&s) != nil {

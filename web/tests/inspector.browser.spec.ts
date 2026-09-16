@@ -67,19 +67,19 @@ test('无正文响应提示实际返回内容，详情合并思考与多个工�
 });
 
 test('请求检查器区分首个 token、正文首字及旧记录未采集状态', async ({ page }, testInfo) => {
-  await expect(page.locator('.detail-head')).toContainText('首个 token 1,200 ms');
-  await expect(page.locator('.detail-head')).toContainText('正文首字 25,123 ms');
-  await page.getByRole('button', { name: '耗时', exact: true }).click();
-  await expect(page.locator('.timeline')).toContainText('1,200 ms');
-  await expect(page.locator('.timeline')).toContainText('25,123 ms');
+  await expect(page.locator('.detail-head')).toContainText('首个 Token · TTFT1.2 s');
+  await expect(page.locator('.detail-head')).toContainText('正文首字 · TTFC25.12 s');
+  await page.getByRole('button', { name: '性能与用量', exact: true }).click();
+  await expect(page.locator('.timeline')).toContainText('1.2 s');
+  await expect(page.locator('.timeline')).toContainText('25.12 s');
   await page.screenshot({ path: testInfo.outputPath('timing-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath('timing-mobile.png'), fullPage: true });
   await page.locator('.request-item').filter({ hasText: '旧记录' }).click();
-  await expect(page.locator('.detail-head')).toContainText('首个 token 未记录');
-  await expect(page.locator('.detail-head')).toContainText('正文首字 25,123 ms');
+  await expect(page.locator('.detail-head')).toContainText('首个 Token · TTFT未记录');
+  await expect(page.locator('.detail-head')).toContainText('正文首字 · TTFC25.12 s');
   await page.locator('.request-item').filter({ hasText: '空响应' }).click();
-  await expect(page.locator('.detail-head')).toContainText('首个 token 未收到');
+  await expect(page.locator('.detail-head')).toContainText('首个 Token · TTFT未收到');
 });
 
 

@@ -143,6 +143,10 @@ func TestMetricsEntryConcurrencyFiltersAndPersistence(t *testing.T) {
 	if active.Summary.Active != 1 || active.Summary.Requests != 1 || active.Summary.Completed != 0 {
 		t.Fatalf("active call not counted: %+v", active.Summary)
 	}
+	detail := parse[Record](t, h.request("GET", "/api/admin/requests/"+active.Recent[0].ID, nil, "", true))
+	if detail.State != "running" || detail.ProjectID != p.Project.ID || detail.ConnectionID != c.ID || !detail.RecordMissing {
+		t.Fatal("active detail lost routing context")
+	}
 	close(release)
 	h.want(<-finished, 200)
 	h.want(h.call(m.Alias, "invalid", nil), 401)
