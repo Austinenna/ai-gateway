@@ -18,6 +18,8 @@ type metricsResult struct {
 	Recent  []Record        `json:"recent"`
 	Buckets []metricBucket  `json:"buckets"`
 	Since   int64           `json:"monitoring_since"`
+	From    int64           `json:"from"`
+	To      int64           `json:"to"`
 }
 
 func getMetrics(t *testing.T, h *harness, query string) metricsResult {
@@ -234,4 +236,66 @@ func TestMetricsAggregationUsesAllRowsAndWeightedCache(t *testing.T) {
 		t.Fatal("cache ratio averaged percentages instead of tokens")
 	}
 	h.want(h.request("GET", "/api/admin/metrics?window=invalid", nil, "", true), 400)
+}
+
+func TestMetricsAllTimeIncludesOlderRecordsAndKeepsFilters(t *testing.T) {
+	h := newHarness(t)
+	empty := getMetrics(t, h, "?window=all")
+	if empty.From != empty.Since || empty.Summary.Requests != 0 || len(empty.Buckets) != 24 {
+		t.Fatal("empty all-time range is invalid")
+	}
+	now := time.Now().UnixMilli()
+	since := now - (14 * 24 * time.Hour).Milliseconds()
+	if _, err := h.g.db.Exec("UPDATE meta SET value=? WHERE key='monitoring_since'", since); err != nil {
+		t.Fatal(err)
+	}
+	h.g.monitoringSince = since
+	stream, nonStream := true, false
+	input, first := int64(100), int64(100)
+	for i, started := range []int64{since, now - (48 * time.Hour).Milliseconds(), now - (2 * time.Hour).Milliseconds(), now - (30 * time.Minute).Milliseconds()} {
+		h.g.saveMetric(Record{
+			ID: strings.Repeat("old", i+1), Started: started, State: "complete", Duration: 1000, FirstToken: &first,
+			ProjectID: "p1", ProjectName: "project one", ModelID: "m1", Alias: "model one", OutputTokens: 10,
+			MetricsFields: MetricsFields{MetricsVersion: 1, ConnectionID: "c1", Stream: &stream, InputTotal: &input, OutputReported: true, Forwarded: true, UsageStatus: "complete"},
+		})
+	}
+	h.g.saveMetric(Record{ID: "other", Started: now - (10 * 24 * time.Hour).Milliseconds(), State: "error", ProjectID: "p2", ModelID: "m2", MetricsFields: MetricsFields{ConnectionID: "c2", Stream: &nonStream, ErrorType: "rate_limit"}})
+	// Records outside the collection period must not enter all-time totals.
+	h.g.saveMetric(Record{ID: "before-monitoring", Started: since - 1, State: "complete"})
+	h.g.saveMetric(Record{ID: "future", Started: now + time.Hour.Milliseconds(), State: "complete"})
+	if h.g.metricsErrors.Load() != 0 {
+		t.Fatal("failed to prepare monitoring records")
+	}
+	for _, tc := range []struct {
+		query string
+		count int
+	}{
+		{"", 2}, {"?window=1h", 1}, {"?window=24h", 2}, {"?window=7d", 3}, {"?window=all", 5},
+		{"?window=all&project_id=p1", 4}, {"?window=all&connection_id=c1", 4}, {"?window=all&model_id=m1", 4},
+		{"?window=all&stream=true", 4}, {"?window=all&stream=false", 1},
+		{"?window=all&project_id=p1&connection_id=c1&model_id=m1&stream=true", 4},
+		{"?window=all&project_id=p1&model_id=m2", 0},
+	} {
+		got := getMetrics(t, h, tc.query)
+		if got.Summary.Requests != tc.count {
+			t.Fatalf("%s: got %d requests, want %d", tc.query, got.Summary.Requests, tc.count)
+		}
+		bucketTotal := 0
+		for _, bucket := range got.Buckets {
+			bucketTotal += bucket.Requests
+		}
+		if len(got.Buckets) != 24 || bucketTotal != tc.count {
+			t.Fatalf("%s: trend does not match summary", tc.query)
+		}
+	}
+	// All-time data and the original collection boundary survive a restart.
+	restartHarness(t, h)
+	got := getMetrics(t, h, "?window=all")
+	s := got.Summary
+	if got.From != since || got.Since != since || s.Requests != 5 || s.Completed != 4 || s.Failed != 1 || s.InputTokens != 400 || s.OutputTokens != 40 || s.SuccessRate == nil || *s.SuccessRate != 80 || s.TTFT.Count != 4 || len(got.Models) != 2 || len(got.Recent) != 5 {
+		t.Fatalf("all-time aggregate changed after restart: %+v", got)
+	}
+	if math.Abs(s.RPM-5*60000/float64(got.To-since)) > .000001 || got.Buckets[0].Started != since {
+		t.Fatal("RPM or trend does not cover the full collection period")
+	}
 }

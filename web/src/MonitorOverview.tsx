@@ -40,7 +40,7 @@ export function MonitorOverview(props: Props) {
   const select = (label: string, value: string, change: (v: string) => void, options: MetricOption[]) => <label><span>{label}</span><select aria-label={'监控' + label} value={value} onChange={e => change(e.target.value)}><option value="">所有{label}</option>{options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>;
   return <div className="monitor-overview">
     <div className="monitor-toolbar">
-      <div className="monitor-range" aria-label="监控时间范围">{[['1h', '近 1 小时'], ['24h', '近 24 小时'], ['7d', '近 7 天']].map(([v, label]) => <button key={v} aria-pressed={window === v} onClick={() => setWindow(v)}>{label}</button>)}</div>
+      <div className="monitor-range" aria-label="监控时间范围">{[['1h', '近 1 小时'], ['24h', '近 24 小时'], ['7d', '近 7 天'], ['all', '全部']].map(([v, label]) => <button key={v} aria-pressed={window === v} title={v === 'all' ? '从监控开始采集至今' : undefined} onClick={() => setWindow(v)}>{label}</button>)}</div>
       <span className="monitor-refresh"><span className={'dot ' + (error ? 'offline' : '')}/>{error ? '刷新失败' : loading ? '正在更新' : `更新于 ${new Date(data?.to || Date.now()).toLocaleTimeString('zh-CN', { hour12: false })}`}</span>
       <button className="icon-btn" aria-label="刷新监控" onClick={() => setRefresh(v => v + 1)} disabled={loading}><RefreshCw size={16}/></button>
     </div>

@@ -327,6 +327,8 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 		span = 24 * time.Hour
 	case "7d":
 		span = 7 * 24 * time.Hour
+	case "all":
+		// Use the persisted monitoring start, including data from previous runs.
 	default:
 		problem(w, 400, "不支持的监控时间范围")
 		return
@@ -340,9 +342,9 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 	// never counted both as a saved record and an active request.
 	g.metricsMu.Lock()
 	now := time.Now().UnixMilli()
-	from := now - span.Milliseconds()
-	if from < g.monitoringSince {
-		from = g.monitoringSince
+	from := g.monitoringSince
+	if window != "all" {
+		from = max(from, now-span.Milliseconds())
 	}
 	rows, err := g.db.QueryContext(r.Context(), "SELECT summary FROM request_metrics WHERE started>=? AND started<=? ORDER BY started DESC,id", from, now)
 	if err != nil {

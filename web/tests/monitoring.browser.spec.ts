@@ -31,10 +31,16 @@ test.beforeEach(async ({ page }) => {
   const records = [record, missing, zero, errored];
   await page.route('**/api/**', route => {
     const url = new URL(route.request().url()), path = url.pathname;
+    const all = url.searchParams.get('window') === 'all', since = now - 14 * 24 * 3600000;
+    const rangeFrom = all ? since : from;
+    const rangeSummary = all ? { ...summary, requests: 30, completed: 26, success_rate: 2600 / 27, input_tokens: 260000, output_tokens: 14326 } : summary;
     const metrics = {
-      from, to: now, monitoring_since: from, summary,
-      models: [{ ...summary, model_id: 'm1', alias: 'coding', connection_id: 'c1', connection_name: '研发模型连接' }],
-      buckets: Array.from({ length: 24 }, (_, i) => ({ started: from + i * 3600000, requests: i >= 19 ? [2, 1, 2, 2, 3][i - 19] : 0, failed: i === 23 ? 1 : 0, canceled: i === 22 ? 1 : 0, rpm: (i >= 19 ? [2, 1, 2, 2, 3][i - 19] : 0) / 60 })),
+      from: rangeFrom, to: now, monitoring_since: since, summary: rangeSummary,
+      models: [{ ...rangeSummary, model_id: 'm1', alias: 'coding', connection_id: 'c1', connection_name: '研发模型连接' }],
+      buckets: Array.from({ length: 24 }, (_, i) => {
+        const requests = all && i === 0 ? 20 : i >= 19 ? [2, 1, 2, 2, 3][i - 19] : 0;
+        return { started: rangeFrom + i * (now - rangeFrom) / 24, requests, failed: i === 23 ? 1 : 0, canceled: i === 22 ? 1 : 0, rpm: requests * 60000 / ((now - rangeFrom) / 24) };
+      }),
       recent: records, options: { projects: [{ id: 'p1', name: '研发助手' }], connections: [{ id: 'c1', name: '研发模型连接' }], models: [{ id: 'm1', name: 'coding' }] }, metrics_errors: 0, dropped_records: 0,
     };
     const json = path === '/api/status' ? { configured: true, authenticated: true, locked: false } :
@@ -43,6 +49,46 @@ test.beforeEach(async ({ page }) => {
     return route.fulfill({ json: json ?? {} });
   });
   await page.goto('/');
+});
+
+test('全部范围显示累计统计并保留筛选与刷新', async ({ page }, info) => {
+  await expect(page.getByRole('button', { name: '近 24 小时', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const allButton = page.getByRole('button', { name: '全部', exact: true });
+  await allButton.click();
+  await expect(allButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.monitor-cards')).toContainText('260,000');
+  await expect(page.locator('.monitor-trend')).toContainText('30 次');
+  await expect(page.locator('.trend-column')).toHaveCount(24);
+  await expect(page.locator('.monitor-models')).toContainText('260,000');
+  await page.getByText('统计口径与采集范围', { exact: true }).click();
+  await expect(page.locator('.monitor-definitions')).toContainText('旧记录保留在请求记录中，不补入新统计');
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 960 });
+    await page.locator('.workspace').evaluate(el => { el.scrollTop = 0; });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(allButton).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath(`overview-all-${width}.png`), fullPage: width === 390 });
+  }
+  await page.setViewportSize({ width: 1440, height: 960 });
+  const waitQuery = (expected: Record<string, string>) => page.waitForResponse(r => {
+    const url = new URL(r.url());
+    return url.pathname === '/api/admin/metrics' && Object.entries({ window: 'all', ...expected }).every(([key, value]) => url.searchParams.get(key) === value);
+  });
+  let response = waitQuery({ project_id: 'p1' });
+  await page.getByLabel('监控项目', { exact: true }).selectOption('p1'); await response;
+  response = waitQuery({ project_id: 'p1', stream: 'true' });
+  await page.getByLabel('监控调用方式').selectOption('true'); await response;
+  response = waitQuery({ project_id: 'p1', stream: 'true', model_id: 'm1', connection_id: 'c1' });
+  await page.locator('.monitor-models').getByRole('button', { name: 'coding', exact: true }).click(); await response;
+  response = waitQuery({ project_id: 'p1', stream: 'true', model_id: 'm1', connection_id: 'c1' });
+  await page.getByRole('button', { name: '刷新监控', exact: true }).click(); await response;
+  response = waitQuery({ project_id: '', stream: '', model_id: '', connection_id: '' });
+  await page.getByRole('button', { name: '清除筛选', exact: true }).click(); await response;
+  await expect(allButton).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '近 1 小时', exact: true }).click();
+  await expect(page.locator('.monitor-cards')).toContainText('60,000');
+  await expect(page.locator('.monitor-trend')).toContainText('10 次');
 });
 
 test('六组监控支持筛选、跳转详情与桌面手机布局', async ({ page }, info) => {
