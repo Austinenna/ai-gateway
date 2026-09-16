@@ -26,6 +26,9 @@ html:has(.requests-workspace), body:has(.requests-workspace), .requests-workspac
 .request-detail .detail-tabs { gap: 24px; padding: 0 24px; background: var(--surface); }
 .request-detail .detail-tabs button { padding: 12px 1px; font-size: 12px; }
 .request-detail .detail-content { padding: 22px 24px 28px; }
+.request-detail .tester { margin: 20px 24px; scroll-margin-top: 72px; }
+.request-detail .tester .panel-head { gap: 10px; }
+.request-detail .tester + .detail-head { border-top: 1px solid var(--line); }
 
 /* Clear message boundaries, without an extra timeline around every paragraph. */
 .messages { display: grid; gap: 12px; }
@@ -89,6 +92,9 @@ html:has(.requests-workspace), body:has(.requests-workspace), .requests-workspac
   .detail-metadata .detail-request-id { flex-basis: 100%; margin-left: 0; }
 }
 @container request-detail (max-width: 520px) {
+  .request-detail .tester { margin: 16px; }
+  .request-detail .tester .panel-head, .request-detail .tester form { padding: 16px; }
+  .request-detail .tester .form-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .request-detail .detail-head { padding: 18px 16px 16px; }
   .detail-identity { flex-wrap: wrap; gap: 8px; }
   .detail-identity h2 { font-size: 17px; }

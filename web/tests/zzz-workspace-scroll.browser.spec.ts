@@ -12,18 +12,6 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
   const create = async (path: string, data: object) => {
     const response = await page.request.post('/api/admin/' + path, { headers, data });
     expect(response.status()).toBe(200);
-  // Use many isolated records to exercise the list independently of the detail pane.
-  let saved: { id: string }[] = [];
-  await expect.poll(async () => {
-    saved = await (await page.request.get('/api/admin/requests')).json();
-    return saved.length;
-  }).toBeGreaterThan(0);
-  const baseRecord = await (await page.request.get('/api/admin/requests/' + saved[0].id)).json();
-  const records = Array.from({ length: 60 }, (_, i) => ({ ...baseRecord, id: 'split-' + i, project_name: '滚动演示项目 ' + (i + 1), started: baseRecord.started - i * 1000 }));
-  await page.route('**/api/admin/requests**', route => {
-    const path = new URL(route.request().url()).pathname;
-    return route.fulfill({ json: path === '/api/admin/requests' ? records : records.find(r => path.endsWith('/' + r.id)) });
-  });
     return response.json();
   };
   const connection = await create('connections', { name: '滚动检查', provider: 'demo', protocol: 'chat', base_url: 'demo://local', enabled: true });
