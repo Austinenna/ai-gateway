@@ -234,16 +234,9 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 	if m.Defaults == nil {
 		m.Defaults = map[string]json.RawMessage{}
 	}
-	for k, v := range m.Defaults {
-		var n float64
-		if k != "temperature" && k != "max_tokens" {
-			problem(w, 400, "Demo 默认参数仅支持 temperature 与 max_tokens")
-			return
-		}
-		if json.Unmarshal(v, &n) != nil || (k == "temperature" && (n < 0 || n > 2)) || (k == "max_tokens" && (n < 1 || n > 131072 || n != float64(int64(n)))) {
-			problem(w, 400, "默认参数的数值超出允许范围")
-			return
-		}
+	if err := validateModelDefaults(m.Defaults); err != nil {
+		problem(w, 400, err.Error())
+		return
 	}
 	defaults, _ := json.Marshal(m.Defaults)
 	protocols, _ := json.Marshal(m.Protocols)

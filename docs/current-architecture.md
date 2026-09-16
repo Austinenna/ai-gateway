@@ -77,10 +77,12 @@ Node.js 用于开发和构建前端，打包后运行网关不需要单独的 No
 | `connection_id` | 使用哪条连接 | 决定厂商 Key 及各协议的基础端点 |
 | `protocols` | 模型启用的一种或两种协议 | 仅能选择连接已配置的协议；按请求路径选择，不进行格式转换 |
 | `upstream_model` | 发给厂商的真实模型 ID | 由账号开通情况决定，可由管理员更新 |
-| `defaults` | 客户端没提供时补充的参数 | 当前配置项为 `temperature`、`max_tokens` |
+| `defaults` | 客户端没提供时补充的参数 | 通用 `temperature`、`max_tokens`；MiniMax Chat 的 `reasoning_split` 与 MiniMax Messages 的 `thinking` |
 | `enabled` | 是否允许使用 | 影响后续请求和项目可见模型列表 |
 
 同一个别名 `coding` 可同时用于 `/v1/chat/completions` 与 `/v1/messages`，项目只需授权该模型一次。新建模型默认勾选连接当前已配置的协议，可以取消不支持的协议；已有模型不因连接新增端点而自动扩大协议范围，需编辑模型启用。移除连接端点后，该协议立即不可用，模型的协议选择保留，重新配置端点后恢复；没有任何可用协议的模型不出现在调用方的模型列表中。保持别名不变并沿用兼容协议时，可以更换连接或上游模型 ID。
+
+默认参数保存于现有 `defaults_json`，无需迁移。管理接口校验 `reasoning_split` 为布尔值，`thinking` 为仅含 `type: adaptive | disabled` 的对象。转发依据连接厂商和实际请求协议选择默认值：MiniMax Chat 只补拆分，MiniMax Messages 只补思考模式；其他厂商不补这两项。客户端字段存在即优先，包括 `false`、`null` 和完整 `thinking` 对象，不按真假判断或递归合并。界面仅在 MiniMax 对应协议下显示设置；暂时切换协议／厂商时保留配置，生效仍受转发条件约束。管理员模型测试和项目调用共用补参逻辑，记录输入保持补参前的原始请求。
 
 新增／编辑模型提供按需获取候选项的管理接口 `POST /api/admin/connections/{id}/models`，请求体为 `{protocol: "chat" | "messages"}`。仅接受同源管理员会话和管理请求标记，从该连接已保存的端点与加密凭据发起 `GET <endpoint>/models`，不接受临时 URL 或 Key；停用连接和锁定密钥库拒绝访问。兼容 Chat 的 `created` 秒级时间及 Messages 的 `created_at` RFC 3339 时间，模型按 ID 去重，时间未知排后，同时间按 ID 排序；不从名称推测发布时间。Messages 分页使用 `limit`／`after_id`，最多 5 页／5000 条、每页 4 MB、总超时 15 秒；遇到上限或不明确分页返回 `truncated: true`，界面明确提示仅为部分结果。禁止跟随重定向，不透出上游错误正文或传输错误中的敏感内容，不进入推理记录与监控。
 

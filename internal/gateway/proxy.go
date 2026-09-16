@@ -241,11 +241,7 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 			rec.Truncated = true
 		}
 	}()
-	for k, v := range m.Defaults {
-		if _, ok := body[k]; !ok {
-			body[k] = v
-		}
-	}
+	applyModelDefaults(body, m.Defaults, c.Provider, c.Protocol)
 	body["model"], _ = json.Marshal(m.UpstreamModel)
 	var stream bool
 	if v, ok := body["stream"]; ok && json.Unmarshal(v, &stream) != nil {
