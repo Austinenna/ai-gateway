@@ -48,8 +48,7 @@ func (g *Gateway) initMetrics() error {
 	_, err := g.db.Exec(`CREATE TABLE IF NOT EXISTS request_metrics(id TEXT PRIMARY KEY, started INTEGER NOT NULL, summary TEXT NOT NULL);
 	 CREATE INDEX IF NOT EXISTS idx_metrics_started ON request_metrics(started DESC);
 	 INSERT OR IGNORE INTO meta(key,value) VALUES('monitoring_since',?);
-	 UPDATE request_metrics SET summary=json_set(summary,'$.state','interrupted','$.error_type','gateway_restart','$.usage_status','unknown') WHERE json_extract(summary,'$.state')='running';
-	 PRAGMA user_version=4;`, strconv.FormatInt(time.Now().UnixMilli(), 10))
+	 UPDATE request_metrics SET summary=json_set(summary,'$.state','interrupted','$.error_type','gateway_restart','$.usage_status','unknown') WHERE json_extract(summary,'$.state')='running';`, strconv.FormatInt(time.Now().UnixMilli(), 10))
 	if err != nil {
 		return err
 	}

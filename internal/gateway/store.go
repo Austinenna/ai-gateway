@@ -24,17 +24,20 @@ type Connection struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Provider string `json:"provider"`
-	Protocol string `json:"protocol"`
-	BaseURL  string `json:"base_url"`
-	Enabled  bool   `json:"enabled"`
-	HasToken bool   `json:"has_token"`
-	Token    string `json:"token,omitempty"`
+	// Legacy input fields; forwarding fills these only after choosing an endpoint.
+	Protocol  string            `json:"protocol,omitempty"`
+	BaseURL   string            `json:"base_url,omitempty"`
+	Endpoints map[string]string `json:"endpoints"`
+	Enabled   bool              `json:"enabled"`
+	HasToken  bool              `json:"has_token"`
+	Token     string            `json:"token,omitempty"`
 }
 type Model struct {
 	ID            string                     `json:"id"`
 	Name          string                     `json:"name"`
 	Alias         string                     `json:"alias"`
 	ConnectionID  string                     `json:"connection_id"`
+	Protocols     []string                   `json:"protocols"`
 	UpstreamModel string                     `json:"upstream_model"`
 	Defaults      map[string]json.RawMessage `json:"defaults"`
 	Enabled       bool                       `json:"enabled"`
@@ -167,7 +170,7 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	if e = db.QueryRow("PRAGMA user_version").Scan(&v); e != nil {
 		return fail(e)
 	}
-	if v > 4 {
+	if v > 5 {
 		return fail(errors.New("database was created by a newer gateway"))
 	}
 	_, e = db.Exec(`
@@ -196,8 +199,15 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 		if err = tx.Commit(); err != nil {
 			return fail(err)
 		}
-	} else if _, e = db.Exec("PRAGMA user_version=3"); e != nil {
-		return fail(e)
+	} else if v < 3 {
+		if _, e = db.Exec("PRAGMA user_version=3"); e != nil {
+			return fail(e)
+		}
+	}
+	if v < 5 {
+		if e = migrateProtocolEndpoints(db); e != nil {
+			return fail(e)
+		}
 	}
 	g := &Gateway{db: db, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient()}
 	if e = g.initMetrics(); e != nil {
@@ -287,7 +297,7 @@ func (g *Gateway) setup(password string) error {
 	return tx.Commit()
 }
 func (g *Gateway) connections() ([]Connection, error) {
-	rows, e := g.db.Query("SELECT id,name,provider,protocol,base_url,enabled FROM connections ORDER BY rowid")
+	rows, e := g.db.Query("SELECT id,name,provider,endpoints_json,enabled FROM connections ORDER BY rowid")
 	if e != nil {
 		return nil, e
 	}
@@ -295,7 +305,11 @@ func (g *Gateway) connections() ([]Connection, error) {
 	out := []Connection{}
 	for rows.Next() {
 		var c Connection
-		if e = rows.Scan(&c.ID, &c.Name, &c.Provider, &c.Protocol, &c.BaseURL, &c.Enabled); e != nil {
+		var endpoints string
+		if e = rows.Scan(&c.ID, &c.Name, &c.Provider, &endpoints, &c.Enabled); e != nil {
+			return nil, e
+		}
+		if e = json.Unmarshal([]byte(endpoints), &c.Endpoints); e != nil {
 			return nil, e
 		}
 		c.HasToken = c.Provider != "demo"
@@ -304,7 +318,7 @@ func (g *Gateway) connections() ([]Connection, error) {
 	return out, rows.Err()
 }
 func (g *Gateway) models() ([]Model, error) {
-	rows, e := g.db.Query("SELECT id,name,alias,connection_id,upstream_model,defaults_json,enabled FROM models ORDER BY rowid")
+	rows, e := g.db.Query("SELECT id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json FROM models ORDER BY rowid")
 	if e != nil {
 		return nil, e
 	}
@@ -312,8 +326,11 @@ func (g *Gateway) models() ([]Model, error) {
 	out := []Model{}
 	for rows.Next() {
 		var m Model
-		var d string
-		if e = rows.Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &d, &m.Enabled); e != nil {
+		var d, protocols string
+		if e = rows.Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &d, &m.Enabled, &protocols); e != nil {
+			return nil, e
+		}
+		if e = json.Unmarshal([]byte(protocols), &m.Protocols); e != nil {
 			return nil, e
 		}
 		if e = json.Unmarshal([]byte(d), &m.Defaults); e != nil {

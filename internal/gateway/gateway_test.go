@@ -428,7 +428,7 @@ func TestConnectionDisableAndDuplicateAlias(t *testing.T) {
 	if strings.Contains(rr.Body.String(), "unique") {
 		t.Fatal("disabled connection model still listed")
 	}
-	c.BaseURL = "http://remote.test/v1"
+	c.Endpoints["chat"] = "http://remote.test/v1"
 	h.want(h.request("PUT", "/api/admin/connections/"+c.ID, c, "", true), 400)
 }
 
@@ -463,7 +463,7 @@ func TestMigrateV1RequestSummary(t *testing.T) {
 	}
 	var version int
 	_ = g.db.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 4 {
+	if version != 5 {
 		t.Fatal("migration version not updated")
 	}
 }

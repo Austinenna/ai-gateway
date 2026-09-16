@@ -1,7 +1,8 @@
 import { Activity, Pencil, Plug, Trash2 } from 'lucide-react';
+import { modelProtocols, protocolName } from './connection-protocols';
 
-type ModelInfo = { id: string; name: string; alias: string; upstream_model: string; connection_id: string; enabled: boolean };
-type ConnectionInfo = { id: string; name: string; enabled: boolean };
+type ModelInfo = { id: string; name: string; alias: string; upstream_model: string; connection_id: string; enabled: boolean; protocols: string[] };
+type ConnectionInfo = { id: string; name: string; enabled: boolean; endpoints: Record<string, string> };
 
 export function ModelList<T extends ModelInfo>({ models, connections, onEdit, onTest, onDelete }: {
   models: T[]; connections: ConnectionInfo[];
@@ -15,11 +16,11 @@ export function ModelList<T extends ModelInfo>({ models, connections, onEdit, on
       <tbody>{models.map(m => <tr key={m.id}>
         <td className="model-identity"><strong>{m.name}</strong><code>{m.alias}</code></td>
         <td className="model-upstream" data-label="厂商模型 ID"><code>{m.upstream_model}</code></td>
-        <td className="model-connection" data-label="所属连接"><span><Plug size={14}/>{byID.get(m.connection_id)?.name || '连接不可用'}</span></td>
-        <td className="model-status"><span className={'model-state '+(m.enabled && byID.get(m.connection_id)?.enabled ? 'is-enabled' : '')}>{!m.enabled ? '已停用' : !byID.get(m.connection_id)?.enabled ? '连接停用' : '已启用'}</span></td>
+        <td className="model-connection" data-label="所属连接"><span><Plug size={14}/>{byID.get(m.connection_id)?.name || '连接不可用'}</span><small className="model-protocols">{modelProtocols(m, byID.get(m.connection_id)).map(protocolName).join(' / ') || '无可用协议'}</small></td>
+        <td className="model-status"><span className={'model-state '+(m.enabled && byID.get(m.connection_id)?.enabled && modelProtocols(m, byID.get(m.connection_id)).length ? 'is-enabled' : '')}>{!m.enabled ? '已停用' : !byID.get(m.connection_id)?.enabled ? '连接停用' : !modelProtocols(m, byID.get(m.connection_id)).length ? '协议不可用' : '已启用'}</span></td>
         <td className="model-operations"><div className="model-actions">
           <button onClick={() => onEdit(m)}><Pencil size={15}/>编辑</button>
-          <button onClick={() => onTest(m)} disabled={!m.enabled || !byID.get(m.connection_id)?.enabled}><Activity size={15}/>测试</button>
+          <button onClick={() => onTest(m)} disabled={!m.enabled || !byID.get(m.connection_id)?.enabled || !modelProtocols(m, byID.get(m.connection_id)).length}><Activity size={15}/>测试</button>
           <button className="danger" onClick={() => onDelete(m)}><Trash2 size={15}/>删除</button>
         </div></td>
       </tr>)}</tbody>

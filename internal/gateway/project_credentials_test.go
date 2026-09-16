@@ -93,12 +93,12 @@ func TestLegacyProjectTokenMigrationAndBackfill(t *testing.T) {
 	h := newHarness(t)
 	p := h.project("legacy-project")
 	other := h.project("other-project")
-	if _, err := h.g.db.Exec("DROP TABLE project_credentials; PRAGMA user_version=2;"); err != nil {
+	if _, err := h.g.db.Exec("DROP TABLE project_credentials; ALTER TABLE connections DROP COLUMN endpoints_json; ALTER TABLE models DROP COLUMN protocols_json; PRAGMA user_version=2;"); err != nil {
 		t.Fatal(err)
 	}
 	restartHarness(t, h)
 	var version int
-	if err := h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 4 {
+	if err := h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 5 {
 		t.Fatal("v2 migration failed")
 	}
 	projects, err := h.g.projects()

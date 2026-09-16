@@ -234,3 +234,13 @@
  .project-row-actions>button:not(.project-access-action){border-color:var(--line)}
  .project-identity strong{font-size:.875rem}
 }
+
+.protocol-fields{border:1px solid var(--line);border-radius:8px;margin:0 0 20px;padding:14px 16px;min-width:0}
+.protocol-fields legend{font-weight:600;font-size:.875rem;padding:0 6px}
+.protocol-fields>p{margin:0 0 14px;line-height:1.6}
+.protocol-endpoint-field+.protocol-endpoint-field{border-top:1px solid var(--line);padding-top:14px}
+.protocol-endpoint-field .field{margin:0 0 14px}
+.protocol-endpoint-field .check{margin-bottom:12px}
+.connection-protocol+.connection-protocol{margin-top:12px}
+.model-protocols{display:block;margin-top:6px;color:var(--muted);font-size:.75rem;line-height:1.5}
+.protocol-options{display:flex;flex-wrap:wrap;gap:12px 20px;margin-bottom:16px}

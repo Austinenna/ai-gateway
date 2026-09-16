@@ -19,7 +19,7 @@ func TestConnectionProvidersForwardBothProtocols(t *testing.T) {
 				}, "", true)
 				h.want(created, 200)
 				c := parse[Connection](t, created)
-				if c.Token != "" || !c.HasToken || c.BaseURL != "https://compatible.test/custom/v1" {
+				if c.Token != "" || !c.HasToken || c.Endpoints[protocol] != "https://compatible.test/custom/v1" {
 					t.Fatal("connection response should hide the key and normalize the endpoint")
 				}
 				m := h.model(c, "compatible")
@@ -43,7 +43,7 @@ func TestConnectionProvidersForwardBothProtocols(t *testing.T) {
 				calls := 0
 				h.g.client = doerFunc(func(r *http.Request) (*http.Response, error) {
 					calls++
-					if r.URL.String() != c.BaseURL+path || r.Header.Get("Authorization") != "Bearer "+secret {
+					if r.URL.String() != c.Endpoints[protocol]+path || r.Header.Get("Authorization") != "Bearer "+secret {
 						t.Error("incorrect endpoint or lost credential after editing")
 					}
 					if protocol == "messages" && (r.Header.Get("x-api-key") != secret || r.Header.Get("anthropic-version") != "2023-06-01") {
@@ -97,10 +97,12 @@ func TestExistingConnectionCanChangeProtocolAndBecomeCustom(t *testing.T) {
 		}
 		return response(`{"type":"message","content":[{"type":"text","text":"ok"}]}`, "application/json", 200), nil
 	})
-	c.Protocol, c.BaseURL = "messages", "https://compatible.test/anthropic/v1"
+	c.Endpoints = map[string]string{"messages": "https://compatible.test/anthropic/v1"}
 	for _, provider := range []string{"zhipu", "custom"} {
 		c.Provider = provider
 		h.want(h.request("PUT", "/api/admin/connections/"+c.ID, c, "", true), 200)
+		m.Protocols = []string{"messages"}
+		h.want(h.request("PUT", "/api/admin/models/"+m.ID, m, "", true), 200)
 		h.want(h.request("POST", "/v1/messages", map[string]any{"model": m.Alias, "messages": []any{map[string]string{"role": "user", "content": "hello"}}}, p.Token, false), 200)
 	}
 }

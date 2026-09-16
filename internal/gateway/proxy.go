@@ -53,7 +53,7 @@ func (g *Gateway) modelList(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "项目凭证无效或项目已停用")
 		return
 	}
-	rows, e := g.db.Query(`SELECT m.alias FROM models m JOIN project_models pm ON pm.model_id=m.id JOIN connections c ON c.id=m.connection_id WHERE pm.project_id=? AND m.enabled=1 AND c.enabled=1 ORDER BY m.alias`, p.ID)
+	rows, e := g.db.Query(`SELECT m.alias FROM models m JOIN project_models pm ON pm.model_id=m.id JOIN connections c ON c.id=m.connection_id WHERE pm.project_id=? AND m.enabled=1 AND c.enabled=1 AND EXISTS(SELECT 1 FROM json_each(m.protocols_json) mp JOIN json_each(c.endpoints_json) ce ON ce.key=mp.value) ORDER BY m.alias`, p.ID)
 	if e != nil {
 		problem(w, 500, "查询失败")
 		return
@@ -74,16 +74,22 @@ func (g *Gateway) route(alias, projectID string, admin bool) (Model, Connection,
 	var m Model
 	var c Connection
 	var encrypted []byte
-	var defaults string
-	q := `SELECT m.id,m.name,m.alias,m.connection_id,m.upstream_model,m.defaults_json,m.enabled,c.id,c.name,c.provider,c.protocol,c.base_url,c.enabled,c.credential FROM models m JOIN connections c ON c.id=m.connection_id WHERE m.alias=? AND m.enabled=1 AND c.enabled=1`
+	var defaults, protocols, endpoints string
+	q := `SELECT m.id,m.name,m.alias,m.connection_id,m.upstream_model,m.defaults_json,m.enabled,m.protocols_json,c.id,c.name,c.provider,c.endpoints_json,c.enabled,c.credential FROM models m JOIN connections c ON c.id=m.connection_id WHERE m.alias=? AND m.enabled=1 AND c.enabled=1`
 	args := []any{alias}
 	if !admin {
 		q += ` AND EXISTS(SELECT 1 FROM project_models pm WHERE pm.model_id=m.id AND pm.project_id=?)`
 		args = append(args, projectID)
 	}
-	e := g.db.QueryRow(q, args...).Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &defaults, &m.Enabled, &c.ID, &c.Name, &c.Provider, &c.Protocol, &c.BaseURL, &c.Enabled, &encrypted)
+	e := g.db.QueryRow(q, args...).Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &defaults, &m.Enabled, &protocols, &c.ID, &c.Name, &c.Provider, &endpoints, &c.Enabled, &encrypted)
 	if e == nil {
 		e = json.Unmarshal([]byte(defaults), &m.Defaults)
+	}
+	if e == nil {
+		e = json.Unmarshal([]byte(protocols), &m.Protocols)
+	}
+	if e == nil {
+		e = json.Unmarshal([]byte(endpoints), &c.Endpoints)
 	}
 	return m, c, encrypted, e
 }
@@ -126,8 +132,9 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/v1/messages" {
 		protocol = "messages"
 	}
-	if c.Protocol != protocol {
-		problem(w, 400, "模型连接的协议与此调用入口不匹配")
+	c, e = selectProtocol(m, c, protocol)
+	if e != nil {
+		problem(w, 400, e.Error())
 		return
 	}
 	g.forward(w, r, p, m, c, enc, body)
@@ -137,7 +144,8 @@ func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 	t.rec.ProjectID, t.rec.ProjectName = "admin-test", "管理员测试"
 	g.snapshotCall(t)
 	var in struct {
-		Message string `json:"message"`
+		Message  string `json:"message"`
+		Protocol string `json:"protocol"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -150,6 +158,19 @@ func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 	m, c, enc, e := g.route(alias, "", true)
 	if e != nil {
 		problem(w, 400, "模型或连接已停用")
+		return
+	}
+	if in.Protocol == "" {
+		protocols := availableProtocols(m, c)
+		if len(protocols) != 1 {
+			problem(w, 400, "请明确选择要测试的协议")
+			return
+		}
+		in.Protocol = protocols[0]
+	}
+	c, e = selectProtocol(m, c, in.Protocol)
+	if e != nil {
+		problem(w, 400, e.Error())
 		return
 	}
 	if in.Message == "" {

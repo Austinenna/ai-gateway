@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -16,15 +17,23 @@ var aliasPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,79}$`)
 func validName(s string) bool { return len(strings.TrimSpace(s)) > 0 && len(s) <= 200 }
 func validEndpoint(c Connection) bool {
 	if c.Provider == "demo" {
-		return c.BaseURL == "demo://local" && c.Protocol == "chat"
+		return len(c.Endpoints) == 1 && c.Endpoints["chat"] == "demo://local"
 	}
 	if c.Provider != "zhipu" && c.Provider != "minimax" && c.Provider != "custom" {
 		return false
 	}
-	if c.Protocol != "chat" && c.Protocol != "messages" {
+	if len(c.Endpoints) == 0 || len(c.Endpoints) > 2 {
 		return false
 	}
-	u, e := url.Parse(c.BaseURL)
+	for protocol, endpoint := range c.Endpoints {
+		if !slices.Contains(supportedProtocols, protocol) || !validEndpointURL(endpoint) {
+			return false
+		}
+	}
+	return true
+}
+func validEndpointURL(endpoint string) bool {
+	u, e := url.Parse(endpoint)
 	if e != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return false
 	}
@@ -61,7 +70,16 @@ func (g *Gateway) saveConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	c.ID = r.PathValue("id")
 	c.Name = strings.TrimSpace(c.Name)
-	c.BaseURL = strings.TrimRight(strings.TrimSpace(c.BaseURL), "/")
+	legacy := c.Endpoints == nil
+	if legacy {
+		c.Endpoints = map[string]string{c.Protocol: c.BaseURL}
+	} else if c.Protocol != "" || c.BaseURL != "" {
+		problem(w, 400, "请使用 endpoints 配置协议端点，不要混用旧字段")
+		return
+	}
+	for protocol, endpoint := range c.Endpoints {
+		c.Endpoints[protocol] = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	}
 	c.Token = strings.TrimSpace(c.Token)
 	if !validName(c.Name) || !validEndpoint(c) || len(c.Token) > 8192 || strings.ContainsAny(c.Token, "\r\n") {
 		problem(w, 400, "请填写有效名称、受支持的厂商协议和端点（远程端点使用 HTTPS）")
@@ -78,15 +96,22 @@ func (g *Gateway) saveConnection(w http.ResponseWriter, r *http.Request) {
 		c.ID = id("con_")
 	}
 	var encrypted []byte
-	var oldURL, oldProvider string
+	var oldEndpoints, oldProvider string
 	if !creating {
-		if e := g.db.QueryRow("SELECT credential,base_url,provider FROM connections WHERE id=?", c.ID).Scan(&encrypted, &oldURL, &oldProvider); e != nil {
+		if e := g.db.QueryRow("SELECT credential,endpoints_json,provider FROM connections WHERE id=?", c.ID).Scan(&encrypted, &oldEndpoints, &oldProvider); e != nil {
 			problem(w, 404, "连接不存在")
 			return
 		}
 		if (oldProvider == "demo") != (c.Provider == "demo") {
 			problem(w, 400, "演示连接与真实厂商连接不能相互转换，请新建连接")
 			return
+		}
+		if legacy {
+			var previous map[string]string
+			if json.Unmarshal([]byte(oldEndpoints), &previous) != nil || len(previous) > 1 {
+				problem(w, 400, "此连接包含多个协议，请刷新页面后编辑")
+				return
+			}
 		}
 	}
 	if c.Token != "" || c.Provider == "demo" {
@@ -102,10 +127,11 @@ func (g *Gateway) saveConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	var result sql.Result
 	var e error
+	endpoints, _ := json.Marshal(c.Endpoints)
 	if creating {
-		result, e = g.db.Exec(`INSERT INTO connections(id,name,provider,protocol,base_url,credential,enabled) VALUES(?,?,?,?,?,?,?)`, c.ID, c.Name, c.Provider, c.Protocol, c.BaseURL, encrypted, c.Enabled)
+		result, e = g.db.Exec(`INSERT INTO connections(id,name,provider,protocol,base_url,credential,enabled,endpoints_json) VALUES(?,?,?,'','',?,?,?)`, c.ID, c.Name, c.Provider, encrypted, c.Enabled, string(endpoints))
 	} else {
-		result, e = g.db.Exec(`UPDATE connections SET name=?,provider=?,protocol=?,base_url=?,credential=?,enabled=? WHERE id=?`, c.Name, c.Provider, c.Protocol, c.BaseURL, encrypted, c.Enabled, c.ID)
+		result, e = g.db.Exec(`UPDATE connections SET name=?,provider=?,protocol='',base_url='',credential=?,enabled=?,endpoints_json=? WHERE id=?`, c.Name, c.Provider, encrypted, c.Enabled, string(endpoints), c.ID)
 	}
 	if e != nil {
 		problem(w, 500, "连接保存失败")
@@ -116,6 +142,7 @@ func (g *Gateway) saveConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.Token = ""
+	c.Protocol, c.BaseURL = "", ""
 	c.HasToken = c.Provider != "demo"
 	writeJSON(w, 200, c)
 }
@@ -170,10 +197,39 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "请填写显示名称、有效调用别名与厂商模型 ID")
 		return
 	}
-	var protocol string
-	if g.db.QueryRow("SELECT protocol FROM connections WHERE id=?", m.ConnectionID).Scan(&protocol) != nil {
+	var endpointsJSON string
+	if g.db.QueryRow("SELECT endpoints_json FROM connections WHERE id=?", m.ConnectionID).Scan(&endpointsJSON) != nil {
 		problem(w, 400, "请选择已有连接")
 		return
+	}
+	var endpoints map[string]string
+	if json.Unmarshal([]byte(endpointsJSON), &endpoints) != nil {
+		problem(w, 500, "读取连接协议失败")
+		return
+	}
+	if m.Protocols == nil {
+		m.Protocols = endpointProtocols(endpoints)
+		if m.ID != "" {
+			var oldConnection, oldProtocols string
+			if g.db.QueryRow("SELECT connection_id,protocols_json FROM models WHERE id=?", m.ID).Scan(&oldConnection, &oldProtocols) == nil && oldConnection == m.ConnectionID {
+				if json.Unmarshal([]byte(oldProtocols), &m.Protocols) != nil {
+					problem(w, 500, "读取模型协议失败")
+					return
+				}
+			}
+		}
+	}
+	if len(m.Protocols) == 0 || len(m.Protocols) > 2 {
+		problem(w, 400, "请至少选择一种模型调用协议")
+		return
+	}
+	seen := map[string]bool{}
+	for _, protocol := range m.Protocols {
+		if !slices.Contains(supportedProtocols, protocol) || endpoints[protocol] == "" || seen[protocol] {
+			problem(w, 400, "模型协议必须对应连接已配置的端点，且不能重复")
+			return
+		}
+		seen[protocol] = true
 	}
 	if m.Defaults == nil {
 		m.Defaults = map[string]json.RawMessage{}
@@ -190,6 +246,7 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	defaults, _ := json.Marshal(m.Defaults)
+	protocols, _ := json.Marshal(m.Protocols)
 	creating := m.ID == ""
 	if creating {
 		m.ID = id("mod_")
@@ -203,9 +260,9 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 	var result sql.Result
 	var e error
 	if creating {
-		result, e = g.db.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled) VALUES(?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled)
+		result, e = g.db.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json) VALUES(?,?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols))
 	} else {
-		result, e = g.db.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, m.ID)
+		result, e = g.db.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=?,protocols_json=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ID)
 	}
 	if e != nil {
 		problem(w, 409, "模型保存失败，请检查调用别名是否重复")
@@ -368,8 +425,8 @@ func (g *Gateway) seedDemo(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "创建失败")
 		return
 	}
-	if _, e = tx.Exec("INSERT INTO connections VALUES(?,?,?,?,?,?,?)", cid, "本地演示连接", "demo", "chat", "demo://local", enc, true); e == nil {
-		_, e = tx.Exec("INSERT INTO models VALUES(?,?,?,?,?,?,?)", mid, "本地演示模型", "demo-chat", cid, "demo-v1", "{}", true)
+	if _, e = tx.Exec(`INSERT INTO connections(id,name,provider,protocol,base_url,credential,enabled,endpoints_json) VALUES(?,?,?,'','',?,?,?)`, cid, "本地演示连接", "demo", enc, true, `{"chat":"demo://local"}`); e == nil {
+		_, e = tx.Exec("INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json) VALUES(?,?,?,?,?,?,?,?)", mid, "本地演示模型", "demo-chat", cid, "demo-v1", "{}", true, `["chat"]`)
 	}
 	if e == nil {
 		_, e = tx.Exec("INSERT INTO projects VALUES(?,?,?,?,?)", pid, "演示项目", true, digest(token), token[:11])

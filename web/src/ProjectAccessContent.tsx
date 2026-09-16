@@ -4,14 +4,14 @@ import { Check, Copy, KeyRound, RefreshCw, ShieldCheck } from 'lucide-react';
 type Props = {
   project: { id: string; name: string; enabled: boolean; token_prefix: string; has_saved_token?: boolean };
   baseURL: string;
-  models: { id: string; alias: string; protocol: string; enabled: boolean }[];
+  models: { id: string; alias: string; protocols: string[]; enabled: boolean }[];
   resolveToken: () => Promise<string>;
   saveToken: (token: string) => Promise<void>;
   rotateToken: () => Promise<void>;
 };
 
 export function ProjectAccessContent({ project, baseURL, models, resolveToken, saveToken, rotateToken }: Props) {
-  const [protocol, setProtocol] = useState(models[0]?.protocol || 'chat');
+  const [protocol, setProtocol] = useState(models.find(m => m.enabled && m.protocols.length)?.protocols[0] || 'chat');
   const [alias, setAlias] = useState(models[0]?.alias || '');
   const [existing, setExisting] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
@@ -24,7 +24,7 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 3500); return () => clearTimeout(t); }, [notice]);
   const endpoint = protocol === 'messages' ? baseURL.replace(/\/v1\/?$/, '') : baseURL;
-  const availableModels = models.filter(m => m.protocol === protocol);
+  const availableModels = models.filter(m => m.enabled && m.protocols.includes(protocol));
   const selectedAlias = availableModels.some(m => m.alias === alias) ? alias : availableModels[0]?.alias || '';
 
   async function action(fn: () => Promise<void>) {
