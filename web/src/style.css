@@ -23,3 +23,12 @@
  .workspace>*{flex-shrink:0}
  .workspace:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 }
+
+/* Message headings remain available while their content is collapsed. */
+.message-toggle{display:flex;width:100%;justify-content:flex-start;gap:7px;border:0;padding:6px 0;background:transparent;text-align:left;white-space:normal;line-height:1.5}
+.message-toggle:hover{background:var(--soft)}
+.message-toggle .dot{top:50%;transform:translateY(-50%)}
+.message-chevron{flex-shrink:0;transition:transform .15s}
+.message-toggle[aria-expanded="true"] .message-chevron{transform:rotate(90deg)}
+.message-toggle-hint{margin-left:auto;flex-shrink:0;font-family:inherit;font-size:10px;color:var(--muted)}
+.message-content[hidden]{display:none}
