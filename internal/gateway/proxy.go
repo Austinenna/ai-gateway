@@ -332,6 +332,7 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 		scanner.Buffer(make([]byte, 4096), maxLog)
 		var event strings.Builder
 		done := false
+		chatEnd := newChatStreamEnd(body["n"])
 		send := func() bool {
 			if event.Len() == 0 {
 				return true
@@ -340,6 +341,9 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 			event.Reset()
 			text, token, ended, _, _ := eventStats(s, c.Protocol)
 			payload := eventData(s)
+			if c.Protocol == "chat" {
+				chatEnd.observe(payload)
+			}
 			if kind := responseError(payload); kind != "" {
 				rec.ErrorType = kind
 			}
@@ -392,6 +396,9 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 				return
 			}
 		}
+		// Some Chat providers close normally after finish_reason=stop without
+		// sending [DONE]. Still drain the body for final content, usage and errors.
+		done = done || (c.Protocol == "chat" && chatEnd.complete())
 		if ctx.Err() != nil || isTimeout(scanner.Err()) {
 			classifyTransport(rec, r.Context(), ctx, scanner.Err())
 		} else if rec.ErrorType != "" {
