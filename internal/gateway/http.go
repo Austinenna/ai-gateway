@@ -188,6 +188,7 @@ func (g *Gateway) Handler(assets fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/admin/demo", g.admin(g.seedDemo))
 	mux.HandleFunc("POST /api/admin/models/{id}/test", g.admin(g.observeCall(g.testModel)))
 	mux.HandleFunc("GET /v1/models", g.modelList)
+	mux.HandleFunc("GET /api/public/models", g.publicModels)
 	mux.HandleFunc("POST /v1/chat/completions", g.observeCall(g.proxy))
 	mux.HandleFunc("POST /v1/messages", g.observeCall(g.proxy))
 	mux.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {

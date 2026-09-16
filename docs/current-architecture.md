@@ -130,6 +130,7 @@ MODEL=coding
 
 | 客户端入口 | 用途 | 上游处理 |
 | --- | --- | --- |
+| `GET /api/public/models` | 无需认证，列出全网关已启用且有可用协议的模型别名、显示名称与协议 | 本地查询，不请求厂商；不返回连接信息、上游模型 ID 或凭据 |
 | `GET /v1/models` | 列出当前项目获授权、模型与连接均启用的别名 | 本地查询，不请求厂商模型列表 |
 | `POST /v1/chat/completions` | Chat Completions 普通／流式调用 | 连接的 `chat` 基础端点追加 `/chat/completions` |
 | `POST /v1/messages` | Messages 普通／流式调用 | 连接的 `messages` 基础端点追加 `/messages` |
@@ -137,6 +138,8 @@ MODEL=coding
 Messages 转发配置 `x-api-key`、Bearer 鉴权及 `anthropic-version`，并允许传递客户端的 `anthropic-beta`。没有提供自动 Chat↔Messages 转换、Responses、Realtime、Token Counting 或任意代理路径。
 
 Anthropic SDK 的 Base URL 应填写网关根地址，由 SDK 添加 `/v1/messages`；管理页“接入信息”会按所选客户端协议给出不同地址。
+
+公开目录固定返回全网关的目录，携带项目凭证也不会按项目筛选；响应格式为 `{"object":"list","data":[{"id":"调用别名","object":"model","name":"显示名称","protocols":["chat","messages"]}]}`，按别名排序，空目录返回 `data: []`。协议取模型启用协议与连接已配置端点的交集，模型或连接停用、交集为空时不展示；无需项目授权、主密钥解锁或上游探测。这个目录表示配置的能力，不承诺上游实时可用，也不授予调用权限。无需认证不等于开放网络监听，其他设备仍需能够访问网关地址。
 
 **实现层面，当前协议差异集中在 `proxy.go` 的分支里。** 尚未抽象为每家厂商独立的适配器类、注册中心或插件。这样便于先把两种协议的流程跑通；将来增加明显不同的协议时，再拆分适配层有实际收益。
 
