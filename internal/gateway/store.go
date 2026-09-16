@@ -71,6 +71,8 @@ type Record struct {
 	InputTokens   int64  `json:"input_tokens"`
 	OutputTokens  int64  `json:"output_tokens"`
 	Truncated     bool   `json:"truncated"`
+
+	Adaptations []RequestAdaptation `json:"adaptations,omitempty"`
 }
 type session struct{ Expires time.Time }
 type Gateway struct {

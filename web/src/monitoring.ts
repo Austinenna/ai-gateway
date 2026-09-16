@@ -1,3 +1,6 @@
+export type RequestAdaptation = {
+  rule: string; field: string; before: string; after: string; removed_fields?: string[];
+};
 export type RequestRecord = {
   id: string; project_id: string; project_name: string; model_id: string; alias: string;
   upstream_model: string; protocol: string; started: number; duration_ms: number;
@@ -11,6 +14,7 @@ export type RequestRecord = {
   cache_read_tokens?: number | null; cache_write_tokens?: number | null;
   output_reported?: boolean; usage_status?: string; output_tps?: number | null; tpot_ms?: number | null;
   record_missing?: boolean;
+  adaptations?: RequestAdaptation[];
 };
 export type Distribution = { count: number; p50: number | null; p95: number | null };
 export type MetricSummary = {

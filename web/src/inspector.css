@@ -148,3 +148,8 @@ html:has(.requests-workspace), body:has(.requests-workspace), .requests-workspac
 @media (max-width: 760px) {
   .rail-head .search, .rail-head .request-filters { grid-column: 1 / -1; }
 }
+.request-adaptations { margin-bottom: 20px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--accent-bg); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.request-adaptations h3 { margin: 0 0 10px; font-size: 13px; }
+.request-adaptations p { margin: 5px 0; }
+.request-adaptations code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.request-adaptations small { display: block; margin-top: 10px; color: var(--muted); }

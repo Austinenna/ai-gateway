@@ -82,6 +82,10 @@ SQLite 升至版本 5，将旧连接的单协议端点与模型的原协议迁�
 
 ## 下一步起点
 
+2026-09-16 网关厂商参数适配：外部继续使用现有统一端点、自定义模型别名与项目 Token，厂商兼容移入 `provider_adapters.go`，按连接厂商、实际上游模型和协议分派。当前 MiniMax M3 的 Messages 请求将 `thinking.type=enabled` 转为 `adaptive`，移除 `thinking.budget_tokens`，保留独立的 `max_tokens` 及其他请求内容。`adaptive`、`disabled`、缺失／null／未知形式保持原意；MiniMax M2、Chat、智谱及自定义连接不应用此规则。公开别名或项目名称不参与厂商判断，同一项目可授权不同厂商模型并共用凭证。
+
+请求 JSON 新增轻量 `adaptations`，记录规则和参数变化，原始输入保留适配前内容；请求详情各页签直接展示转换与预算失效说明，旧记录不补写，无需数据库迁移。OpenClaw 继续使用 `ai-gateway/MiniMax-M3` 自定义接入，本次未修改其配置或源码。新增模拟转发覆盖普通／SSE、同项目跨厂商、别名隔离、请求历史和工具保留、原始日志与响应保留；浏览器覆盖适配展示、原始字段、旧记录／智谱、桌面／手机和深色主题。48 项 Go 测试含竞态检测、11 项前端单测、6 项相关浏览器回归与前端／本机二进制构建通过。确认无进行中调用后正常重启 8317，自动解锁、最新静态资源和 OpenClaw 自定义接入已核对，原 2 条连接、4 个模型、3 个项目、6 条授权、113 条请求及 62 条监控记录均保留。首次受限环境中的完整 Go 回归因不允许监听临时端口而中断，随后在允许本机端口的环境完整通过。验收产物位于 `output/provider-adapters-qa/`；本次未发起真实模型调用，恢复思考输出仍需由后续实际调用确认。
+
 2026-09-16 OpenClaw 执行审批迁移修复：用户在接入网关后触发 `ExecApprovalsMigrationRequiredError`。确认旧 `exec-approvals.json` 与当前 SQLite 均无自定义审批规则，但内部 socket Token 不同；首次 `doctor --fix --non-interactive` 因冲突保留旧文件，退出成功仍未解除运行时阻塞。备份后仅将旧文件对齐为当前 SQLite 的完整权威表示，再执行官方修复，迁移记录已完成并移除旧文件，未扩大执行权限。本机及运行中 Gateway 的 `approvals get --json` 均通过，startup／ready 正常，唯一模型仍为 `ai-gateway/MiniMax-M3`。Doctor 将现有网关项目 Token 同步到 `ai-gateway:default` 认证项，未恢复旧厂商凭据；主配置仅额外补入空的 UI 偏好。备份位于 `~/.openclaw/backups/exec-approvals-repair-20260916-222500/`，脱敏验收记录在 `output/openclaw-exec-approvals-qa/verification.json`。未发起模型调用，未执行 Agent 命令；此前接入验证未覆盖执行审批链路，本次已补验读取入口。
 
 2026-09-16 OpenClaw 统一接入网关：按用户要求，在现有网关中新建 `OpenClaw` 项目，仅授权 `MiniMax-M3`，使用该项目凭证接入 `http://127.0.0.1:8317` 的 Anthropic Messages 协议。OpenClaw 改为 `models.mode=replace`，唯一模型、默认模型及允许列表均为 `ai-gateway/MiniMax-M3`，无备用模型；移除旧模型定义、5 组直连认证与3组插件模型目录缓存，根目录旧认证文件移入备份。通过 OpenClaw API 清除全部 7 个已有会话的模型选择和旧认证覆盖，保留全部 118 条会话事件及现有渠道设置。
