@@ -174,6 +174,7 @@ func (g *Gateway) Handler(assets fs.FS) http.Handler {
 	mux.HandleFunc("PUT /api/admin/connections/{id}", g.admin(g.saveConnection))
 	mux.HandleFunc("DELETE /api/admin/connections/{id}", g.admin(g.deleteConnection))
 	mux.HandleFunc("POST /api/admin/connections/{id}/reveal", g.admin(g.reveal))
+	mux.HandleFunc("POST /api/admin/connections/{id}/models", g.admin(g.discoverModels))
 	mux.HandleFunc("POST /api/admin/models", g.admin(g.saveModel))
 	mux.HandleFunc("PUT /api/admin/models/{id}", g.admin(g.saveModel))
 	mux.HandleFunc("DELETE /api/admin/models/{id}", g.admin(g.deleteModel))
