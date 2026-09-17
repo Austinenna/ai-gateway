@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// Authentication continues to use the digest. Only an unlocked admin session
-// can request the encrypted copy, which is bound to this project by GCM AAD.
+// Authentication continues to use the digest. The encrypted copy is bound to
+// this project by GCM AAD. Admin recovery and scoped enrollment retries share it.
 func saveProjectToken(tx *sql.Tx, key []byte, projectID, token string) error {
 	enc, err := seal(key, []byte(token), "project:"+projectID)
 	if err != nil {
@@ -54,6 +54,9 @@ func (g *Gateway) projectCredential(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) saveExistingProjectCredential(w http.ResponseWriter, r *http.Request) {
+	if !g.applicationAllowsEdit(w, r.PathValue("id")) {
+		return
+	}
 	var input struct {
 		Token string `json:"token"`
 	}
@@ -100,6 +103,9 @@ func (g *Gateway) saveExistingProjectCredential(w http.ResponseWriter, r *http.R
 }
 
 func (g *Gateway) rotateProject(w http.ResponseWriter, r *http.Request) {
+	if !g.applicationAllowsEdit(w, r.PathValue("id")) {
+		return
+	}
 	key := g.key()
 	defer wipe(key)
 	if len(key) == 0 {

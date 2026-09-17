@@ -1,0 +1,63 @@
+import { test, expect } from '@playwright/test';
+import { randomBytes } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
+
+test('客户端立即领取待启用 Token，管理员批准原 Token 或拒绝申请', async ({ page, playwright }) => {
+  const admin = { 'X-Gateway-Admin': '1' };
+  const status = await (await page.request.get('/api/status')).json();
+  await page.goto('/');
+  await page.getByLabel('管理密码', { exact: true }).fill('isolated-ui-test-password-2026');
+  if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill('isolated-ui-test-password-2026');
+  await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
+  await expect(page.locator('nav')).toBeVisible();
+  const connection = await (await page.request.post('/api/admin/connections', { headers: admin, data: { name: '申请测试连接', provider: 'demo', protocol: 'chat', base_url: 'demo://local', enabled: true } })).json();
+  const model = await (await page.request.post('/api/admin/models', { headers: admin, data: { name: '申请模型', alias: 'application-test-model', upstream_model: 'demo', connection_id: connection.id, protocols: ['chat'], defaults: {}, enabled: true } })).json();
+  const client = await playwright.request.newContext({ baseURL: 'http://127.0.0.1:18318' });
+  const apply = async (name: string) => {
+    const receipt = 'gr_' + randomBytes(32).toString('base64url');
+    const response = await client.post('/api/project-applications', { headers: { 'X-Gateway-Enrollment': '1', Authorization: 'Bearer ' + receipt }, data: { name, client: '本地项目客户端', models: [model.alias], note: '用于当前项目的对话功能，配置已完成' } });
+    expect(response.status()).toBe(201); return response.json();
+  };
+  const first = await apply('等待批准的项目');
+  const second = await apply('准备拒绝的项目');
+  const auth = { Authorization: 'Bearer ' + first.token };
+  expect((await client.get('/v1/models', { headers: auth })).status()).toBe(401);
+  expect((await client.get('/api/admin/state', { headers: auth })).status()).toBe(401);
+  expect((await (await client.get('/api/project-access', { headers: auth })).json()).status).toBe('pending');
+  await page.reload();
+  await expect(page.getByRole('button', { name: '2 个项目等待批准接入' })).toBeVisible();
+  await page.getByRole('button', { name: '2 个项目等待批准接入' }).click();
+  const row = page.locator('.project-card').filter({ hasText: '等待批准的项目' });
+  await expect(row).toContainText('待批准');
+  await expect(row).toContainText('Chat Completions');
+  expect(await page.locator('body').evaluate((body, token) => body.textContent!.includes(token), first.token)).toBe(false);
+  const out = path.resolve('../output/applications-qa'); mkdirSync(out, { recursive: true });
+  for (const [name, width, height] of [['desktop', 1440, 1000], ['mobile', 390, 844]] as const) {
+    await page.setViewportSize({ width, height });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await row.getByRole('button', { name: '批准', exact: true }).scrollIntoViewIfNeeded();
+    await expect(row.getByRole('button', { name: '批准', exact: true })).toBeInViewport();
+    await page.screenshot({ path: path.join(out, name + '.png'), fullPage: true });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: path.join(out, 'dark.png'), fullPage: true });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await row.getByRole('button', { name: '批准', exact: true }).click();
+  await expect(row).toContainText('启用');
+  expect((await client.get('/v1/models', { headers: auth })).status()).toBe(200);
+  expect((await (await client.get('/api/project-access', { headers: auth })).json()).status).toBe('active');
+  const call = await client.post('/v1/chat/completions', { headers: auth, data: { model: model.alias, messages: [{ role: 'user', content: 'isolated mock test' }] } });
+  expect(call.status()).toBe(200);
+  const reject = page.locator('.project-card').filter({ hasText: '准备拒绝的项目' });
+  await reject.getByRole('button', { name: '拒绝', exact: true }).click();
+  await expect(reject).toContainText('已拒绝');
+  expect((await client.get('/v1/models', { headers: { Authorization: 'Bearer ' + second.token } })).status()).toBe(401);
+  await page.goto('/?view=projects');
+  await expect(page.getByRole('heading', { name: '项目权限', exact: true })).toBeVisible();
+  for (const result of [first, second]) await page.request.delete('/api/admin/projects/' + result.application.project_id, { headers: admin });
+  await page.request.delete('/api/admin/models/' + model.id, { headers: admin });
+  await page.request.delete('/api/admin/connections/' + connection.id, { headers: admin });
+  await client.dispose();
+});

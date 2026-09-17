@@ -61,7 +61,12 @@ func (g *Gateway) state(w http.ResponseWriter, r *http.Request) {
 	}
 	var count int
 	_ = g.db.QueryRow("SELECT count(*) FROM requests").Scan(&count)
-	writeJSON(w, 200, map[string]any{"connections": cs, "models": ms, "projects": ps, "request_count": count, "dropped_records": g.dropped.Load(), "base_url": g.origin + "/v1"})
+	applications, e := g.applications()
+	if e != nil {
+		problem(w, 500, "读取申请失败")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"applications": applications, "connections": cs, "models": ms, "projects": ps, "request_count": count, "dropped_records": g.dropped.Load(), "base_url": g.origin + "/v1"})
 }
 func (g *Gateway) saveConnection(w http.ResponseWriter, r *http.Request) {
 	var c Connection
@@ -273,6 +278,9 @@ func (g *Gateway) saveProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.ID = r.PathValue("id")
+	if p.ID != "" && !g.applicationAllowsEdit(w, p.ID) {
+		return
+	}
 	p.Name = strings.TrimSpace(p.Name)
 	if !validName(p.Name) {
 		problem(w, 400, "请填写项目名称")

@@ -161,7 +161,7 @@ func TestMigrateV4ProtocolEndpointsPreservesCredentialsAndGrants(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		restartHarness(t, h)
 		var version int
-		if err := h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 5 {
+		if err := h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 7 {
 			t.Fatal("schema version did not persist")
 		}
 		connections, err := h.g.connections()

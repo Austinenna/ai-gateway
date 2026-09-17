@@ -272,3 +272,12 @@
 .catalog-results code{display:block;margin-top:4px;font-size:.6875rem;color:var(--muted);overflow-wrap:anywhere}
 .catalog-results small{font-size:.6875rem;white-space:nowrap;color:var(--muted);flex:none}
 @media(max-width:550px){.catalog-source>label{flex-basis:100%;justify-content:space-between}.catalog-source>button{width:100%}.catalog-source select{max-width:75%}.catalog-filters{grid-template-columns:minmax(0,1fr) 100px;gap:8px}.catalog-filters input,.catalog-filters select,.catalog-source select{font-size:16px}.model-catalog{padding:12px}}
+
+/* Enrollment is visible in the project list; no credential is exposed here. */
+.project-pending{background:light-dark(#fffcf2,#302b20)}
+.project-applicant{display:grid;gap:5px;color:var(--muted);font-size:.75rem;margin-top:9px;overflow-wrap:anywhere}
+.project-applicant small{line-height:1.5}
+.project-pending .project-state{color:light-dark(#8d5707,#f1c77a);background:light-dark(#fff0cd,#493a20)}
+.application-banner{width:100%;justify-content:flex-start;white-space:normal;text-align:left;background:light-dark(#fff8e5,#302b20);border-color:light-dark(#ebd8a0,#655330);margin-bottom:20px;padding:14px 18px}
+.application-banner span{flex:1}.application-banner svg{flex:none}
+.projects-table .project-row-actions .primary{background:var(--accent);color:white;border-color:var(--accent)}

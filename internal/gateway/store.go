@@ -172,7 +172,7 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	if e = db.QueryRow("PRAGMA user_version").Scan(&v); e != nil {
 		return fail(e)
 	}
-	if v > 5 {
+	if v > 7 {
 		return fail(errors.New("database was created by a newer gateway"))
 	}
 	_, e = db.Exec(`
@@ -208,6 +208,11 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	}
 	if v < 5 {
 		if e = migrateProtocolEndpoints(db); e != nil {
+			return fail(e)
+		}
+	}
+	if v < 7 {
+		if e = migrateApplications(db); e != nil {
 			return fail(e)
 		}
 	}
