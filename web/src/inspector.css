@@ -153,3 +153,8 @@ html:has(.requests-workspace), body:has(.requests-workspace), .requests-workspac
 .request-adaptations p { margin: 5px 0; }
 .request-adaptations code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .request-adaptations small { display: block; margin-top: 10px; color: var(--muted); }
+.raw-data-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 12px}
+.raw-data-heading h3{margin:0;min-width:0}
+.raw-data-copy{flex:none;gap:5px;padding:5px 8px;font-size:12px;min-height:30px}
+.raw-data-copy svg{flex:none}
+@media(pointer:coarse){.raw-data-copy{min-height:40px}}
