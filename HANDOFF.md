@@ -40,6 +40,8 @@ bash scripts/start.sh
 
 ## 验证边界
 
+2026-09-17 模型别名复制：模型配置列表在每行调用别名右侧增加小复制图标，直接复制完整别名，复用现有成功／失败提示；支持键盘操作和触屏点击，长别名可换行。TypeScript／Vite 和本机二进制构建通过，使用模拟配置及模拟剪贴板核对逐行内容、成功／拒绝反馈、键盘操作和 1440／390 宽度、深色布局；验收图位于 `output/alias-copy-qa/`。 等待进行中调用结束后正常重启 8317，自动解锁与新静态资源核对通过，原 3 条连接、5 个模型、3 个项目和 163 条请求记录保留；本次未调用真实厂商。
+
 2026-09-17 新增 DeepSeek 厂商模板：连接表单、列表和请求厂商筛选显示 DeepSeek，后端接受 `deepseek` 标识。Chat 基础端点为 `https://api.deepseek.com`，Messages 为 `https://api.deepseek.com/anthropic/v1`，可独立启用或共用一份 Key；沿用模型列表获取、别名、项目授权与普通／SSE 同协议转发，不内置固定模型清单、不套用 MiniMax 专用参数规则。地址依据 DeepSeek 官方文档及官方 Harness 实现核对，详见 `docs/demo.md`。
 
 51 项 Go 测试含竞态检测、11 项前端单测、3 项相关浏览器回归及 TypeScript／Vite／本机二进制构建通过。扩展既有厂商用例覆盖 DeepSeek 双协议普通／SSE 转发、鉴权与编辑保留凭据，浏览器覆盖模板切换、保存回显、列表和筛选；1440／390 宽度截图已核对（`output/multi-protocol-qa/deepseek-*.png`）。首次完整 Go 测试因沙箱禁止临时端口监听中断，权限审批后完整回归通过。确认无进行中调用后正常重启 8317，自动解锁和新静态资源核对通过，原 2 条连接、4 个模型、3 个项目及 143 条请求记录保留。重启验证位于 `output/deepseek-qa/restart-verification.json`；未读取真实 Key、未创建真实 DeepSeek 连接、未调用真实厂商，API Key 由用户在管理页面填写。

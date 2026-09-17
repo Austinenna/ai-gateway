@@ -53,6 +53,11 @@
 .models-table tbody tr:hover{background:light-dark(#fafbfe,#1e2733)}
 .model-identity strong{display:block;font-size:.9375rem;font-weight:600;line-height:1.5;margin-bottom:5px}
 .models-table .model-identity code{display:block;color:var(--muted);font-size:.8125rem;line-height:1.5}
+.model-alias{display:flex;align-items:center;gap:6px}
+.model-alias code{min-width:0}
+.model-alias-copy{flex:none;width:28px;height:28px;min-height:28px;padding:5px;border-color:transparent;background:transparent;color:var(--muted);border-radius:5px}
+.model-alias-copy:hover{border-color:transparent;background:var(--soft);color:var(--accent)}
+@media(pointer:coarse){.model-alias-copy{width:40px;height:40px;min-height:40px}}
 .models-table .model-upstream code{font-size:.8125rem;line-height:1.65;color:var(--ink)}
 .model-connection>span{display:flex;align-items:flex-start;gap:7px;line-height:1.55}
 .model-connection svg{color:var(--muted);flex:none;margin-top:4px}
