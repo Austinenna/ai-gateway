@@ -7,7 +7,7 @@
 ## 已确认的范围和方案
 
 - **先在本地实现，为未来迁移单台 Linux 服务器做好准备。** 现在不部署远程服务，也不引入分布式组件。
-- **第一版只做大语言模型。** 提供智谱、MiniMax 模板与自定义连接，每条连接可配置 Chat Completions、Anthropic Messages 中的一种或两种；百炼 ASR、豆包 ASR、火山视频生成等属于后续候选能力。
+- **第一版只做大语言模型。** 提供智谱、MiniMax、DeepSeek 模板与自定义连接，每条连接可配置 Chat Completions、Anthropic Messages 中的一种或两种；百炼 ASR、豆包 ASR、火山视频生成等属于后续候选能力。
 - 技术栈固定为 **Go＋React／TypeScript＋Vite＋SQLite**：Go 标准库处理 HTTP 与 SSE，前端嵌入一个可执行文件，SQLite 保存配置和记录。运行时无需 Node 服务。
 - 界面采用 A 的整体侧栏结构＋B 的请求检查器，已根据实际使用调整项目列表、接入信息、删除流程和独立滚动。
 

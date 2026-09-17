@@ -1,6 +1,6 @@
 # AI Gateway：开发交接
 
-更新日期：2026-09-16。项目转正后位于 `/Users/enna/Projects/apps/ai-gateway`，阶段为第一版已实现、继续开发与实际联调。
+更新日期：2026-09-17。项目转正后位于 `/Users/enna/Projects/apps/ai-gateway`，阶段为第一版已实现、继续开发与实际联调。
 
 ## 先理解什么
 
@@ -39,6 +39,11 @@ bash scripts/start.sh
 文件迁移不代表当前聊天和应用项目入口自动迁移。后续对话应从上述正式目录打开；不要继续在旧 `drafts` 路径下新建同名项目。转正记录由技能脚本保存在 `~/Projects/_meta/promotions/`。
 
 ## 验证边界
+
+2026-09-17 新增 DeepSeek 厂商模板：连接表单、列表和请求厂商筛选显示 DeepSeek，后端接受 `deepseek` 标识。Chat 基础端点为 `https://api.deepseek.com`，Messages 为 `https://api.deepseek.com/anthropic/v1`，可独立启用或共用一份 Key；沿用模型列表获取、别名、项目授权与普通／SSE 同协议转发，不内置固定模型清单、不套用 MiniMax 专用参数规则。地址依据 DeepSeek 官方文档及官方 Harness 实现核对，详见 `docs/demo.md`。
+
+51 项 Go 测试含竞态检测、11 项前端单测、3 项相关浏览器回归及 TypeScript／Vite／本机二进制构建通过。扩展既有厂商用例覆盖 DeepSeek 双协议普通／SSE 转发、鉴权与编辑保留凭据，浏览器覆盖模板切换、保存回显、列表和筛选；1440／390 宽度截图已核对（`output/multi-protocol-qa/deepseek-*.png`）。首次完整 Go 测试因沙箱禁止临时端口监听中断，权限审批后完整回归通过。确认无进行中调用后正常重启 8317，自动解锁和新静态资源核对通过，原 2 条连接、4 个模型、3 个项目及 143 条请求记录保留。重启验证位于 `output/deepseek-qa/restart-verification.json`；未读取真实 Key、未创建真实 DeepSeek 连接、未调用真实厂商，API Key 由用户在管理页面填写。
+
 
 2026-09-16 MiniMax M3 自动缓存用量修正：Messages 输入总量按普通输入＋缓存读取计算，不再被缺失的缓存写入字段阻塞；原始缺失与明确零继续区分，详情显示“未单列（自动缓存）”并说明公式，明确正数写入仍计入总量。规则限定实际 MiniMax 厂商与 M3 上游模型，Chat、其他模型和厂商沿用原口径。已有监控记录在列表、详情、总览读取时重算派生输入，不重写原始响应或数据库；历史未保存最终输出确认标记的记录继续保留该不确定性，不补算历史速度。
 

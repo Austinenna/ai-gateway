@@ -19,7 +19,7 @@ func validEndpoint(c Connection) bool {
 	if c.Provider == "demo" {
 		return len(c.Endpoints) == 1 && c.Endpoints["chat"] == "demo://local"
 	}
-	if c.Provider != "zhipu" && c.Provider != "minimax" && c.Provider != "custom" {
+	if c.Provider != "zhipu" && c.Provider != "minimax" && c.Provider != "deepseek" && c.Provider != "custom" {
 		return false
 	}
 	if len(c.Endpoints) == 0 || len(c.Endpoints) > 2 {

@@ -2,7 +2,7 @@ import { Eye, KeyRound, Pencil, Trash2 } from 'lucide-react';
 import { connectionProtocols, protocolName } from './connection-protocols';
 
 type ConnectionInfo = { id: string; name: string; provider: string; endpoints: Record<string, string>; enabled: boolean; has_token?: boolean };
-const providerName = (provider: string) => ({ zhipu: '智谱', minimax: 'MiniMax', custom: '自定义', demo: '本地演示' }[provider] || provider);
+const providerName = (provider: string) => ({ zhipu: '智谱', minimax: 'MiniMax', deepseek: 'DeepSeek', custom: '自定义', demo: '本地演示' }[provider] || provider);
 
 export function ConnectionList<T extends ConnectionInfo>({ connections, onEdit, onReveal, onDelete }: {
   connections: T[];

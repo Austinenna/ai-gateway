@@ -8,18 +8,25 @@ import (
 )
 
 func TestConnectionProvidersForwardBothProtocols(t *testing.T) {
-	for _, provider := range []string{"zhipu", "minimax", "custom"} {
+	for _, provider := range []string{"zhipu", "minimax", "deepseek", "custom"} {
 		for _, protocol := range []string{"chat", "messages"} {
 			t.Run(provider+"/"+protocol, func(t *testing.T) {
 				h := newHarness(t)
 				const secret = "fake-custom-connection-key"
+				endpoint := "https://compatible.test/custom/v1"
+				if provider == "deepseek" {
+					endpoint = "https://api.deepseek.com"
+					if protocol == "messages" {
+						endpoint += "/anthropic/v1"
+					}
+				}
 				created := h.request("POST", "/api/admin/connections", Connection{
 					Name: "兼容服务", Provider: provider, Protocol: protocol,
-					BaseURL: "https://compatible.test/custom/v1/", Token: secret, Enabled: true,
+					BaseURL: endpoint + "/", Token: secret, Enabled: true,
 				}, "", true)
 				h.want(created, 200)
 				c := parse[Connection](t, created)
-				if c.Token != "" || !c.HasToken || c.Endpoints[protocol] != "https://compatible.test/custom/v1" {
+				if c.Provider != provider || c.Token != "" || !c.HasToken || c.Endpoints[protocol] != endpoint {
 					t.Fatal("connection response should hide the key and normalize the endpoint")
 				}
 				m := h.model(c, "compatible")

@@ -122,12 +122,16 @@ bash scripts/start.sh
 | MiniMax Chat Completions（中国站） | `https://api.minimax.cn/v1` | `/chat/completions` |
 | MiniMax Messages（中国站） | `https://api.minimax.cn/anthropic/v1` | `/messages` |
 | MiniMax 国际站 | 使用账号对应的 `api.minimax.io` 端点 | 同协议路径 |
+| DeepSeek Chat Completions | `https://api.deepseek.com` | `/chat/completions` |
+| DeepSeek Anthropic Messages | `https://api.deepseek.com/anthropic/v1` | `/messages` |
 | 自定义 Chat Completions | 例如 `https://example.com/v1`，按服务文档填写 | `/chat/completions` |
 | 自定义 Anthropic Messages | 例如 `https://example.com/anthropic/v1`，按服务文档填写 | `/messages` |
 
 套餐、地域与账号权限可能不同；编码套餐端点不能直接假设等同于通用端点。模型 ID 手动填写自己账号实际开通的值。MiniMax 接口模板与协议参考 [中国站 Messages 文档](https://platform.minimax.cn/docs/api-reference/text-anthropic-api)、[中国站 Chat Completions 文档](https://platform.minimax.cn/docs/api-reference/text-openai-api)，智谱参考 [API 快速开始](https://docs.bigmodel.cn/cn/api/introduction) 与 [Claude API 兼容说明](https://docs.bigmodel.cn/cn/guide/develop/claude/introduction)。本次没有使用用户真实 Token 进行厂商联调。
 
 自定义连接需要提供兼容所选协议与当前鉴权方式的服务：Chat 使用 Bearer Token；Messages 还发送 `x-api-key`、`anthropic-version` 并允许透传 `anthropic-beta`。远程地址使用 HTTPS，本机可用回环 HTTP。表单内临时关闭再打开协议会保留手填端点；保存连接不会调用上游。客户端请求路径决定协议，模型必须启用该协议且连接必须配置对应端点；不自动转换 Chat／Messages。
+
+DeepSeek 选择内置模板后填写自己的 API Key，再添加模型；可通过 Chat 协议“获取模型列表”选择当前可用 ID，也可手动填写。参考 [DeepSeek 首次调用 API](https://api-docs.deepseek.com/zh-cn/)、[Anthropic 兼容接口](https://api-docs.deepseek.com/zh-cn/guides/anthropic_api) 和 [模型列表](https://api-docs.deepseek.com/api/list-models/)。官网给 Anthropic SDK 的基础地址不含 `/v1`；本项目只追加 `/messages`，所以模板预先包含 `/v1`，与 [DeepSeek 官方 Harness 实现](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/web/web-search-deepseek/src/provider.ts) 一致。不内置固定模型清单；若 Messages 端点不提供列表，可切换 Chat 获取或手填。厂商特有请求参数按原协议透传，MiniMax 的专用参数转换不会应用于 DeepSeek。
 
 同一个模型别名可分别通过 Chat／Messages 入口调用，项目只需授权一次。模型新建时默认启用该连接已配置的协议，可取消不支持的协议；连接新增协议后，已有模型需要编辑并勾选才启用。升级前的单协议连接和模型会保留原协议，不会自动增加新协议。
 

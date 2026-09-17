@@ -19,7 +19,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
   const row = (name: string) => page.locator('.connection-row').filter({ hasText: name });
   const output = resolve('../output/multi-protocol-qa');
   mkdirSync(output, { recursive: true });
-  const names = ['双协议表单验证', '仅 Messages 表单验证'];
+  const names = ['双协议表单验证', '仅 Messages 表单验证', 'DeepSeek 模板验证'];
   let modelID = '', projectID = '';
   const openNew = async () => {
     await page.locator('nav').getByRole('button', { name: /^厂商连接/ }).click();
@@ -41,6 +41,9 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       await modal.getByRole('combobox', { name: '厂商', exact: true }).selectOption('minimax');
       await expect(chatURL()).toHaveValue('https://api.minimax.cn/v1');
       await expect(messagesURL()).toHaveValue('https://api.minimax.cn/anthropic/v1');
+      await modal.getByRole('combobox', { name: '厂商', exact: true }).selectOption('deepseek');
+      await expect(chatURL()).toHaveValue('https://api.deepseek.com');
+      await expect(messagesURL()).toHaveValue('https://api.deepseek.com/anthropic/v1');
       await modal.getByRole('combobox', { name: '厂商', exact: true }).selectOption('custom');
       await expect(chatURL()).toHaveValue(''); await expect(messagesURL()).toHaveValue('');
       await chatURL().fill('http://127.0.0.1:9/chat/v1');
@@ -74,6 +77,36 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       await expect(chat()).not.toBeChecked(); await expect(messages()).toBeChecked();
       await expect(modal.getByLabel('更换厂商 Token')).toHaveValue('');
       await modal.getByRole('button', {name:'取消',exact:true}).click();
+    });
+    await test.step('DeepSeek 双协议模板保存回显、列表与厂商筛选', async () => {
+      await openNew();
+      await modal.getByRole('combobox', { name: '厂商', exact: true }).selectOption('deepseek');
+      await messages().check();
+      await expect(chatURL()).toHaveValue('https://api.deepseek.com');
+      await expect(messagesURL()).toHaveValue('https://api.deepseek.com/anthropic/v1');
+      await save(names[2]);
+      await page.reload();
+      await page.locator('nav').getByRole('button', { name: /^厂商连接/ }).click();
+      await expect(row(names[2]).locator('.connection-identity span')).toHaveText('DeepSeek');
+      await expect(row(names[2])).toContainText('https://api.deepseek.com/anthropic/v1');
+      await row(names[2]).getByRole('button', { name: '编辑', exact: true }).click();
+      await expect(modal.getByRole('combobox', { name: '厂商', exact: true })).toHaveValue('deepseek');
+      await expect(chat()).toBeChecked(); await expect(messages()).toBeChecked();
+      await expect(chatURL()).toHaveValue('https://api.deepseek.com');
+      await expect(messagesURL()).toHaveValue('https://api.deepseek.com/anthropic/v1');
+      await expect(modal.getByLabel('更换厂商 Token')).toHaveValue('');
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 1000 });
+        expect(await modal.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+        await page.screenshot({ path: resolve(output, `deepseek-${width}.png`) });
+      }
+      await modal.getByRole('button', { name: '保存连接', exact: true }).click();
+      await expect(modal).toHaveCount(0);
+      await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+      await page.getByRole('combobox', { name: '按厂商筛选' }).click();
+      await page.getByRole('option', { name: 'DeepSeek', exact: true }).click();
+      await expect(page.getByRole('combobox', { name: '按厂商筛选' })).toHaveText('DeepSeek');
+      await page.getByRole('button', { name: '清除请求筛选' }).click();
     });
     await test.step('一个模型启用两种协议，测试明确选择协议', async () => {
       const state = await (await page.request.get('/api/admin/state')).json();

@@ -43,7 +43,7 @@ flowchart TB
     DB --> Auth
     Queue --> DB
     DB -->|记录查询| Admin
-    Forward <-->|厂商 API| Provider[智谱 / MiniMax / 自定义兼容服务]
+    Forward <-->|厂商 API| Provider[智谱 / MiniMax / DeepSeek / 自定义兼容服务]
     Forward -->|模型响应| Client
 ```
 
@@ -65,7 +65,7 @@ Node.js 用于开发和构建前端，打包后运行网关不需要单独的 No
 
 同一厂商可以建多条连接，例如分别使用开发和生产 Key；一个连接可以被多个模型共用。这里的“删除厂商”在数据层删除的是选中的连接，其他同厂商连接独立保留。
 
-当前厂商标识为 `zhipu`、`minimax`、`custom`、`demo`。智谱、MiniMax 与自定义连接均支持独立启用 Chat／Messages；模板按协议预填地址，自定义连接手填兼容服务的地址。两个入口共用一份 Token；若凭据或上游模型 ID 不同，应分别配置连接／模型。演示连接固定为本地 Chat 模拟协议。表单内临时关闭再打开协议会保留手填地址；选择其他厂商模板会预填对应地址。远程端点要求 HTTPS，本机可用回环 HTTP。
+当前厂商标识为 `zhipu`、`minimax`、`deepseek`、`custom`、`demo`。智谱、MiniMax、DeepSeek 与自定义连接均支持独立启用 Chat／Messages；模板按协议预填地址，自定义连接手填兼容服务的地址。两个入口共用一份 Token；若凭据或上游模型 ID 不同，应分别配置连接／模型。演示连接固定为本地 Chat 模拟协议。表单内临时关闭再打开协议会保留手填地址；选择其他厂商模板会预填对应地址。远程端点要求 HTTPS，本机可用回环 HTTP。
 
 ### 3.2 模型：对外名字与厂商模型之间的映射
 
