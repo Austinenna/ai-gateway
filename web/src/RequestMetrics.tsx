@@ -1,3 +1,4 @@
+import { requestCostText, RequestCostDetails } from './pricing';
 import { type RequestRecord, firstTiming, inputTotal, outputTotal, number, percent, duration, dateTime, recordStatus, errorName } from './monitoring';
 
 export function RequestHeader({ record: r }: { record: RequestRecord }) {
@@ -14,6 +15,7 @@ export function RequestHeader({ record: r }: { record: RequestRecord }) {
       <code className="detail-request-id" title={'请求 ID：' + r.id}>{r.id}</code>
     </div>
     {r.error_type && <div className="request-outcome-note">{errorName(r.error_type)} · HTTP {r.status || '—'}</div>}
+    <div className="request-cost-banner">{requestCostText(r)}</div>
     <RequestMetrics record={r}/>
   </header>;
 }
@@ -57,6 +59,7 @@ export function RequestTiming({ record: r }: { record: RequestRecord }) {
       <div className="cache-ratio"><span>缓存命中占输入总量</span><b>{percent(ratio)}</b><div><i style={{ width: `${ratio || 0}%` }}/></div></div>
       <p className="metric-explanation">{autoCache ? 'MiniMax M3 自动缓存：输入总量＝普通输入＋缓存读取。缓存写入未单列时不影响总量；上报 0 不代表后台没有建立缓存。' : r.protocol === 'messages' ? '输入总量＝普通输入＋缓存读取＋缓存写入。' : '缓存读取是输入总量的一部分，不重复相加。'} 未报告的数量不当作零。输出采用厂商口径，可能包含思考及工具调用。</p>
     </section>
+    <RequestCostDetails record={r}/>
     <section className="detail-speed"><h3>输出阶段</h3><dl className="usage-breakdown"><div><dt>估算速度</dt><dd>{number(r.output_tps, 1)} <small>Token/s</small></dd></div><div><dt>估算 TPOT</dt><dd>{number(r.tpot_ms, 2)} <small>ms/Token</small></dd></div></dl><p className="metric-explanation">按首段到末段有效内容的时间与厂商输出用量估算。仅流式完整结束、用量完整且样本足够时计算；分片可能包含多个 Token，因此不是模型内部逐 Token 测量。</p></section>
     <section className="detail-outcome"><h3>请求结果</h3><dl className="usage-breakdown"><div><dt>最终结果</dt><dd>{recordStatus(r)}</dd></div><div><dt>客户端 HTTP / 上游 HTTP</dt><dd>{r.status || '—'} / {r.upstream_status || '—'}</dd></div></dl>{r.error_type && <p className="metric-explanation">{errorName(r.error_type)}。流式请求可能在 HTTP 200 后发生错误，最终结果以传输是否完整结束为准。</p>}</section>
   </div>;

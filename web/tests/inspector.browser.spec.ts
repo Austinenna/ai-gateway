@@ -76,7 +76,7 @@ test('请求检查器区分首个 token、正文首字及旧记录未采集状�
   await page.screenshot({ path: testInfo.outputPath('timing-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath('timing-mobile.png'), fullPage: true });
-  await page.locator('.request-item').filter({ hasText: '旧记录' }).click();
+  await page.locator('.request-item').filter({ has: page.locator('b', { hasText: /^旧记录$/ }) }).click();
   await expect(page.locator('.detail-head')).toContainText('首个 Token · TTFT未记录');
   await expect(page.locator('.detail-head')).toContainText('正文首字 · TTFC25.12 s');
   await page.locator('.request-item').filter({ hasText: '空响应' }).click();
@@ -112,7 +112,7 @@ test('消息块独立折叠、键盘展开及切换请求后恢复默认状态',
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath('messages-mobile.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.locator('.request-item').filter({ hasText: '旧记录' }).click();
+  await page.locator('.request-item').filter({ has: page.locator('b', { hasText: /^旧记录$/ }) }).click();
   await expect(system).toHaveAttribute('aria-expanded', 'true');
   await expect(blocks.nth(0)).toBeVisible();
   await page.locator('.request-item').filter({ hasText: '计时演示' }).click();
@@ -160,7 +160,7 @@ test('长消息预览和全文都随页面滚动，支持键盘展开及切换�
   await assistant.locator('summary').click();
 
   await system.getByRole('button', { name: '展开全文', exact: true }).click();
-  await page.locator('.request-item').filter({ hasText: '旧记录' }).click();
+  await page.locator('.request-item').filter({ has: page.locator('b', { hasText: /^旧记录$/ }) }).click();
   await expect(page.locator('.detail-head h2')).toHaveText('旧记录');
   await page.locator('.request-item').filter({ hasText: '长消息预览' }).click();
   await expect(page.locator('.detail-head h2')).toHaveText('长消息预览');

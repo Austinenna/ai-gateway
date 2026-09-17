@@ -138,6 +138,7 @@ func (g *Gateway) observeCall(next http.HandlerFunc) http.HandlerFunc {
 				}
 			}
 			finalizeUsage(rec)
+			rec.Cost = calculateCost(rec)
 			g.metricsMu.Lock()
 			g.saveMetric(*rec)
 			delete(g.inflight, rec.ID)
@@ -201,6 +202,7 @@ func distribution(values []float64) metricDistribution {
 }
 
 type metricAggregate struct {
+	Cost                        CostAggregate      `json:"cost"`
 	Requests                    int                `json:"requests"`
 	Completed                   int                `json:"completed"`
 	Failed                      int                `json:"failed"`
@@ -228,8 +230,11 @@ type metricAggregate struct {
 	cacheInput                  int64
 }
 
-func newAggregate() metricAggregate { return metricAggregate{Errors: map[string]int{}} }
+func newAggregate() metricAggregate {
+	return metricAggregate{Errors: map[string]int{}, Cost: CostAggregate{Amounts: map[string]float64{}}}
+}
 func (a *metricAggregate) add(rec Record) {
+	a.Cost.add(rec)
 	a.Requests++
 	if rec.State == "running" {
 		a.Active++
@@ -309,6 +314,13 @@ type metricGroup struct {
 	ConnectionName string `json:"connection_name"`
 	metricAggregate
 }
+type metricProject struct {
+	ProjectID   string        `json:"project_id"`
+	ProjectName string        `json:"project_name"`
+	Requests    int           `json:"requests"`
+	Cost        CostAggregate `json:"cost"`
+}
+
 type metricBucket struct {
 	Started  int64   `json:"started"`
 	Requests int     `json:"requests"`
@@ -387,6 +399,7 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 	options := map[string]map[string]string{"projects": {}, "connections": {}, "models": {}}
 	agg := newAggregate()
 	groups := map[string]*metricGroup{}
+	projects := map[string]*metricProject{}
 	recent := []Record{}
 	const n = 24
 	buckets := make([]metricBucket, n)
@@ -423,6 +436,11 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		agg.add(rec)
+		if projects[rec.ProjectID] == nil {
+			projects[rec.ProjectID] = &metricProject{ProjectID: rec.ProjectID, ProjectName: rec.ProjectName}
+		}
+		projects[rec.ProjectID].Requests++
+		projects[rec.ProjectID].Cost.add(rec)
 		key := rec.ModelID + "/" + rec.ConnectionID
 		if groups[key] == nil {
 			groups[key] = &metricGroup{ModelID: rec.ModelID, Alias: rec.Alias, ConnectionID: rec.ConnectionID, ConnectionName: rec.ConnectionName, metricAggregate: newAggregate()}
@@ -439,6 +457,16 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 	}
 	minutes := float64(now-from) / 60000
 	agg.finish(minutes)
+	projectList := []metricProject{}
+	for _, p := range projects {
+		projectList = append(projectList, *p)
+	}
+	sort.Slice(projectList, func(i, j int) bool {
+		if projectList[i].Requests != projectList[j].Requests {
+			return projectList[i].Requests > projectList[j].Requests
+		}
+		return projectList[i].ProjectID < projectList[j].ProjectID
+	})
 	groupList := []metricGroup{}
 	for _, v := range groups {
 		v.finish(minutes)
@@ -469,5 +497,5 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 		filterOptions[k] = out
 	}
-	writeJSON(w, 200, map[string]any{"from": from, "to": now, "monitoring_since": g.monitoringSince, "summary": agg, "models": groupList, "buckets": buckets, "recent": recent, "options": filterOptions, "metrics_errors": g.metricsErrors.Load(), "dropped_records": g.dropped.Load()})
+	writeJSON(w, 200, map[string]any{"from": from, "to": now, "monitoring_since": g.monitoringSince, "summary": agg, "models": groupList, "projects": projectList, "buckets": buckets, "recent": recent, "options": filterOptions, "metrics_errors": g.metricsErrors.Load(), "dropped_records": g.dropped.Load()})
 }

@@ -23,13 +23,14 @@ func tokenValue(v *int64) *int64 {
 }
 func (rec *Record) readUsage(data []byte) {
 	type usage struct {
-		Input      *int64 `json:"input_tokens"`
-		Output     *int64 `json:"output_tokens"`
-		Prompt     *int64 `json:"prompt_tokens"`
-		Completion *int64 `json:"completion_tokens"`
-		CacheRead  *int64 `json:"cache_read_input_tokens"`
-		CacheWrite *int64 `json:"cache_creation_input_tokens"`
-		Details    struct {
+		Input          *int64 `json:"input_tokens"`
+		Output         *int64 `json:"output_tokens"`
+		Prompt         *int64 `json:"prompt_tokens"`
+		PromptCacheHit *int64 `json:"prompt_cache_hit_tokens"`
+		Completion     *int64 `json:"completion_tokens"`
+		CacheRead      *int64 `json:"cache_read_input_tokens"`
+		CacheWrite     *int64 `json:"cache_creation_input_tokens"`
+		Details        struct {
 			Cached *int64 `json:"cached_tokens"`
 		} `json:"prompt_tokens_details"`
 	}
@@ -56,6 +57,9 @@ func (rec *Record) readUsage(data []byte) {
 			rec.OutputTokens = *n
 			rec.OutputReported = true
 			rec.outputFinal = true
+		}
+		if u.Details.Cached == nil {
+			u.Details.Cached = u.PromptCacheHit
 		}
 		if n := tokenValue(u.Details.Cached); n != nil {
 			rec.CacheRead = n
