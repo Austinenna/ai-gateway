@@ -155,13 +155,13 @@ func TestMigrateV4ProtocolEndpointsPreservesCredentialsAndGrants(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Recreate the v4 schema using only this isolated database.
-	if _, err := h.g.db.Exec(`UPDATE connections SET protocol='messages',base_url='https://legacy.test/anthropic/v1'; ALTER TABLE connections DROP COLUMN endpoints_json; ALTER TABLE models DROP COLUMN protocols_json; ALTER TABLE models DROP COLUMN pricing_json; PRAGMA user_version=4;`); err != nil {
+	if _, err := h.g.db.Exec(`UPDATE connections SET protocol='messages',base_url='https://legacy.test/anthropic/v1'; ALTER TABLE connections DROP COLUMN endpoints_json; ALTER TABLE models DROP COLUMN protocols_json; PRAGMA user_version=4;`); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
 		restartHarness(t, h)
 		var version int
-		if err := h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 6 {
+		if err := h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 5 {
 			t.Fatal("schema version did not persist")
 		}
 		connections, err := h.g.connections()

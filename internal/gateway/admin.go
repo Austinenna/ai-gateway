@@ -238,25 +238,6 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, err.Error())
 		return
 	}
-	var oldPricing *ModelPricing
-	if m.ID != "" {
-		var previous, oldConnection, oldUpstream string
-		if err := g.db.QueryRow("SELECT pricing_json,connection_id,upstream_model FROM models WHERE id=?", m.ID).Scan(&previous, &oldConnection, &oldUpstream); err == nil && oldConnection == m.ConnectionID && oldUpstream == m.UpstreamModel {
-			var err error
-			oldPricing, err = decodePricing(previous)
-			if err != nil {
-				problem(w, 500, "读取价格失败")
-				return
-			}
-		}
-	}
-	var pricingErr error
-	m.Pricing, pricingErr = preparePricing(m.Pricing, oldPricing)
-	if pricingErr != nil {
-		problem(w, 400, pricingErr.Error())
-		return
-	}
-	pricing, _ := json.Marshal(m.Pricing)
 	defaults, _ := json.Marshal(m.Defaults)
 	protocols, _ := json.Marshal(m.Protocols)
 	creating := m.ID == ""
@@ -272,9 +253,9 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 	var result sql.Result
 	var e error
 	if creating {
-		result, e = g.db.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,pricing_json) VALUES(?,?,?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), string(pricing))
+		result, e = g.db.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json) VALUES(?,?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols))
 	} else {
-		result, e = g.db.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=?,protocols_json=?,pricing_json=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), string(pricing), m.ID)
+		result, e = g.db.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=?,protocols_json=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ID)
 	}
 	if e != nil {
 		problem(w, 409, "模型保存失败，请检查调用别名是否重复")

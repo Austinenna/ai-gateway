@@ -1,9 +1,7 @@
-import type { RequestCost, CostAggregate } from './pricing';
 export type RequestAdaptation = {
   rule: string; field: string; before: string; after: string; removed_fields?: string[];
 };
 export type RequestRecord = {
-  cost?: RequestCost;
   id: string; project_id: string; project_name: string; model_id: string; alias: string;
   upstream_model: string; protocol: string; started: number; duration_ms: number;
   first_text_ms: number | null; first_token_ms?: number | null; timing_version?: number;
@@ -21,7 +19,6 @@ export type RequestRecord = {
 };
 export type Distribution = { count: number; p50: number | null; p95: number | null };
 export type MetricSummary = {
-  cost?: CostAggregate;
   requests: number; completed: number; failed: number; canceled: number; active: number;
   success_rate: number | null; rpm: number; errors: Record<string, number>;
   input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number;
@@ -31,7 +28,6 @@ export type MetricSummary = {
 };
 export type MetricOption = { id: string; name: string };
 export type Metrics = {
-  projects?: { project_id: string; project_name: string; requests: number; cost: CostAggregate }[];
   from: number; to: number; monitoring_since: number; summary: MetricSummary;
   models: (MetricSummary & { model_id: string; alias: string; connection_id: string; connection_name: string })[];
   buckets: { started: number; requests: number; failed: number; canceled: number; rpm: number }[];

@@ -74,14 +74,14 @@ func (g *Gateway) route(alias, projectID string, admin bool) (Model, Connection,
 	var m Model
 	var c Connection
 	var encrypted []byte
-	var defaults, protocols, endpoints, pricing string
-	q := `SELECT m.id,m.name,m.alias,m.connection_id,m.upstream_model,m.defaults_json,m.enabled,m.protocols_json,c.id,c.name,c.provider,c.endpoints_json,c.enabled,c.credential,m.pricing_json FROM models m JOIN connections c ON c.id=m.connection_id WHERE m.alias=? AND m.enabled=1 AND c.enabled=1`
+	var defaults, protocols, endpoints string
+	q := `SELECT m.id,m.name,m.alias,m.connection_id,m.upstream_model,m.defaults_json,m.enabled,m.protocols_json,c.id,c.name,c.provider,c.endpoints_json,c.enabled,c.credential FROM models m JOIN connections c ON c.id=m.connection_id WHERE m.alias=? AND m.enabled=1 AND c.enabled=1`
 	args := []any{alias}
 	if !admin {
 		q += ` AND EXISTS(SELECT 1 FROM project_models pm WHERE pm.model_id=m.id AND pm.project_id=?)`
 		args = append(args, projectID)
 	}
-	e := g.db.QueryRow(q, args...).Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &defaults, &m.Enabled, &protocols, &c.ID, &c.Name, &c.Provider, &endpoints, &c.Enabled, &encrypted, &pricing)
+	e := g.db.QueryRow(q, args...).Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &defaults, &m.Enabled, &protocols, &c.ID, &c.Name, &c.Provider, &endpoints, &c.Enabled, &encrypted)
 	if e == nil {
 		e = json.Unmarshal([]byte(defaults), &m.Defaults)
 	}
@@ -90,9 +90,6 @@ func (g *Gateway) route(alias, projectID string, admin bool) (Model, Connection,
 	}
 	if e == nil {
 		e = json.Unmarshal([]byte(endpoints), &c.Endpoints)
-	}
-	if e == nil {
-		m.Pricing, e = decodePricing(pricing)
 	}
 	return m, c, encrypted, e
 }
@@ -214,7 +211,6 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	rec := &t.rec
 	rec.ProjectID, rec.ProjectName, rec.ModelID, rec.Alias, rec.UpstreamModel, rec.Protocol = p.ID, p.Name, m.ID, m.Alias, m.UpstreamModel, c.Protocol
 	rec.ConnectionID, rec.ConnectionName, rec.Provider = c.ID, c.Name, c.Provider
-	rec.Cost = &RequestCost{Status: "pending", Pricing: m.Pricing}
 	g.snapshotCall(t)
 	key := g.key()
 	defer wipe(key)

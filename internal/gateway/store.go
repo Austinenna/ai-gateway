@@ -33,7 +33,6 @@ type Connection struct {
 	Token     string            `json:"token,omitempty"`
 }
 type Model struct {
-	Pricing       *ModelPricing              `json:"pricing,omitempty"`
 	ID            string                     `json:"id"`
 	Name          string                     `json:"name"`
 	Alias         string                     `json:"alias"`
@@ -52,7 +51,6 @@ type Project struct {
 	ModelIDs      []string `json:"model_ids"`
 }
 type Record struct {
-	Cost *RequestCost `json:"cost,omitempty"`
 	MetricsFields
 	ID            string `json:"id"`
 	ProjectID     string `json:"project_id"`
@@ -174,7 +172,7 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	if e = db.QueryRow("PRAGMA user_version").Scan(&v); e != nil {
 		return fail(e)
 	}
-	if v > 6 {
+	if v > 5 {
 		return fail(errors.New("database was created by a newer gateway"))
 	}
 	_, e = db.Exec(`
@@ -211,19 +209,6 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	if v < 5 {
 		if e = migrateProtocolEndpoints(db); e != nil {
 			return fail(e)
-		}
-	}
-	if v < 6 {
-		tx, err := db.Begin()
-		if err != nil {
-			return fail(err)
-		}
-		if _, err = tx.Exec(`ALTER TABLE models ADD COLUMN pricing_json TEXT NOT NULL DEFAULT 'null'; PRAGMA user_version=6;`); err != nil {
-			tx.Rollback()
-			return fail(err)
-		}
-		if err = tx.Commit(); err != nil {
-			return fail(err)
 		}
 	}
 	g := &Gateway{db: db, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient()}
@@ -335,7 +320,7 @@ func (g *Gateway) connections() ([]Connection, error) {
 	return out, rows.Err()
 }
 func (g *Gateway) models() ([]Model, error) {
-	rows, e := g.db.Query("SELECT id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,pricing_json FROM models ORDER BY rowid")
+	rows, e := g.db.Query("SELECT id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json FROM models ORDER BY rowid")
 	if e != nil {
 		return nil, e
 	}
@@ -343,17 +328,14 @@ func (g *Gateway) models() ([]Model, error) {
 	out := []Model{}
 	for rows.Next() {
 		var m Model
-		var d, protocols, pricing string
-		if e = rows.Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &d, &m.Enabled, &protocols, &pricing); e != nil {
+		var d, protocols string
+		if e = rows.Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &d, &m.Enabled, &protocols); e != nil {
 			return nil, e
 		}
 		if e = json.Unmarshal([]byte(protocols), &m.Protocols); e != nil {
 			return nil, e
 		}
 		if e = json.Unmarshal([]byte(d), &m.Defaults); e != nil {
-			return nil, e
-		}
-		if m.Pricing, e = decodePricing(pricing); e != nil {
 			return nil, e
 		}
 		out = append(out, m)
