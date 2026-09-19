@@ -174,3 +174,92 @@ test('MiniMax 自动缓存显示总输入、命中率并区分未单列与零', 
   await expect(usage.locator('dd').nth(3)).toHaveText('0');
   await expect(page.locator('.usage-state')).toHaveText('输入与最终输出已报告');
 });
+
+test('模型指标双向排序、未知值置后，并在刷新与筛选后保留', async ({ page }, info) => {
+  const model = (id: string, requests: number, success: number | null, ttft: number | null, ttfc: number | null, input: number, output: number, cache: number | null, speed: number | null, samples = 1) => ({
+    ...summary, model_id: id, alias: id, connection_id: id ? 'c1' : '', connection_name: id ? '研发模型连接' : '',
+    requests, success_rate: success, ttft: distribution(ttft, ttft), ttfc: distribution(ttfc, ttfc),
+    input_tokens: input, output_tokens: output, input_samples: samples, output_samples: samples,
+    cache_ratio: cache, speed: distribution(speed, speed),
+  });
+  const alpha = model('alpha', 12, 80, 900, 3000, 100, 900, 25, 9);
+  let rows = [
+    model('', 999, 100, 1, 1, 99999, 99999, 100, 999),
+    model('unknown', 1, null, null, null, 9999, 9999, null, null, 0),
+    model('beta', 9, 95, 1200, 900, 900, 100, 80, 120),
+    model('zero', 2, 0, 0, 0, 0, 0, 0, 0), alpha,
+  ];
+  let refreshes = 0;
+  await page.route('**/api/admin/metrics?*', route => {
+    refreshes++;
+    return route.fulfill({ json: {
+      from, to: now, monitoring_since: from, summary, models: refreshes % 2 ? rows : [...rows].reverse(),
+      buckets: [], recent: [], options: { projects: [], models: [], connections: [] }, metrics_errors: 0, dropped_records: 0,
+    } });
+  });
+  await page.clock.install();
+  await page.reload();
+  const table = page.locator('.monitor-models');
+  const names = table.locator('tbody tr td:first-child > :first-child');
+  const unrouted = '未路由请求';
+  await expect(names).toHaveText(['alpha', 'beta', 'zero', 'unknown', unrouted]);
+  const cases = [
+    { name: '请求数', desc: ['alpha', 'beta', 'zero', 'unknown', unrouted], asc: ['unknown', 'zero', 'beta', 'alpha', unrouted] },
+    { name: '成功率', desc: ['beta', 'alpha', 'zero', 'unknown', unrouted], asc: ['zero', 'alpha', 'beta', 'unknown', unrouted] },
+    { name: 'TTFT · P95', desc: ['beta', 'alpha', 'zero', 'unknown', unrouted], asc: ['zero', 'alpha', 'beta', 'unknown', unrouted] },
+    { name: 'TTFC · P95', desc: ['alpha', 'beta', 'zero', 'unknown', unrouted], asc: ['zero', 'beta', 'alpha', 'unknown', unrouted] },
+    { name: '输入 Token', desc: ['beta', 'alpha', 'zero', 'unknown', unrouted], asc: ['zero', 'alpha', 'beta', 'unknown', unrouted] },
+    { name: '输出 Token', desc: ['alpha', 'beta', 'zero', 'unknown', unrouted], asc: ['zero', 'beta', 'alpha', 'unknown', unrouted] },
+    { name: '缓存命中', desc: ['beta', 'alpha', 'zero', 'unknown', unrouted], asc: ['zero', 'alpha', 'beta', 'unknown', unrouted] },
+    { name: '速度 · P50', desc: ['beta', 'alpha', 'zero', 'unknown', unrouted], asc: ['zero', 'alpha', 'beta', 'unknown', unrouted] },
+  ];
+  for (const { name, desc, asc } of cases) {
+    const button = table.getByRole('button', { name: name + '排序', exact: true });
+    const firstDirection = name === '请求数' || name.startsWith('TTF') ? 'ascending' : 'descending';
+    await button.click();
+    await expect(table.locator('th[aria-sort]')).toHaveCount(1);
+    await expect(table.locator('th[aria-sort]')).toHaveAttribute('aria-sort', firstDirection);
+    await expect(names).toHaveText(firstDirection === 'ascending' ? asc : desc);
+    await button.focus();
+    await button.press('Enter');
+    await expect(table.locator('th[aria-sort]')).toHaveAttribute('aria-sort', firstDirection === 'ascending' ? 'descending' : 'ascending');
+    await expect(names).toHaveText(firstDirection === 'ascending' ? desc : asc);
+  }
+  const speedOrder = ['zero', 'alpha', 'beta', 'unknown', unrouted];
+  const before = refreshes;
+  const automaticRefresh = page.waitForResponse(r => new URL(r.url()).pathname === '/api/admin/metrics');
+  await page.clock.runFor(5100);
+  await automaticRefresh;
+  expect(refreshes).toBeGreaterThan(before);
+  await expect(names).toHaveText(speedOrder);
+  await expect(table.locator('th[aria-sort]')).toHaveAttribute('aria-sort', 'ascending');
+  const changeMetrics = async (action: () => Promise<unknown>) => {
+    const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/admin/metrics');
+    await action();
+    await response;
+    await expect(page.getByRole('button', { name: '刷新监控', exact: true })).toBeEnabled();
+  };
+  await changeMetrics(() => page.getByLabel('监控项目', { exact: true }).selectOption('p1'));
+  await expect(names).toHaveText(speedOrder);
+  await changeMetrics(() => page.getByRole('button', { name: '刷新监控', exact: true }).click());
+  await expect(names).toHaveText(speedOrder);
+
+  for (const width of [1440, 1024, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await table.scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await table.screenshot({ path: info.outputPath(`model-sorting-${width}.png`) });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await table.screenshot({ path: info.outputPath('model-sorting-dark.png') });
+  await changeMetrics(() => table.getByRole('button', { name: 'alpha', exact: true }).click());
+  await expect(page.getByLabel('监控连接', { exact: true })).toHaveValue('c1');
+  await expect(names).toHaveText(speedOrder);
+  rows = [];
+  await changeMetrics(() => page.getByRole('button', { name: '刷新监控', exact: true }).click());
+  await expect(table).toContainText('当前筛选下没有请求。');
+  rows = [alpha];
+  await changeMetrics(() => page.getByRole('button', { name: '刷新监控', exact: true }).click());
+  await expect(names).toHaveText(['alpha']);
+});

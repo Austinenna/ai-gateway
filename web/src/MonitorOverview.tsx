@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Activity, ArrowRight, Clock3, Gauge, RefreshCw, ShieldCheck, Timer, Coins, Plug, FlaskConical } from 'lucide-react';
+import { Activity, ArrowRight, ArrowDown, ArrowUp, ArrowUpDown, Clock3, Gauge, RefreshCw, ShieldCheck, Timer, Coins, Plug, FlaskConical } from 'lucide-react';
 import { type Metrics, type MetricOption, number, percent, duration, dateTime, errorName, recordStatus, firstTiming } from './monitoring';
+import { type ModelSort, type ModelSortKey, nextModelSort, sortModelMetrics } from './model-metrics';
 
 type Props = {
   projects: MetricOption[]; connections: MetricOption[]; models: { id: string; alias: string }[];
@@ -15,6 +16,7 @@ function mergeOptions(current: MetricOption[], history: MetricOption[]) {
 export function MonitorOverview(props: Props) {
   const [window, setWindow] = useState('24h'), [project, setProject] = useState(''), [connection, setConnection] = useState(''), [model, setModel] = useState(''), [stream, setStream] = useState('');
   const [data, setData] = useState<Metrics | null>(null), [error, setError] = useState(''), [refresh, setRefresh] = useState(0), [loading, setLoading] = useState(true);
+  const [modelSort, setModelSort] = useState<ModelSort>({ key: 'requests', direction: 'descending' });
   useEffect(() => {
     let disposed = false, inProgress = false;
     const controller = new AbortController();
@@ -36,7 +38,16 @@ export function MonitorOverview(props: Props) {
   }, [window, project, connection, model, stream, refresh]);
   const filtersActive = !!(project || connection || model || stream);
   const s = data?.summary;
-  const modelRows = [...(data?.models || [])].sort((a, b) => Number(!a.model_id) - Number(!b.model_id));
+  const modelRows = sortModelMetrics(data?.models || [], modelSort);
+  const sortDirection = (key: ModelSortKey) => modelSort.key === key ? modelSort.direction : undefined;
+  const sortButton = (key: ModelSortKey, label: string, name = label) => {
+    const direction = sortDirection(key), next = nextModelSort(modelSort, key).direction;
+    const Icon = direction === 'ascending' ? ArrowUp : direction === 'descending' ? ArrowDown : ArrowUpDown;
+    return <button className={'metric-sort' + (direction ? ' active' : '')} aria-label={name + '排序'}
+      title={`${name}：点击${next === 'ascending' ? '升序' : '降序'}`} onClick={() => setModelSort(current => nextModelSort(current, key))}>
+      {label}<Icon size={12} aria-hidden="true"/>
+    </button>;
+  };
   const max = Math.max(1, ...(data?.buckets.map(b => b.requests) || []));
   const select = (label: string, value: string, change: (v: string) => void, options: MetricOption[]) => <label><span>{label}</span><select aria-label={'监控' + label} value={value} onChange={e => change(e.target.value)}><option value="">所有{label}</option>{options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>;
   return <div className="monitor-overview">
@@ -91,7 +102,27 @@ export function MonitorOverview(props: Props) {
           </div><p className="monitor-panel-note">客户端取消／断开单列，不计入成功率分母。</p>
         </section>
       </div>
-      <section className="panel monitor-models"><div className="panel-head"><h2>模型表现</h2><span className="muted small">点击模型可筛选</span></div><div className="table-scroll"><table><thead><tr><th>模型 / 连接</th><th>请求数</th><th>成功率</th><th>TTFT · P95</th><th>TTFC · P95</th><th>输入 / 输出 Token</th><th>缓存命中</th><th>速度 · P50</th></tr></thead><tbody>{modelRows.map(m => <tr key={m.model_id + m.connection_id}><td>{m.model_id ? <button className="table-link" onClick={() => { setModel(m.model_id); setConnection(m.connection_id); }}>{m.alias}</button> : <span>未路由请求</span>}<small>{m.connection_name || '网关前置检查'}</small></td><td>{number(m.requests)}</td><td>{percent(m.success_rate)}</td><td>{duration(m.ttft.p95)}</td><td>{duration(m.ttfc.p95)}</td><td>{number(m.input_samples ? m.input_tokens : null)} / {number(m.output_samples ? m.output_tokens : null)}</td><td>{percent(m.cache_ratio)}</td><td>{number(m.speed.p50, 1)}<small>Token/s</small></td></tr>)}</tbody></table></div>{!data!.models.length && <p className="monitor-empty-note">当前筛选下没有请求。</p>}</section>
+      <section className="panel monitor-models">
+        <div className="panel-head"><h2>模型表现</h2><span className="muted small">点击表头排序 · 点击模型筛选</span></div>
+        <div className="table-scroll"><table><thead><tr>
+          <th scope="col">模型 / 连接</th>
+          <th scope="col" aria-sort={sortDirection('requests')}>{sortButton('requests', '请求数')}</th>
+          <th scope="col" aria-sort={sortDirection('success_rate')}>{sortButton('success_rate', '成功率')}</th>
+          <th scope="col" aria-sort={sortDirection('ttft')}>{sortButton('ttft', 'TTFT · P95')}</th>
+          <th scope="col" aria-sort={sortDirection('ttfc')}>{sortButton('ttfc', 'TTFC · P95')}</th>
+          <th scope="col" aria-sort={sortDirection('input_tokens') || sortDirection('output_tokens')}><span className="metric-token-sort">
+            {sortButton('input_tokens', '输入', '输入 Token')}<span>/</span>{sortButton('output_tokens', '输出', '输出 Token')}<span>Token</span>
+          </span></th>
+          <th scope="col" aria-sort={sortDirection('cache_ratio')}>{sortButton('cache_ratio', '缓存命中')}</th>
+          <th scope="col" aria-sort={sortDirection('speed')}>{sortButton('speed', '速度 · P50')}</th>
+        </tr></thead><tbody>{modelRows.map(m => <tr key={JSON.stringify([m.model_id, m.connection_id])}>
+          <td>{m.model_id ? <button className="table-link" onClick={() => { setModel(m.model_id); setConnection(m.connection_id); }}>{m.alias}</button> : <span>未路由请求</span>}<small>{m.connection_name || '网关前置检查'}</small></td>
+          <td>{number(m.requests)}</td><td>{percent(m.success_rate)}</td><td>{duration(m.ttft.p95)}</td><td>{duration(m.ttfc.p95)}</td>
+          <td>{number(m.input_samples ? m.input_tokens : null)} / {number(m.output_samples ? m.output_tokens : null)}</td>
+          <td>{percent(m.cache_ratio)}</td><td>{number(m.speed.p50, 1)}<small>Token/s</small></td>
+        </tr>)}</tbody></table></div>
+        {!modelRows.length && <p className="monitor-empty-note">当前筛选下没有请求。</p>}
+      </section>
       <section className="panel monitor-recent"><div className="panel-head"><h2>近期调用</h2><span className="muted small">当前筛选 · 最近 8 条</span></div><div className="table-scroll"><table><thead><tr><th>项目 / 时间</th><th>模型</th><th>结果</th><th>TTFT</th><th>TTFC</th><th>总耗时</th><th/></tr></thead><tbody>{data!.recent.map(r => <tr key={r.id}><td>{r.project_name}<small>{dateTime(r.started)}</small></td><td><code>{r.alias || '—'}</code><small>{r.stream == null ? '—' : r.stream ? '流式' : '非流式'}</small></td><td><span className={'result-label result-' + r.state}>{recordStatus(r)}</span>{r.error_type && <small>{errorName(r.error_type)}</small>}</td><td>{firstTiming(r)}</td><td>{firstTiming(r, true)}</td><td>{r.state === 'running' || r.state === 'interrupted' ? '—' : duration(r.duration_ms)}</td><td><button className="icon-btn" aria-label={`查看请求 ${r.id}`} onClick={() => props.onSelect(r.id)}><ArrowRight size={16}/></button></td></tr>)}</tbody></table></div>{!data!.recent.length && <p className="monitor-empty-note">暂无调用记录。</p>}</section>
       <details className="monitor-definitions"><summary>统计口径与采集范围</summary><p>首次响应和输出速度仅统计有效的流式成功请求，总耗时统计成功请求。P50 是中位数，P95 覆盖约 95% 的样本；不同长度的回答可结合 Token 用量比较。TTFC 专指正文，不包含思考和工具调用。</p><p>用量为已上报数量，部分请求可能只报告了部分用量。缓存命中占比按已报告缓存信息的输入 Token 加权，未知不当作零。缓存写入 {number(s.cache_write_samples ? s.cache_write_tokens : null)} Token；缓存读取 {number(s.cache_samples ? s.cache_read_tokens : null)} Token。</p><p>从 {dateTime(data!.monitoring_since)} 开始采集；旧记录保留在请求记录中，不补入新统计。当前范围为 {dateTime(data!.from)} 至 {dateTime(data!.to)}，每 5 秒刷新。包含模型调用及管理员测试，排除管理操作和模型列表查询。RPM 按实际已监控时长计算。</p></details>
     </> : !error && <div className="monitor-loading" role="status">正在读取监控数据…</div>}
