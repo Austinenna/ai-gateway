@@ -1,0 +1,45 @@
+.prompt-text { min-width: 0; }
+.prompt-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; color: var(--muted); font-size: 10px; }
+.prompt-toolbar > div { display: flex; gap: 3px; padding: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.prompt-toolbar button { padding: 4px 9px; font-size: 10px; border: 0; background: transparent; color: var(--muted); }
+.prompt-toolbar button[aria-pressed=true] { background: var(--accent-bg); color: var(--accent); }
+.prompt-parts { display: grid; gap: 14px; }
+.message-content .prompt-section, .task-message .prompt-section { margin: 10px 0; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+.prompt-section:first-child { margin-top: 0; }
+.message-content .prompt-section > summary, .task-message .prompt-section > summary { margin: 0; padding: 12px 14px; cursor: pointer; line-height: 1.9; }
+.prompt-section > summary b { font-size: 12px; }
+.prompt-section > summary code { color: var(--muted); font-size: 10px; margin-left: 10px; }
+.prompt-section > summary small { color: var(--muted); font-size: 10px; margin-left: 10px; white-space: nowrap; }
+.prompt-section[open] > summary { border-bottom: 1px solid var(--line); }
+.prompt-section-body { padding: 14px; }
+.message-content .prompt-attributes { font-size: 10px; color: var(--muted); font-family: monospace; margin-bottom: 12px; }
+.prompt-environment { margin: 0; }
+.prompt-environment > div { display: grid; grid-template-columns: 85px minmax(0, 1fr); gap: 14px; padding: 9px 0; font-size: 12px; line-height: 1.8; border-bottom: 1px solid var(--line); }
+.prompt-environment > div:last-child { border: 0; }
+.prompt-environment dt { color: var(--muted); }
+.prompt-environment dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt-markdown { color: var(--ink); overflow-wrap: anywhere; font-size: 12px; line-height: 1.85; }
+.message-content .prompt-markdown p, .task-message .prompt-markdown p { margin: 10px 0; font-size: 12px; line-height: 1.85; white-space: pre-wrap; }
+.prompt-markdown > :first-child { margin-top: 0 !important; }
+.prompt-markdown > :last-child { margin-bottom: 0 !important; }
+.prompt-markdown h1, .prompt-markdown h2, .prompt-markdown h3, .prompt-markdown h4, .prompt-markdown h5, .prompt-markdown h6 { margin: 20px 0 10px; line-height: 1.6; letter-spacing: 0; font-weight: 600; }
+.prompt-markdown h1 { font-size: 19px; }
+.prompt-markdown h2 { font-size: 17px; }
+.prompt-markdown h3 { font-size: 15px; }
+.prompt-markdown h4, .prompt-markdown h5, .prompt-markdown h6 { font-size: 13px; }
+.prompt-markdown ul, .prompt-markdown ol { padding-left: 24px; margin: 10px 0; }
+.prompt-markdown li { margin: 4px 0; white-space: pre-wrap; }
+.prompt-markdown a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.prompt-markdown blockquote { border-left: 3px solid var(--line); color: var(--muted); margin: 12px 0; padding: 2px 14px; }
+.prompt-markdown code { border-radius: 4px; background: var(--soft); padding: 2px 4px; font-size: 11px; }
+.message-content .prompt-markdown pre, .task-message .prompt-markdown pre { border: 1px solid var(--line); border-radius: 7px; background: var(--bg); padding: 12px 14px; margin: 12px 0; max-height: none; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt-markdown pre code { padding: 0; background: none; }
+.prompt-markdown hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+.prompt-image { color: var(--muted); font-size: 11px; }
+.message-content .prompt-source, .task-message .prompt-source { margin: 0; padding: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: none; overflow: visible; background: transparent; border: 0; }
+@container request-detail (max-width: 420px) {
+  .prompt-section-body { padding: 10px; }
+  .prompt-section > summary code { display: block; margin: 4px 0 0; }
+  .prompt-section > summary small { margin-left: 0; }
+  .prompt-environment > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+}
