@@ -122,7 +122,7 @@ test('刷新显示等待后续和未知用量，不声称任务完成', async ({
   await expect(page.locator('.task-head')).toContainText('等待后续');
   await expect(page.locator('.task-answer')).toContainText('尚未记录主代理正常结束的正文回复');
   await expect(page.locator('.task-stats')).toContainText('0 / 4 次用量已知');
-  await expect(page.locator('.task-item').first()).toContainText('部分未知');
+  await expect(page.locator('.task-item').first()).not.toContainText('Token');
   await expect(page.locator('.task-stats b').nth(1)).toHaveText('—');
 });
 

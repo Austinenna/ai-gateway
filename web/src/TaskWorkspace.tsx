@@ -69,7 +69,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
           <span><small>{task.project_name}</small><small>{dateTime(task.started)}</small></span>
           <b className="task-title">{task.title}</b>
           <span className="task-badges"><em className={task.grouped ? 'task-tag' : 'task-tag neutral'}>{task.grouped ? 'WorkBuddy · 明确分组' : '无标识 · 独立调用'}</em><small className={task.state === 'replied' ? 'good-text' : 'warning-text'}>{taskState(task)}</small></span>
-          <span><small>{task.calls} 次调用 · 输入 {task.input_samples ? number(task.input_tokens) : '—'} / 输出 {task.output_samples ? number(task.output_tokens) : '—'} Token{task.input_samples < task.calls || task.output_samples < task.calls ? '（部分未知）' : ''}</small></span>
+          <span><small>{task.calls} 次调用</small></span>
           {task.failed > 0 && <span className="task-failure">{task.failed} 次调用失败</span>}
         </button>)}
         {!visible.length && <p className="rail-empty">没有匹配的任务。WorkBuddy 携带分组标识的新调用会自动出现在这里。</p>}
