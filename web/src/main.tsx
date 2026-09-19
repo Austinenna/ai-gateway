@@ -15,7 +15,6 @@ import { connectionProtocols, modelProtocols, protocolName, templateEndpoint } f
 import { ProjectList, type ProjectApplication } from './ProjectList';
 import { ConnectionDeleteContent } from './ConnectionDeleteContent';
 import { ResponseDetails } from './ResponseDetails';
-import { PromptText } from './PromptText';
 import { TaskWorkspace } from './TaskWorkspace';
 import type { RequestTask } from './request-tasks';
 import { RequestAdaptations } from './RequestAdaptations';
@@ -213,11 +212,11 @@ function MessageBlock({label,assistant=false,children}:{label:string;assistant?:
 }
 function MessageContent({content}:{content:unknown}){
  const blocks=Array.isArray(content)?content:[content];
- return <>{blocks.map((block,i)=>{
-  if(typeof block==='string')return <PromptText key={i} text={block}/>;
-  if(block&&typeof block==='object'&&'type' in block&&block.type==='text'&&'text' in block&&typeof block.text==='string')return <PromptText key={i} text={block.text}/>;
-  return <TextPreview key={i}><pre>{readable(block)}</pre></TextPreview>;
- })}</>;
+ return <TextPreview>{blocks.map((block,i)=>{
+  if(typeof block==='string')return <p key={i}>{block}</p>;
+  if(block&&typeof block==='object'&&'type' in block&&block.type==='text'&&'text' in block&&typeof block.text==='string')return <p key={i}>{block.text}</p>;
+  return <pre key={i}>{readable(block)}</pre>;
+ })}</TextPreview>;
 }
 function RecordDetail({selected,tab,setTab,copy}:{selected:RequestRecord;tab:string;setTab:(tab:string)=>void;copy:(value:string)=>void}){return <><RequestHeader record={selected}/><div className="detail-tabs">{[['messages','消息'],['response','响应详情'],['raw','原始数据'],['timing','性能与用量']].map(([v,t])=><button key={v} className={tab===v?'active':''} onClick={()=>setTab(v)}>{t}</button>)}</div><div className="detail-content"><RequestAdaptations changes={selected.adaptations}/>{selected.record_missing&&<div className="request-outcome-note">当前仅有监控摘要；请求可能仍在进行、正文日志尚未写入或未能保存。</div>}{selected.truncated&&<div className="error">记录内容达到上限，已截断；不代表模型响应本身被截断。</div>}{tab==='messages'?<Messages key={selected.id} record={selected} onResponseDetails={()=>{setTab('response')}}/>:tab==='response'?<ResponseDetails key={selected.id} output={selected.output||''}/>:tab==='raw'?<><div className="raw-data-heading"><h3>项目请求</h3><button type="button" className="raw-data-copy" aria-label="复制项目请求原始数据" disabled={!selected.input} onClick={()=>copy(selected.input||'')}><Copy size={14}/>复制</button></div><pre>{pretty(selected.input||'')}</pre><div className="raw-data-heading"><h3>上游响应 / SSE 事件</h3><button type="button" className="raw-data-copy" aria-label="复制上游响应原始数据" disabled={!selected.output} onClick={()=>copy(selected.output||'')}><Copy size={14}/>复制</button></div><pre>{pretty(selected.output||'')}</pre></>:<RequestTiming record={selected}/>}</div></>}
 
