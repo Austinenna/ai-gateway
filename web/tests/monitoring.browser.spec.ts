@@ -38,7 +38,11 @@ test.beforeEach(async ({ page }) => {
     const rangeSummary = all ? { ...summary, requests: 30, completed: 26, success_rate: 2600 / 27, input_tokens: 260000, output_tokens: 14326 } : summary;
     const metrics = {
       from: rangeFrom, to: now, monitoring_since: since, summary: rangeSummary,
-      models: [{ ...rangeSummary, model_id: 'm1', alias: 'coding', connection_id: 'c1', connection_name: '研发模型连接' }],
+      models: [
+        { ...rangeSummary, model_id: 'm1', alias: 'coding', connection_id: 'c1', connection_name: '研发模型连接' },
+        { ...summary, requests: 4, model_id: '', alias: '', connection_id: '', connection_name: '' },
+        { ...summary, requests: 2, model_id: 'm2', alias: 'light', connection_id: 'c1', connection_name: '研发模型连接' },
+      ],
       buckets: Array.from({ length: 24 }, (_, i) => {
         const requests = all && i === 0 ? 20 : i >= 19 ? [2, 1, 2, 2, 3][i - 19] : 0;
         return { started: rangeFrom + i * (now - rangeFrom) / 24, requests, failed: i === 23 ? 1 : 0, canceled: i === 22 ? 1 : 0, rpm: requests * 60000 / ((now - rangeFrom) / 24) };
@@ -94,6 +98,7 @@ test('全部范围显示累计统计并保留筛选与刷新', async ({ page }, 
 });
 
 test('六组监控支持筛选、跳转详情与桌面手机布局', async ({ page }, info) => {
+  await expect(page.locator('.monitor-models tbody tr td:first-child')).toHaveText(['coding研发模型连接', 'light研发模型连接', '未路由请求网关前置检查']);
   await expect(page.locator('.monitor-cards .metric-card')).toHaveCount(6);
   await expect(page.locator('.metric-health')).toContainText('85.7%');
   await expect(page.locator('.monitor-cards')).toContainText('60,000');
