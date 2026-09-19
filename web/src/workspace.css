@@ -19,6 +19,8 @@
   gap: 12px;
 }
 .page-head h1 { font-size: 20px; line-height: 1.4; letter-spacing: -.4px; }
+.page-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.page-heading h1 { white-space: nowrap; }
 .page-head button { flex: none; font-size: 13px; }
 .request-page-head .page-head-inner { max-width: none; padding-inline: 24px; }
 .gateway-status { display: grid; gap: 8px; min-width: 0; }
@@ -40,4 +42,6 @@
 }
 @media (max-width: 550px) {
   .page-head-inner, .request-page-head .page-head-inner { padding-inline: 14px; }
+  .page-heading { gap: 8px; }
+  .request-page-head .page-head-inner { flex-wrap: wrap; gap: 8px; }
 }

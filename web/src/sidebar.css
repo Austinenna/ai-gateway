@@ -1,7 +1,8 @@
 .sidebar-header { display: flex; align-items: center; gap: 4px; }
-.sidebar-header .brand { flex: 1; min-width: 0; padding: 0; gap: 8px; font-size: 15px; }
+.sidebar-header .brand { flex: 1; min-width: 0; padding: 0; gap: 10px; font-size: 17px; }
 .sidebar-header .brand-icon { padding: 7px; flex: none; }
-.sidebar-header .sidebar-toggle { flex: none; width: 28px; height: 32px; padding: 0; color: var(--muted); }
+.page-heading .sidebar-toggle { flex: none; width: 32px; height: 32px; padding: 0; color: var(--muted); border-radius: 6px; }
+.page-heading .sidebar-toggle:hover { color: var(--ink); background: var(--soft); border-color: transparent; }
 .sidebar nav button { position: relative; }
 .sidebar nav button svg, .sidebar-bottom button svg { flex: none; }
 
@@ -21,12 +22,10 @@
 
 @media (min-width: 761px) {
   .sidebar.is-collapsed { width: 72px; padding-inline: 13px; }
-  .sidebar.is-collapsed .sidebar-header { flex-direction: column; gap: 12px; }
+  .sidebar.is-collapsed .sidebar-header { justify-content: center; }
   .sidebar.is-collapsed .sidebar-header .brand { flex: none; }
   .sidebar.is-collapsed nav { margin-top: 24px; }
 }
 @media (max-width: 760px) {
-  .sidebar-header .brand { font-size: 17px; }
-  .sidebar-header .sidebar-toggle { width: 36px; height: 36px; }
   .sidebar.is-collapsed nav { margin-top: 12px; }
 }
