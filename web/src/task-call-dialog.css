@@ -1,0 +1,22 @@
+.task-call-dialog { width: min(1120px, calc(100vw - 64px)); height: min(920px, calc(100dvh - 64px)); max-width: none; max-height: none; margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 90px #101b3055; overflow: hidden; }
+.task-call-dialog[open] { display: flex; flex-direction: column; }
+.task-call-dialog::backdrop { background: #101b3066; backdrop-filter: blur(3px); }
+.task-call-dialog-head { display: flex; align-items: center; gap: 18px; padding: 14px 20px; border-bottom: 1px solid var(--line); flex: none; }
+.task-call-dialog-title { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 14px; margin-right: auto; }
+.task-call-dialog-title h2 { font-size: 16px; }
+.task-call-dialog-title span { color: var(--muted); font-size: 12px; }
+.task-call-dialog-nav { display: flex; gap: 8px; }
+.task-call-dialog-nav button { padding: 8px 12px; font-size: 12px; }
+.task-call-dialog .task-call-dialog-content { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.task-call-dialog .task-call-dialog-content:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.task-call-dialog .detail-tabs { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+.task-call-dialog-notice { color: var(--muted); background: var(--bg); padding: 8px 20px; font-size: 11px; border-bottom: 1px solid var(--line); flex: none; }
+.task-call-dialog-error { margin: 16px 20px; color: var(--red); font-size: 12px; line-height: 1.8; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.task-call-dialog-error button { font-size: 11px; padding: 6px 10px; }
+@media (max-width: 700px) {
+  .task-call-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); border-radius: 9px; }
+  .task-call-dialog-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 10px 12px; gap: 10px; }
+  .task-call-dialog-close { grid-column: 2; grid-row: 1; }
+  .task-call-dialog-nav { grid-column: 1 / -1; grid-row: 2; }
+  .task-call-dialog-nav button { flex: 1; }
+}

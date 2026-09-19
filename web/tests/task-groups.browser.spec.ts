@@ -32,7 +32,7 @@ async function setup(page: Page, count = 4) {
 }
 
 test('WorkBuddy 一次提问汇总，查看子代理与原始调用，保留逐次视图', async ({ page }, info) => {
-  await setup(page);
+  const { calls } = await setup(page);
   await expect(page.getByRole('button', { name: '按任务', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.task-item')).toHaveCount(3);
   await expect(page.locator('.task-item').first()).toContainText('4 次调用');
@@ -47,7 +47,11 @@ test('WorkBuddy 一次提问汇总，查看子代理与原始调用，保留逐�
   await expect(page.getByRole('button', { name: '原始数据', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '原始数据', exact: true }).click();
   await expect(page.getByRole('button', { name: '复制项目请求原始数据' })).toBeEnabled();
-  await page.getByRole('button', { name: '返回任务', exact: true }).click();
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { (window as unknown as { copied: string }).copied = value; } } }));
+  await page.getByRole('button', { name: '复制项目请求原始数据' }).click();
+  await expect(page.getByRole('dialog').getByRole('status')).toHaveText('已复制');
+  expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(calls[1].input);
+  await page.getByRole('button', { name: '关闭调用详情', exact: true }).click();
   await page.getByRole('button', { name: '分组信息', exact: true }).click();
   await expect(page.locator('.task-group-fields')).toContainText('root-first');
   await page.locator('.task-item').nth(1).click();
@@ -96,4 +100,94 @@ test('刷新显示等待后续和未知用量，不声称任务完成', async ({
   await expect(page.locator('.task-stats')).toContainText('0 / 4 次用量已知');
   await expect(page.locator('.task-item').first()).toContainText('部分未知');
   await expect(page.locator('.task-stats b').nth(1)).toHaveText('—');
+});
+
+test('调用浮层跨分页切换，保留详情页签、背景位置和键盘焦点', async ({ page }) => {
+  await setup(page, 112);
+  await page.getByRole('button', { name: '调用过程 · 112' }).click();
+  const pane = page.getByRole('region', { name: '任务详情', exact: true });
+  const trigger = page.locator('.task-call').nth(99);
+  await trigger.scrollIntoViewIfNeeded();
+  const before = await pane.evaluate(el => el.scrollTop);
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: '单次调用', exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.detail-request-id')).toHaveText('r-99');
+  await expect(dialog.locator('.task-call-dialog-title')).toContainText('第 100 / 112 次调用');
+  await dialog.getByRole('button', { name: '原始数据', exact: true }).click();
+  await dialog.getByRole('button', { name: '下一个调用', exact: true }).click();
+  await expect(dialog.locator('.detail-request-id')).toHaveText('r-100');
+  await expect(dialog.getByRole('button', { name: '原始数据', exact: true })).toHaveClass('active');
+  await expect(dialog.getByRole('button', { name: '复制项目请求原始数据' })).toBeVisible();
+  await dialog.getByRole('button', { name: '上一个调用', exact: true }).click();
+  await expect(dialog.locator('.detail-request-id')).toHaveText('r-99');
+  expect(await pane.evaluate(el => el.scrollTop)).toBe(before);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  expect(await pane.evaluate(el => el.scrollTop)).toBe(before);
+  await expect(page.locator('.task-call')).toHaveCount(100);
+  // The overview reply can point past the first loaded list page.
+  await page.getByRole('button', { name: '对话概览', exact: true }).click();
+  await page.getByRole('button', { name: '查看响应', exact: true }).click();
+  await expect(dialog.locator('.task-call-dialog-title')).toContainText('第 112 / 112 次调用');
+  await expect(dialog.locator('.detail-request-id')).toHaveText('r-111');
+  await expect(dialog.getByRole('button', { name: '下一个调用', exact: true })).toBeDisabled();
+});
+
+test('调用浮层首尾边界、窄屏与深色布局及关闭', async ({ page }, info) => {
+  await setup(page);
+  await page.getByRole('button', { name: '调用过程 · 4' }).click();
+  await page.locator('.task-call').first().click();
+  const dialog = page.getByRole('dialog', { name: '单次调用', exact: true });
+  const previous = dialog.getByRole('button', { name: '上一个调用', exact: true });
+  const next = dialog.getByRole('button', { name: '下一个调用', exact: true });
+  await expect(previous).toBeDisabled();
+  for (let i = 1; i < 4; i++) {
+    await next.click();
+    await expect(dialog.locator('.detail-request-id')).toHaveText(`r-${i}`);
+  }
+  await expect(next).toBeDisabled();
+  await previous.click();
+  await expect(dialog.locator('.detail-request-id')).toHaveText('r-2');
+  for (const [width, height] of [[1440, 900], [1024, 420], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    const box = (await dialog.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0); expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(box.y + box.height).toBeLessThanOrEqual(height);
+    expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await expect(previous).toBeInViewport(); await expect(next).toBeInViewport();
+    await page.screenshot({ path: info.outputPath(`call-dialog-${width}.png`), animations: 'disabled' });
+  }
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: info.outputPath('call-dialog-dark.png'), animations: 'disabled' });
+  await dialog.getByRole('button', { name: '关闭调用详情', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '调用过程 · 4' })).toHaveClass('active');
+});
+
+test('浮层读取失败可重试，快速切换时延迟响应不覆盖当前调用', async ({ page }) => {
+  await setup(page);
+  let fail = true;
+  await page.route('**/api/admin/requests/r-1', route => {
+    if (fail) { fail = false; return route.fulfill({ status: 500, json: { error: { message: '模拟读取失败' } } }); }
+    return route.fallback();
+  });
+  await page.route('**/api/admin/requests/r-2', async route => {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return route.fallback();
+  });
+  await page.getByRole('button', { name: '调用过程 · 4' }).click();
+  await page.locator('.task-call').nth(1).click();
+  const dialog = page.getByRole('dialog', { name: '单次调用', exact: true });
+  await expect(dialog.getByRole('alert')).toContainText('模拟读取失败');
+  await dialog.getByRole('button', { name: '重试读取调用' }).click();
+  await expect(dialog.locator('.detail-request-id')).toHaveText('r-1');
+  const delayed = page.waitForResponse('**/api/admin/requests/r-2');
+  await dialog.getByRole('button', { name: '下一个调用' }).click();
+  await dialog.getByRole('button', { name: '下一个调用' }).click();
+  await expect(dialog.locator('.detail-request-id')).toHaveText('r-3');
+  await delayed;
+  await expect(dialog.locator('.detail-request-id')).toHaveText('r-3');
 });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, GitBranch, Layers3, RefreshCw, Search } from 'lucide-react';
+import { ArrowRight, GitBranch, Layers3, RefreshCw, Search } from 'lucide-react';
+import { TaskCallDialog } from './TaskCallDialog';
 import { FilterSelect } from './FilterSelect';
 import { PromptText } from './PromptText';
 import { TextPreview } from './TextPreview';
@@ -10,13 +11,13 @@ import './task-groups.css';
 
 type Props = {
   tasks: RequestTask[]; api: (path: string) => Promise<any>; refresh: () => void;
-  renderRecord: (record: RequestRecord) => ReactNode; onSelectCall: () => void;
+  renderRecord: (record: RequestRecord, tab: string, setTab: (tab: string) => void, copy: (value: string) => void) => ReactNode;
 };
-export function TaskWorkspace({ tasks, api, refresh, renderRecord, onSelectCall }: Props) {
+export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
   const [id, setID] = useState(tasks[0]?.id || ''), [detail, setDetail] = useState<TaskDetail | null>(null);
   const [search, setSearch] = useState(''), [project, setProject] = useState('all'), [filter, setFilter] = useState('all');
   const [tab, setTab] = useState('overview'), [limit, setLimit] = useState(100), [error, setError] = useState('');
-  const [callID, setCallID] = useState(''), [bodies, setBodies] = useState<Record<string, RequestRecord>>({});
+  const [callID, setCallID] = useState(''), [callTab, setCallTab] = useState('messages'), [bodies, setBodies] = useState<Record<string, RequestRecord>>({});
   const cache = useRef(new Map<string, RequestRecord>()), pane = useRef<HTMLElement>(null), rail = useRef<HTMLDivElement>(null);
   useEffect(() => { if (!id && tasks.length) setID(tasks[0].id); }, [tasks, id]);
   useEffect(() => {
@@ -36,7 +37,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord, onSelectCall 
   useEffect(() => {
     if (detail?.task.id !== id) return;
     let disposed = false;
-    const ids = [...new Set([detail.task.question_record_id, detail.task.reply_record_id, callID].filter(Boolean))] as string[];
+    const ids = [...new Set([detail.task.question_record_id, detail.task.reply_record_id].filter(Boolean))] as string[];
     Promise.all(ids.map(async recordID => {
       const cached = cache.current.get(recordID);
       const record: RequestRecord = cached || await api('/admin/requests/' + encodeURIComponent(recordID));
@@ -44,8 +45,8 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord, onSelectCall 
       return [recordID, record] as const;
     })).then(values => { if (!disposed) setBodies(Object.fromEntries(values)); }).catch(e => { if (!disposed) setError(e.message); });
     return () => { disposed = true; };
-  }, [detail, id, callID, api]);
-  useEffect(() => { pane.current?.scrollTo({ top: 0 }); }, [id, tab, callID]);
+  }, [detail, id, api]);
+  useEffect(() => { pane.current?.scrollTo({ top: 0 }); }, [id, tab]);
   useEffect(() => { rail.current?.scrollTo({ top: 0 }); }, [search, project, filter]);
   const visible = tasks.filter(t => (project === 'all' || t.project_id === project) &&
     (filter === 'all' || filter === 'grouped' && t.grouped || filter === 'attention' && (t.failed > 0 || t.state === 'waiting')) &&
@@ -55,8 +56,8 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord, onSelectCall 
   const question = t?.question_record_id ? bodies[t.question_record_id] : undefined;
   const reply = t?.reply_record_id ? bodies[t.reply_record_id] : undefined;
   function select(task: RequestTask) { if (task.id === id) return; setID(task.id); setDetail(null); setTab('overview'); setLimit(100); setCallID(''); setBodies({}); cache.current.clear(); setError(''); }
-  function openCall(recordID: string) { setCallID(recordID); onSelectCall(); }
-  return <div className="inspector task-inspector">
+  function openCall(recordID: string) { setCallID(recordID); setCallTab('messages'); }
+  return <><div className="inspector task-inspector">
     <section className="request-rail">
       <div className="rail-head task-rail-head">
         <div><h2>任务记录</h2><span className="muted small">{visible.length} / {tasks.length} 项</span><button className="icon-btn" aria-label="刷新任务" onClick={refresh}><RefreshCw size={15}/></button></div>
@@ -78,10 +79,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord, onSelectCall 
     </section>
     <section className="request-detail" ref={pane} aria-label="任务详情" tabIndex={0}>
       {error && <div className="error" role="alert">{error}</div>}
-      {callID ? <>
-        <div className="task-back"><button className="link" onClick={() => setCallID('')}><ArrowLeft size={15}/>返回任务</button><span>单次调用</span></div>
-        {bodies[callID] ? renderRecord(bodies[callID]) : <p className="rail-empty">读取调用详情…</p>}
-      </> : t ? <>
+      {t ? <>
         <header className="task-head">
           <div className="task-heading-meta"><span><Layers3 size={14}/>{t.grouped ? 'WorkBuddy · 一次提问' : '独立调用'} · {t.project_name}</span><span className={'task-state ' + t.state}>{taskState(t)}</span></div>
           <h2>{t.title}</h2>
@@ -115,5 +113,8 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord, onSelectCall 
         </div>
       </> : <p className="rail-empty">{id ? '正在读取任务…' : '选择一项任务，查看提问、回复和中间调用。'}</p>}
     </section>
-  </div>;
+  </div>
+    {callID && t && <TaskCallDialog key={t.id} taskID={t.id} initialCallID={callID} initialCalls={detail!.calls} total={detail!.total}
+      api={api} detailTab={callTab} renderRecord={(record, copy) => renderRecord(record, callTab, setCallTab, copy)} onClose={() => setCallID('')}/>}
+  </>;
 }
