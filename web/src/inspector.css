@@ -53,6 +53,17 @@ html:has(.requests-workspace), body:has(.requests-workspace), .requests-workspac
 .message details { margin-top: 14px; }
 .message details summary { margin-bottom: 0; }
 .message details[open] summary { margin-bottom: 12px; }
+.tool-definitions { display: grid; gap: 6px; }
+.message .tool-definition { margin: 0; min-width: 0; color: var(--ink); border: 1px solid var(--line); border-radius: 5px; }
+.message .tool-definition > summary { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; list-style: none; border-radius: 5px; background: var(--bg); }
+.tool-definition > summary::-webkit-details-marker { display: none; }
+.tool-definition > summary:hover { background: var(--soft); }
+.tool-definition > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tool-definition > summary svg { flex: none; margin-top: 2px; color: var(--muted); }
+.tool-definition[open] > summary svg { transform: rotate(90deg); }
+.tool-definition > summary code { min-width: 0; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.message .tool-definition[open] > summary { margin-bottom: 0; border-bottom: 1px solid var(--line); border-radius: 5px 5px 0 0; }
+.message .tool-definition > pre { border-radius: 0 0 5px 5px; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
 .message .response-details-link { margin-top: 10px; font-size: 11px; }
 
 .request-metrics-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }

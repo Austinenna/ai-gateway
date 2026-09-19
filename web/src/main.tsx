@@ -19,6 +19,7 @@ import { TaskWorkspace } from './TaskWorkspace';
 import type { RequestTask } from './request-tasks';
 import { RequestAdaptations } from './RequestAdaptations';
 import { TextPreview } from './TextPreview';
+import { ToolDefinitions } from './ToolDefinitions';
 import { Sidebar } from './Sidebar';
 import { responseDetails, responsePlaceholder } from './response-details.mjs';
 import './style.css';
@@ -223,8 +224,8 @@ function RecordDetail({selected,tab,setTab,copy}:{selected:RequestRecord;tab:str
 function Messages({record,onResponseDetails}:{record:RequestRecord;onResponseDetails:()=>void}){
  const messages=messageList(record.input||'{}');
  return <div className="messages">
-  {messages.map((m,i)=><MessageBlock key={i} label={m.role.toUpperCase()}>
-   <MessageContent content={m.content}/>
+  {messages.map((m,i)=><MessageBlock key={i} label={m.role==='tools'?`TOOLS · ${Array.isArray(m.content)?m.content.length:1} 个工具`:m.role.toUpperCase()}>
+   {m.role==='tools'?<ToolDefinitions content={m.content}/>:<MessageContent content={m.content}/>}
    {Boolean(m.tool_calls)&&<details><summary>工具调用</summary><TextPreview><pre>{readable(m.tool_calls)}</pre></TextPreview></details>}
   </MessageBlock>)}
   <MessageBlock label="ASSISTANT · 本次响应" assistant>
