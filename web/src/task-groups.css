@@ -2,7 +2,6 @@
 .request-view-switch { display: flex; padding: 3px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; }
 .request-view-switch button { padding: 5px 10px; border-color: transparent; background: transparent; color: var(--muted); font-size: 12px; }
 .request-view-switch button.active { color: var(--accent); border-color: var(--line); background: var(--surface); }
-.inspector.task-inspector { grid-template-columns: 320px minmax(0, 1fr); }
 .task-rail-head { gap: 10px; }
 .task-scope { font-size: 10px; color: var(--muted); line-height: 1.7; }
 .task-item { gap: 9px; padding: 16px; }
@@ -55,11 +54,7 @@
   .task-call-usage { flex-basis: 100%; padding-left: 36px; }
   .task-call > svg { display: none; }
 }
-@media (min-width: 761px) and (max-width: 1100px) {
-  .inspector.task-inspector { grid-template-columns: 270px minmax(0, 1fr); }
-}
 @media (max-width: 760px) {
-  .inspector.task-inspector { grid-template-columns: minmax(0, 1fr); }
   .task-head { padding: 20px 16px; }
   .task-rail-head { grid-template-columns: minmax(0, 1fr); }
   .task-rail-head > * { grid-column: 1 / -1; }
