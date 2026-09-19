@@ -138,6 +138,9 @@ func (g *Gateway) observeCall(next http.HandlerFunc) http.HandlerFunc {
 				}
 			}
 			finalizeUsage(rec)
+			if rec.TaskID != "" {
+				rec.ReplyKind = taskReplyKind(*rec)
+			}
 			g.metricsMu.Lock()
 			g.saveMetric(*rec)
 			delete(g.inflight, rec.ID)

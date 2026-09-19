@@ -101,6 +101,7 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t.rec.ProjectID, t.rec.ProjectName = p.ID, p.Name
+	captureWorkBuddy(&t.rec, r.Header, projectCredential(r))
 	g.snapshotCall(t)
 	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, 2*1024*1024))
 	if e != nil {
@@ -230,6 +231,9 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	}
 	original, _ := json.Marshal(body)
 	rec.Input = redact(string(original), string(secret), projectCredential(r))
+	if rec.TaskID != "" {
+		rec.Question = questionExcerpt(rec.Input)
+	}
 	start := time.Now()
 	rec.ForwardOffset = time.Since(t.start).Milliseconds()
 	var captured capture

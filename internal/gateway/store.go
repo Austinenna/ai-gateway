@@ -52,6 +52,7 @@ type Project struct {
 }
 type Record struct {
 	MetricsFields
+	TaskFields
 	ID            string `json:"id"`
 	ProjectID     string `json:"project_id"`
 	ProjectName   string `json:"project_name"`
@@ -218,6 +219,9 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	}
 	g := &Gateway{db: db, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient()}
 	if e = g.initMetrics(); e != nil {
+		return fail(e)
+	}
+	if e = g.initTasks(); e != nil {
 		return fail(e)
 	}
 	go func() {
