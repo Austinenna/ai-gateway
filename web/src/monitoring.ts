@@ -1,7 +1,9 @@
+import type { WorkBuddyGrouping } from './request-tasks';
 export type RequestAdaptation = {
   rule: string; field: string; before: string; after: string; removed_fields?: string[];
 };
 export type RequestRecord = {
+  task_id?: string; grouping?: WorkBuddyGrouping; question_excerpt?: string; reply_kind?: string;
   id: string; project_id: string; project_name: string; model_id: string; alias: string;
   upstream_model: string; protocol: string; started: number; duration_ms: number;
   first_text_ms: number | null; first_token_ms?: number | null; timing_version?: number;

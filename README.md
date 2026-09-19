@@ -50,6 +50,8 @@ bash scripts/start.sh
 
 公开模型目录为 `GET /api/public/models`，无需 Token 或管理登录，返回全网关已启用且有可用协议的模型别名、显示名称与协议。`GET /v1/models` 仍需项目凭证，仅返回该项目获授权的模型；实际调用也继续校验项目权限。用法见 [模型列表接口](docs/demo.md#模型列表接口)。
 
+请求记录支持 WorkBuddy 按一次提问汇总主／子代理调用，展示用户提问、最新主代理回复、调用过程与累计用量；仍可切换逐次调用。仅新请求中的有效显式标识用于分组，旧记录不猜测合并。使用与统计边界见 [WorkBuddy 任务分组](docs/workbuddy-tasks.md)。
+
 ## 项目自助接入
 
 其他项目或客户端可通过 Skill 自行申请项目，立即领取待启用 Token 并写入自己的配置。你在「项目权限」页面点击「批准」后，同一个 Token 生效；客户端不用等待或再次配置。默认 Chat Completions，可选 Messages。接口、审批行为和 Skill 开发源码见 [项目自助申请与审批](docs/project-enrollment.md)。
