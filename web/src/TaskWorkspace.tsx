@@ -6,7 +6,7 @@ import { PromptText } from './PromptText';
 import { TextPreview } from './TextPreview';
 import { responseText } from './protocol.mjs';
 import { dateTime, duration, inputTotal, number, outputTotal, recordStatus, type RequestRecord } from './monitoring';
-import { agentName, taskState, userQuestion, type RequestTask, type TaskDetail } from './request-tasks';
+import { agentName, taskState, type RequestTask, type TaskDetail } from './request-tasks';
 import './task-groups.css';
 
 type Props = {
@@ -37,7 +37,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
   useEffect(() => {
     if (detail?.task.id !== id) return;
     let disposed = false;
-    const ids = [...new Set([detail.task.question_record_id, detail.task.reply_record_id].filter(Boolean))] as string[];
+    const ids = [detail.task.reply_record_id].filter(Boolean) as string[];
     Promise.all(ids.map(async recordID => {
       const cached = cache.current.get(recordID);
       const record: RequestRecord = cached || await api('/admin/requests/' + encodeURIComponent(recordID));
@@ -53,7 +53,6 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
     [t.title, t.project_name, t.id, t.grouping?.root_id, t.grouping?.session_id, ...t.models].join(' ').toLowerCase().includes(search.toLowerCase()));
   const projects = [...new Map(tasks.map(t => [t.project_id, t.project_name])).entries()];
   const t = detail?.task.id === id ? detail.task : null;
-  const question = t?.question_record_id ? bodies[t.question_record_id] : undefined;
   const reply = t?.reply_record_id ? bodies[t.reply_record_id] : undefined;
   function select(task: RequestTask) { if (task.id === id) return; setID(task.id); setDetail(null); setTab('overview'); setLimit(100); setCallID(''); setBodies({}); cache.current.clear(); setError(''); }
   function openCall(recordID: string) { setCallID(recordID); setCallTab('messages'); }
@@ -95,7 +94,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
           {t.missing_records > 0 && <p className="request-outcome-note">{t.missing_records} 次调用只有摘要，正文尚未保存或未能保存；统计仍包含这些调用。</p>}
           {tab === 'overview' ? <>
             <div className="task-explanation">{t.grouped ? '按根任务标识合并主代理与子代理。' : '此调用没有可靠分组标识，单独保留。'}“已回复”只表示网关看到了主代理正文回复。</div>
-            <section className="task-message"><div className="task-message-label">用户提问 · 摘录自首个已记录主代理请求{t.question_record_id && <button className="link" onClick={() => openCall(t.question_record_id!)}>查看请求<ArrowRight size={13}/></button>}</div><PromptText key={t.question_record_id || t.id} text={question && userQuestion(question.input || '') || (t.question_record_id && t.grouped ? t.title : '未记录可识别的用户提问，可查看调用原始数据。')}/>{question?.truncated && <small className="warning-text">该请求正文已截断。</small>}</section>
+            <section className="task-message"><div className="task-message-label">用户提问{t.question_record_id && <button className="link" onClick={() => openCall(t.question_record_id!)}>查看请求<ArrowRight size={13}/></button>}</div><PromptText key={t.question_record_id || t.id} text={detail!.question || '未记录可识别的用户提问，可在调用详情中查看完整提示词。'}/></section>
             <section className="task-message task-answer"><div className="task-message-label">最新主代理回复{t.reply_record_id && <button className="link" onClick={() => openCall(t.reply_record_id!)}>查看响应<ArrowRight size={13}/></button>}</div><TextPreview><p>{reply ? responseText(reply.output || '') || '此调用没有可显示的正文，请查看调用详情。' : t.state === 'running' ? '调用仍在进行，等待主代理回复。' : t.state === 'error' ? '最新主代理调用异常，请查看调用过程。' : t.state === 'replied' ? '正在读取回复…' : '尚未记录主代理正常结束的正文回复；可能仍在执行工具或等待后续。'}</p></TextPreview></section>
             <button className="task-process-link" onClick={() => setTab('calls')}><GitBranch size={16}/>查看 {t.calls} 次 LLM 调用{t.failed > 0 && <span className="task-failure">含 {t.failed} 次失败</span>}<ArrowRight size={15}/></button>
           </> : tab === 'calls' ? <>

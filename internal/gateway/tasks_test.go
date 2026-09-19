@@ -196,3 +196,76 @@ func TestTasksIncludeWholeGroupAndLegacyWithMissingBodies(t *testing.T) {
 	}
 	h.want(h.request("GET", "/api/admin/request-tasks/"+base.TaskID+"?offset=-1", nil, "", true), 400)
 }
+
+func TestWorkBuddyQuestionExtraction(t *testing.T) {
+	context := `<system-reminder data-role="user-context">` + strings.Repeat("环境上下文\n", 500) + `<user_query>上下文中的示例</user_query></system-reminder>`
+	cases := []struct{ name, text, want string }{
+		{"query after long context", context + "\n<user_query>修复登录\n\n保留 **Markdown** 和 <div>代码</div>。</user_query>", "修复登录\n\n保留 **Markdown** 和 <div>代码</div>。"},
+		{"query alias", context + "\n<query>检查性能</query>", "检查性能"},
+		{"session", "<session>\n你好\n</session>", "你好"},
+		{"plain", "普通提问 <query>示例</query>", "普通提问 <query>示例</query>"},
+		{"context only", context, ""},
+		{"unclosed context", "<system-reminder>上下文", ""},
+		{"unclosed query", context + "<user_query>未记录完整", ""},
+		{"empty query", context + "<user_query> </user_query>", ""},
+		{"literal nested tag", "<user_query>解释 <user_query>例子</user_query> 标签</user_query>", "解释 <user_query>例子</user_query> 标签"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, content := range []any{tc.text, []any{map[string]any{"type": "text", "text": tc.text}}} {
+				input, _ := json.Marshal(map[string]any{"messages": []any{map[string]any{"role": "user", "content": content}}})
+				if got := questionText(string(input), true); got != tc.want {
+					t.Fatalf("got %q, want %q", got, tc.want)
+				}
+			}
+		})
+	}
+	input, _ := json.Marshal(map[string]any{"messages": []any{
+		map[string]any{"role": "user", "content": "<user_query>之前的问题</user_query>"},
+		map[string]any{"role": "user", "content": context + "<user_query>当前的问题</user_query>"},
+		map[string]any{"role": "user", "content": context},
+		map[string]any{"role": "user", "content": []any{map[string]any{"type": "tool_result", "content": "<user_query>工具内容</user_query>"}}},
+	}})
+	if got := questionText(string(input), true); got != "当前的问题" {
+		t.Fatalf("picked context, tool result, or previous turn: %q", got)
+	}
+}
+
+func TestTaskQueryPresentationKeepsOriginalRecords(t *testing.T) {
+	h := newHarness(t)
+	query := "用户提问\n\n" + strings.Repeat("长问题", 400)
+	context := `<system-reminder data-role="user-context">` + strings.Repeat("环境信息\n", 500) + `</system-reminder>`
+	input, _ := json.Marshal(map[string]any{"messages": []any{map[string]any{"role": "user", "content": context + "\n<user_query>" + query + "</user_query>"}}})
+	rec := Record{ID: "old-query", ProjectID: "p", Started: 1, State: "complete", Alias: "coding", Input: string(input)}
+	captureWorkBuddy(&rec, buddyHeaders("root-query", "session", "turn", "main"), "")
+	rec.Question = excerpt(context) // A pre-upgrade summary ends before user_query.
+	raw, _ := json.Marshal(rec)
+	summaryRec := rec
+	summaryRec.Input = ""
+	summary, _ := json.Marshal(summaryRec)
+	if _, err := h.g.db.Exec("INSERT INTO requests(id,project_id,started,summary,record) VALUES(?,?,?,?,?)", rec.ID, rec.ProjectID, rec.Started, string(summary), string(raw)); err != nil {
+		t.Fatal(err)
+	}
+	h.g.saveMetric(rec) // Task APIs prefer this older metric summary over requests.
+	list := parse[struct {
+		Tasks []RequestTask `json:"tasks"`
+	}](t, h.request("GET", "/api/admin/request-tasks", nil, "", true))
+	if len(list.Tasks) != 1 || list.Tasks[0].Title != excerpt(query) {
+		t.Fatal("old list title did not use the query")
+	}
+	detail := parse[TaskDetail](t, h.request("GET", "/api/admin/request-tasks/"+rec.TaskID, nil, "", true))
+	if detail.Question != query || detail.Task.Title != excerpt(query) || detail.Task.QuestionRecordID != rec.ID {
+		t.Fatal("detail must retain the full query with the same title and source")
+	}
+	var stored, storedSummary string
+	if err := h.g.db.QueryRow("SELECT record,summary FROM requests WHERE id=?", rec.ID).Scan(&stored, &storedSummary); err != nil || stored != string(raw) || storedSummary != string(summary) {
+		t.Fatal("presentation modified the saved request")
+	}
+	// New summaries still identify the query when the body is missing.
+	rec.Question, rec.QuestionVersion, rec.Input = excerpt(query), 1, ""
+	rec.ID = "missing-query"
+	task, question, err := h.g.presentTask([]Record{rec}, true)
+	if err != nil || task.Title != excerpt(query) || question != excerpt(query) {
+		t.Fatal("query summary was lost with missing body")
+	}
+}

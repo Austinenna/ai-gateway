@@ -22,7 +22,7 @@ async function setup(page: Page, count = 4) {
       const task = tasks.find(t => t.id === path.split('/').pop())!;
       const records = task.id === first.id ? calls : all.filter(r => r.id === task.question_record_id);
       const offset = Number(url.searchParams.get('offset') || 0);
-      json = { task, calls: records.slice(offset, offset + 100), total: records.length, offset, has_more: offset + 100 < records.length };
+      json = { task, question: task.title, calls: records.slice(offset, offset + 100), total: records.length, offset, has_more: offset + 100 < records.length };
     }
     return route.fulfill({ json });
   });
@@ -62,6 +62,30 @@ test('WorkBuddy 一次提问汇总，查看子代理与原始调用，保留逐�
   await expect(page.locator('.request-item')).toHaveCount(6);
   await page.locator('.request-item').first().click();
   await expect(page.getByRole('button', { name: '响应详情', exact: true })).toBeVisible();
+});
+
+test('标题和对话概览只显示 query，完整 USER 提示词仍在浮层', async ({ page }, info) => {
+  const { first, calls } = await setup(page);
+  const query = first.title;
+  const context = '<system-reminder data-role="user-context">\n环境上下文仅在调用详情显示\n</system-reminder>';
+  calls[0].input = JSON.stringify({ messages: [{ role: 'user', content: `${context}\n<user_query>${query}</user_query>` }] });
+  await page.getByRole('button', { name: '刷新任务', exact: true }).click();
+  await expect(page.locator('.task-item .task-title').first()).toHaveText(query);
+  await expect(page.locator('.task-head h2')).toHaveText(query);
+  await expect(page.locator('.task-message').first()).toContainText(query);
+  await expect(page.locator('.task-message').first()).not.toContainText('system-reminder');
+  await expect(page.locator('.task-message').first()).not.toContainText('user_query');
+  await page.getByLabel('搜索任务').fill('重复提交');
+  await expect(page.locator('.task-item')).toHaveCount(1);
+  await page.screenshot({ path: info.outputPath('query-overview.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: '查看请求', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '单次调用', exact: true });
+  await expect(dialog).toContainText('环境上下文仅在调用详情显示');
+  await expect(dialog).toContainText('user_query');
+  await dialog.getByRole('button', { name: '原始数据', exact: true }).click();
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { (window as unknown as { copied: string }).copied = value; } } }));
+  await dialog.getByRole('button', { name: '复制项目请求原始数据' }).click();
+  expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(calls[0].input);
 });
 
 test('任务分页、搜索、独立记录以及窄屏深色布局', async ({ page }, info) => {

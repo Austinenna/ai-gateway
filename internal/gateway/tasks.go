@@ -1,8 +1,10 @@
 package gateway
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,10 +13,11 @@ import (
 
 // Only this allowlist of client metadata is recorded. It never affects auth or forwarding.
 type TaskFields struct {
-	TaskID    string             `json:"task_id,omitempty"`
-	Grouping  *WorkBuddyGrouping `json:"grouping,omitempty"`
-	Question  string             `json:"question_excerpt,omitempty"`
-	ReplyKind string             `json:"reply_kind,omitempty"`
+	TaskID          string             `json:"task_id,omitempty"`
+	Grouping        *WorkBuddyGrouping `json:"grouping,omitempty"`
+	Question        string             `json:"question_excerpt,omitempty"`
+	QuestionVersion int                `json:"question_version,omitempty"`
+	ReplyKind       string             `json:"reply_kind,omitempty"`
 }
 type WorkBuddyGrouping struct {
 	Client          string `json:"client"`
@@ -85,7 +88,32 @@ func contentText(v any) string {
 	}
 	return out.String()
 }
-func questionExcerpt(input string) string {
+
+var buddyContextStart = regexp.MustCompile(`^<system-reminder(?:\s[^>]*)?>`)
+var buddyQueryStart = regexp.MustCompile(`^<(user_query|query|session)(?:\s[^>]*)?>`)
+
+// WorkBuddy wraps the actual question after its injected context. These are
+// text delimiters, not an XML document: keep Markdown and literal markup intact.
+func workBuddyQuestion(text string) string {
+	text = strings.TrimSpace(text)
+	for buddyContextStart.MatchString(text) {
+		end := strings.Index(text, "</system-reminder>")
+		if end < 0 {
+			return ""
+		}
+		text = strings.TrimSpace(text[end+len("</system-reminder>"):])
+	}
+	if match := buddyQueryStart.FindStringSubmatch(text); match != nil {
+		end := strings.LastIndex(text, "</"+match[1]+">")
+		if end < len(match[0]) {
+			return ""
+		}
+		return strings.TrimSpace(text[len(match[0]):end])
+	}
+	return text
+}
+
+func questionText(input string, workBuddy bool) string {
 	var body struct {
 		Messages []struct {
 			Role    string
@@ -101,17 +129,26 @@ func questionExcerpt(input string) string {
 			continue
 		}
 		value := strings.TrimSpace(contentText(m.Content))
+		if workBuddy {
+			value = workBuddyQuestion(value)
+		}
 		if value == "" {
 			continue
-		}
-		r := []rune(value)
-		if len(r) > 1024 {
-			value = string(r[:1024]) + "…"
 		}
 		return value
 	}
 	return ""
 }
+
+func excerpt(value string) string {
+	r := []rune(value)
+	if len(r) > 1024 {
+		return string(r[:1024]) + "…"
+	}
+	return value
+}
+
+func questionExcerpt(input string) string { return excerpt(questionText(input, true)) }
 
 // A normal textual stop is evidence of a reply, not proof that the agent task has ended.
 func taskReplyKind(rec Record) string {
@@ -211,11 +248,12 @@ type RequestTask struct {
 	Providers        []string           `json:"providers"`
 }
 type TaskDetail struct {
-	Task    RequestTask `json:"task"`
-	Calls   []Record    `json:"calls"`
-	Total   int         `json:"total"`
-	Offset  int         `json:"offset"`
-	HasMore bool        `json:"has_more"`
+	Task     RequestTask `json:"task"`
+	Question string      `json:"question"`
+	Calls    []Record    `json:"calls"`
+	Total    int         `json:"total"`
+	Offset   int         `json:"offset"`
+	HasMore  bool        `json:"has_more"`
 }
 
 func taskKey(r Record) string {
@@ -385,6 +423,43 @@ func summarizeTask(records []Record) RequestTask {
 	}
 	return task
 }
+
+// Older summaries may have cut off the query after a long context prefix.
+// Derive their presentation from the saved body without rewriting either log.
+// New summaries already contain the query; only the detail needs its full text.
+func (g *Gateway) presentTask(records []Record, fullQuestion bool) (RequestTask, string, error) {
+	task := summarizeTask(records)
+	for _, rec := range records {
+		if task.Grouped && (rec.Grouping == nil || rec.Grouping.AgentType != "main") {
+			continue
+		}
+		question := rec.Question
+		if task.Grouped && rec.QuestionVersion == 0 {
+			question = workBuddyQuestion(question)
+		}
+		if fullQuestion || task.Grouped && rec.QuestionVersion == 0 {
+			input := rec.Input
+			if input == "" {
+				err := g.db.QueryRow("SELECT COALESCE(json_extract(record,'$.input'),'') FROM requests WHERE id=?", rec.ID).Scan(&input)
+				if err != nil && err != sql.ErrNoRows {
+					return task, "", err
+				}
+			}
+			if json.Valid([]byte(input)) {
+				question = questionText(input, task.Grouped)
+			}
+		}
+		if task.Grouped {
+			task.QuestionRecordID = rec.ID
+			task.Title = excerpt(question)
+			if task.Title == "" {
+				task.Title = "未记录提问"
+			}
+		}
+		return task, question, nil
+	}
+	return task, "", nil
+}
 func (g *Gateway) listTasks(w http.ResponseWriter, r *http.Request) {
 	seeds, err := g.taskRecords(nil)
 	if err != nil {
@@ -413,7 +488,12 @@ func (g *Gateway) listTasks(w http.ResponseWriter, r *http.Request) {
 			groups[key] = append(groups[key], rec)
 		}
 		for _, group := range groups {
-			tasks = append(tasks, summarizeTask(group))
+			task, _, err := g.presentTask(group, false)
+			if err != nil {
+				problem(w, 500, "读取任务提问失败")
+				return
+			}
+			tasks = append(tasks, task)
 		}
 		sort.Slice(tasks, func(i, j int) bool {
 			if tasks[i].Updated == tasks[j].Updated {
@@ -450,5 +530,10 @@ func (g *Gateway) getTask(w http.ResponseWriter, r *http.Request) {
 	if end > len(records) {
 		end = len(records)
 	}
-	writeJSON(w, 200, TaskDetail{Task: summarizeTask(records), Calls: records[offset:end], Total: len(records), Offset: offset, HasMore: end < len(records)})
+	task, question, err := g.presentTask(records, true)
+	if err != nil {
+		problem(w, 500, "读取任务提问失败")
+		return
+	}
+	writeJSON(w, 200, TaskDetail{Task: task, Question: question, Calls: records[offset:end], Total: len(records), Offset: offset, HasMore: end < len(records)})
 }

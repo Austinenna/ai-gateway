@@ -233,6 +233,7 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	rec.Input = redact(string(original), string(secret), projectCredential(r))
 	if rec.TaskID != "" {
 		rec.Question = questionExcerpt(rec.Input)
+		rec.QuestionVersion = 1
 	}
 	start := time.Now()
 	rec.ForwardOffset = time.Since(t.start).Milliseconds()
