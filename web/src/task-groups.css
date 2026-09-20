@@ -25,8 +25,7 @@
 .task-message-label { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 11px; }
 .task-message-label .link { font-size: 11px; }
 .task-message p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.9; }
-.task-answer { background: var(--surface); border-left: 3px solid var(--green); }
-.task-answer .task-message-label { color: var(--green); }
+.task-message .text-preview-window.is-clipped::after { background: linear-gradient(transparent, var(--bg)); }
 .task-process-link { justify-content: flex-start; white-space: normal; font-size: 12px; padding: 14px; }
 .task-process-link > svg:last-child { margin-left: auto; flex: none; }
 .task-calls { display: grid; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
