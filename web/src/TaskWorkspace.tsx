@@ -48,7 +48,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
   useEffect(() => { pane.current?.scrollTo({ top: 0 }); }, [id, tab]);
   useEffect(() => { rail.current?.scrollTo({ top: 0 }); }, [search, project, filter]);
   const visible = tasks.filter(t => (project === 'all' || t.project_id === project) &&
-    (filter === 'all' || filter === 'grouped' && t.grouped || filter === 'attention' && (t.failed > 0 || t.state === 'waiting')) &&
+    (filter === 'all' || filter === 'attention' && (t.failed > 0 || t.state === 'waiting')) &&
     [t.title, t.project_name, t.id, t.grouping?.root_id, t.grouping?.session_id, ...t.models].join(' ').toLowerCase().includes(search.toLowerCase()));
   const projects = [...new Map(tasks.map(t => [t.project_id, t.project_name])).entries()];
   const t = detail?.task.id === id ? detail.task : null;
@@ -61,25 +61,25 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
         <div><h2>任务记录</h2><span className="muted small">{visible.length} / {tasks.length} 项</span><button className="icon-btn" aria-label="刷新任务" onClick={refresh}><RefreshCw size={15}/></button></div>
         <label className="search"><Search size={15}/><input aria-label="搜索任务" placeholder="搜索提问、项目、模型、ID" value={search} onChange={e => setSearch(e.target.value)}/></label>
         <FilterSelect label="按任务项目筛选" value={project} onChange={setProject} options={[{ value: 'all', label: '所有项目' }, ...projects.map(([value, label]) => ({ value, label }))]}/>
-        <div className="filter-tabs">{[['all','全部'],['grouped','已分组'],['attention','需关注']].map(([v, label]) => <button key={v} className={filter === v ? 'selected' : ''} aria-pressed={filter === v} onClick={() => setFilter(v)}>{label}</button>)}</div>
-        <p className="task-scope">最近 200 次调用涉及的任务<br/>组内统计包含全部已记录调用</p>
+        <div className="filter-tabs">{[['all','全部'],['attention','需关注']].map(([v, label]) => <button key={v} className={filter === v ? 'selected' : ''} aria-pressed={filter === v} onClick={() => setFilter(v)}>{label}</button>)}</div>
+        <p className="task-scope">最近 200 次已分组调用涉及的任务<br/>组内统计包含全部已记录调用</p>
       </div>
       <div className="request-items" ref={rail} role="region" aria-label="任务列表" tabIndex={0}>
         {visible.map(task => <button key={task.id} className={'request-item task-item ' + (id === task.id ? 'selected' : '')} onClick={() => select(task)}>
           <span><small>{task.project_name}</small><small>{dateTime(task.started)}</small></span>
           <b className="task-title">{task.title}</b>
-          <span className="task-badges"><em className={task.grouped ? 'task-tag' : 'task-tag neutral'}>{task.grouped ? 'WorkBuddy · 明确分组' : '无标识 · 独立调用'}</em><small className={task.state === 'replied' ? 'good-text' : 'warning-text'}>{taskState(task)}</small></span>
+          <span className="task-badges"><em className="task-tag">WorkBuddy · 明确分组</em><small className={task.state === 'replied' ? 'good-text' : 'warning-text'}>{taskState(task)}</small></span>
           <span><small>{task.calls} 次调用</small></span>
           {task.failed > 0 && <span className="task-failure">{task.failed} 次调用失败</span>}
         </button>)}
-        {!visible.length && <p className="rail-empty">没有匹配的任务。WorkBuddy 携带分组标识的新调用会自动出现在这里。</p>}
+        {!visible.length && <p className="rail-empty">{tasks.length ? '没有匹配的任务。' : '暂无已识别的任务。未分组的调用可在「请求记录」中查看。'}</p>}
       </div>
     </section>
     <section className="request-detail" ref={pane} aria-label="任务详情" tabIndex={0}>
       {error && <div className="error" role="alert">{error}</div>}
       {t ? <>
         <header className="task-head">
-          <div className="task-heading-meta"><span><Layers3 size={14}/>{t.grouped ? 'WorkBuddy · 一次提问' : '独立调用'} · {t.project_name}</span><span className={'task-state ' + t.state}>{taskState(t)}</span></div>
+          <div className="task-heading-meta"><span><Layers3 size={14}/>WorkBuddy · 一次提问 · {t.project_name}</span><span className={'task-state ' + t.state}>{taskState(t)}</span></div>
           <h2>{t.title}</h2>
           <div className="task-stats">
             <div><span>LLM 调用</span><b>{t.calls}<small> 次</small></b><small>{t.failed ? `${t.failed} 次失败，已计入统计` : t.active ? `${t.active} 次正在进行` : '全部已记录调用'}</small></div>
@@ -92,7 +92,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
         <div className="detail-content task-content">
           {t.missing_records > 0 && <p className="request-outcome-note">{t.missing_records} 次调用只有摘要，正文尚未保存或未能保存；统计仍包含这些调用。</p>}
           {tab === 'overview' ? <>
-            <div className="task-explanation">{t.grouped ? '按根任务标识合并主代理与子代理。' : '此调用没有可靠分组标识，单独保留。'}“已回复”只表示网关看到了主代理正文回复。</div>
+            <div className="task-explanation">按根任务标识合并主代理与子代理。“已回复”只表示网关看到了主代理正文回复。</div>
             <section className="task-message"><div className="task-message-label">用户提问{t.question_record_id && <button className="link" onClick={() => openCall(t.question_record_id!)}>查看请求<ArrowRight size={13}/></button>}</div><TextPreview key={t.question_record_id || t.id}><p>{detail!.question || '未记录可识别的用户提问，可在调用详情中查看完整提示词。'}</p></TextPreview></section>
             <section className="task-message task-answer"><div className="task-message-label">最新主代理回复{t.reply_record_id && <button className="link" onClick={() => openCall(t.reply_record_id!)}>查看响应<ArrowRight size={13}/></button>}</div><TextPreview><p>{reply ? responseText(reply.output || '') || '此调用没有可显示的正文，请查看调用详情。' : t.state === 'running' ? '调用仍在进行，等待主代理回复。' : t.state === 'error' ? '最新主代理调用异常，请查看调用过程。' : t.state === 'replied' ? '正在读取回复…' : '尚未记录主代理正常结束的正文回复；可能仍在执行工具或等待后续。'}</p></TextPreview></section>
             <button className="task-process-link" onClick={() => setTab('calls')}><GitBranch size={16}/>查看 {t.calls} 次 LLM 调用{t.failed > 0 && <span className="task-failure">含 {t.failed} 次失败</span>}<ArrowRight size={15}/></button>
@@ -104,8 +104,8 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
             </button>)}</div>
             {detail!.has_more && <button className="task-load-more" onClick={() => setLimit(v => v + 100)}>加载更多调用（已显示 {detail!.calls.length} / {detail!.total}）</button>}
           </> : <>
-            <p className="task-explanation">{t.grouped ? '此组依据客户端显式标识合并，并限定在同一个网关项目内。兼容相同请求头的客户端也会识别为 WorkBuddy。' : '没有可靠的根任务标识。本版不按时间间隔猜测，也不自动合并历史记录。'}</p>
-            <dl className="task-group-fields"><dt>分组方式</dt><dd>{t.grouped ? t.grouping?.source === 'turn' ? '明确分组 · 主代理轮次 ID 回退' : '明确分组 · 根任务 ID' : '未分组'}</dd><dt>网关任务 ID</dt><dd>{t.id}</dd><dt>网关项目 ID</dt><dd>{t.project_id || '未识别'}</dd>{t.grouping && <><dt>根任务 ID</dt><dd>{t.grouping.root_id}</dd><dt>参考会话 ID</dt><dd>{t.grouping.session_id}</dd><dt>参考轮次 ID</dt><dd>{t.grouping.turn_id || '未提供'}</dd></>}</dl>
+            <p className="task-explanation">此组依据客户端显式标识合并，并限定在同一个网关项目内。兼容相同请求头的客户端也会识别为 WorkBuddy。</p>
+            <dl className="task-group-fields"><dt>分组方式</dt><dd>{t.grouping?.source === 'turn' ? '明确分组 · 主代理轮次 ID 回退' : '明确分组 · 根任务 ID'}</dd><dt>网关任务 ID</dt><dd>{t.id}</dd><dt>网关项目 ID</dt><dd>{t.project_id || '未识别'}</dd>{t.grouping && <><dt>根任务 ID</dt><dd>{t.grouping.root_id}</dd><dt>参考会话 ID</dt><dd>{t.grouping.session_id}</dd><dt>参考轮次 ID</dt><dd>{t.grouping.turn_id || '未提供'}</dd></>}</dl>
             <p className="task-explanation">同一会话的不同提问不会仅因会话 ID 相同而合并。仅统计经过网关且标识有效的调用，无法确认是否捕获了客户端的全部过程。</p>
           </>}
         </div>

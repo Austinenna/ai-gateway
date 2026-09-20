@@ -6,9 +6,8 @@ async function setup(page: Page, count = 4) {
   const calls = Array.from({ length: count }, (_, i) => ({ ...base, id: `r-${i}`, started: base.started + i * 2000, grouping: i > 0 && i < count - 1 ? { ...grouping, session_id: 'session-child', parent_session_id: 'session-same', agent_type: 'subagent' } : grouping, state: i === 1 ? 'error' : 'complete', status: i === 1 ? 500 : 200, reply_kind: i === count - 1 ? 'reply' : 'tools' }));
   const first = { id: 'task-first', project_id: 'p1', project_name: base.project_name, grouped: true, title: '帮我检查登录流程，并修复重复提交的问题。', state: 'replied', started: base.started, updated: base.started + count * 2000, duration_ms: count * 2000, calls: count, active: 0, failed: 1, missing_records: 0, input_tokens: count * 100, output_tokens: count * 25, input_samples: count, output_samples: count, question_record_id: 'r-0', reply_record_id: `r-${count - 1}`, grouping, models: ['coding'], providers: ['zhipu'] };
   const second = { ...first, input_samples: 1, output_samples: 1, input_tokens: 100, output_tokens: 25, id: 'task-second', title: '再补充一个回归用例', calls: 1, failed: 0, question_record_id: 'previous', reply_record_id: 'previous', grouping: { ...grouping, root_id: 'root-second', turn_id: 'turn-second' } };
-  const legacy = { ...first, input_samples: 1, output_samples: 1, input_tokens: 100, output_tokens: 25, id: 'legacy', grouped: false, title: '历史独立调用', state: 'complete', calls: 1, failed: 0, question_record_id: 'legacy', reply_record_id: 'legacy', grouping: undefined };
   const extra = [{ ...base, id: 'previous', task_id: second.id, grouping: second.grouping, input: JSON.stringify({ messages: [{ role: 'user', content: '再补充一个回归用例' }] }), output: JSON.stringify({ choices: [{ message: { content: '回归用例已添加。' }, finish_reason: 'stop' }] }) }, { ...base, id: 'legacy', task_id: undefined, grouping: undefined }];
-  const tasks = [first, second, legacy];
+  const tasks = [first, second];
   const all = [...calls, ...extra];
   await page.route('**/api/**', route => {
     const url = new URL(route.request().url()), path = url.pathname;
@@ -36,7 +35,9 @@ test('独立导航进入任务汇总与逐次请求，保留子代理与原始�
   await expect(page.locator('nav').getByRole('button', { name: '任务记录', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: '任务记录', level: 1 })).toBeVisible();
   await expect(page.getByRole('button', { name: /^(按任务|逐次调用)$/ })).toHaveCount(0);
-  await expect(page.locator('.task-item')).toHaveCount(3);
+  await expect(page.locator('.task-item')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: '已分组', exact: true })).toHaveCount(0);
+  await expect(page.locator('.task-item').last()).toContainText('1 次调用');
   await expect(page.locator('.task-item').first()).toContainText('4 次调用');
   await expect(page.locator('.task-item').first()).toContainText('1 次调用失败');
   await expect(page.locator('.task-answer')).toContainText('已经修复重复提交');
@@ -67,6 +68,8 @@ test('独立导航进入任务汇总与逐次请求，保留子代理与原始�
   await expect(page.locator('.task-inspector')).toHaveCount(0);
   await page.getByRole('button', { name: '刷新请求', exact: true }).click();
   await expect(page.locator('.request-item')).toHaveCount(6);
+  await page.locator('.request-item').last().click();
+  await expect(page.locator('.detail-request-id')).toHaveText('legacy');
   await page.locator('.request-item').first().click();
   await expect(page.getByRole('button', { name: '响应详情', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '收起侧边栏', exact: true }).click();
@@ -75,7 +78,7 @@ test('独立导航进入任务汇总与逐次请求，保留子代理与原始�
   await page.keyboard.press('Enter');
   await expect(taskEntry).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: '任务记录', level: 1 })).toBeVisible();
-  await expect(page.locator('.task-item')).toHaveCount(3);
+  await expect(page.locator('.task-item')).toHaveCount(2);
   await page.getByRole('button', { name: '试调用', exact: true }).click();
   await expect(page.locator('.tester')).toBeVisible();
   await expect(taskEntry).toHaveAttribute('aria-current', 'page');
@@ -108,7 +111,7 @@ test('标题和对话概览只显示 query，完整 USER 提示词仍在浮层',
   expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(calls[0].input);
 });
 
-test('任务分页、搜索、独立记录以及窄屏深色布局', async ({ page }, info) => {
+test('任务分页、搜索、需关注筛选以及窄屏深色布局', async ({ page }, info) => {
   await setup(page, 112);
   await page.getByRole('button', { name: '调用过程 · 112' }).click();
   await expect(page.locator('.task-call')).toHaveCount(100);
@@ -137,12 +140,35 @@ test('任务分页、搜索、独立记录以及窄屏深色布局', async ({ pa
   await page.getByLabel('搜索任务').fill('再补充');
   await expect(page.locator('.task-item')).toHaveCount(1);
   await page.getByLabel('搜索任务').fill('');
-  await page.getByRole('button', { name: '已分组', exact: true }).click();
-  await expect(page.locator('.task-item')).toHaveCount(2);
+  await page.getByRole('button', { name: '需关注', exact: true }).click();
+  await expect(page.locator('.task-item')).toHaveCount(1);
   await page.getByRole('button', { name: '全部', exact: true }).click();
+  await expect(page.locator('.task-item')).toHaveCount(2);
   await page.locator('.task-item').last().click();
   await page.getByRole('button', { name: '分组信息', exact: true }).click();
-  await expect(page.locator('.task-group-fields')).toContainText('未分组');
+  await expect(page.locator('.task-group-fields')).toContainText('root-second');
+});
+
+test('没有已识别任务时说明请求入口，刷新后显示新任务', async ({ page }, info) => {
+  await setup(page);
+  await page.route('**/api/admin/request-tasks', route => route.fulfill({ json: { tasks: [], recent_call_limit: 200 } }));
+  await page.reload();
+  await page.locator('nav').getByRole('button', { name: '任务记录', exact: true }).click();
+  await expect(page.locator('.task-item')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: '任务列表' })).toContainText('暂无已识别的任务。未分组的调用可在「请求记录」中查看。');
+  await expect(page.locator('.task-head')).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('empty-tasks.png'), animations: 'disabled' });
+  await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+  await expect(page.locator('.request-item')).toHaveCount(6);
+  await page.locator('.request-item').last().click();
+  await expect(page.locator('.detail-request-id')).toHaveText('legacy');
+  await page.locator('nav').getByRole('button', { name: '任务记录', exact: true }).click();
+  await page.unroute('**/api/admin/request-tasks');
+  await page.getByRole('button', { name: '刷新任务', exact: true }).click();
+  await expect(page.locator('.task-item')).toHaveCount(2);
+  await expect(page.locator('.task-head h2')).toContainText('帮我检查登录流程');
+  await page.getByLabel('搜索任务').fill('不存在的任务');
+  await expect(page.getByRole('region', { name: '任务列表' })).toContainText('没有匹配的任务。');
 });
 
 test('刷新显示等待后续和未知用量，不声称任务完成', async ({ page }) => {

@@ -271,24 +271,20 @@ func (g *Gateway) initTasks() error {
 	return err
 }
 
-// Metrics survive body-log drops. Legacy records without metrics remain independently visible.
+// Metrics survive body-log drops. Only calls with explicit task IDs belong here;
+// ungrouped calls remain available through the request APIs.
 func (g *Gateway) taskRecords(keys []string) ([]Record, error) {
-	where := ""
+	where := " WHERE COALESCE(json_extract(summary,'$.task_id'),'')<>''"
 	args := []any{}
 	if len(keys) > 0 {
 		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(keys)), ",")
-		where = " WHERE " + taskKeySQL + " IN (" + placeholders + ")"
+		where += " AND " + taskKeySQL + " IN (" + placeholders + ")"
 		for _, key := range keys {
 			args = append(args, key)
 		}
 	}
 	query := "SELECT id,started,summary,NOT EXISTS(SELECT 1 FROM requests r WHERE r.id=m.id) AS missing FROM request_metrics m" + where + " UNION ALL SELECT id,started,summary,0 AS missing FROM requests" + where
-	if where == "" {
-		query += " WHERE "
-	} else {
-		query += " AND "
-	}
-	query += "NOT EXISTS(SELECT 1 FROM request_metrics m WHERE m.id=requests.id) ORDER BY started DESC,id DESC"
+	query += " AND NOT EXISTS(SELECT 1 FROM request_metrics m WHERE m.id=requests.id) ORDER BY started DESC,id DESC"
 	if len(keys) == 0 {
 		query += " LIMIT 200"
 	} else {
@@ -327,7 +323,7 @@ func (g *Gateway) taskRecords(keys []string) ([]Record, error) {
 	g.metricsMu.Lock()
 	for id, rec := range g.inflight {
 		delete(records, id)
-		if len(keys) == 0 || wanted[taskKey(rec)] {
+		if rec.TaskID != "" && (len(keys) == 0 || wanted[taskKey(rec)]) {
 			rec.RecordMissing = true
 			records[id] = rec
 		}

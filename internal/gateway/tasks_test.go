@@ -127,7 +127,7 @@ func TestTaskReplyAndQuestionEvidence(t *testing.T) {
 		t.Fatal("tool result mistaken for user question")
 	}
 }
-func TestTasksIncludeWholeGroupAndLegacyWithMissingBodies(t *testing.T) {
+func TestTasksIncludeWholeGroupWithMissingBodies(t *testing.T) {
 	h := newHarness(t)
 	base := Record{ID: "r-000", ProjectID: "p", ProjectName: "P", Started: 1, Duration: 10, State: "complete", Alias: "coding"}
 	// Embedded fields must be assigned separately in struct literals.
@@ -172,7 +172,7 @@ func TestTasksIncludeWholeGroupAndLegacyWithMissingBodies(t *testing.T) {
 	list = parse[struct {
 		Tasks []RequestTask `json:"tasks"`
 	}](t, rr)
-	if len(list.Tasks) != 2 {
+	if len(list.Tasks) != 1 || !list.Tasks[0].Grouped {
 		t.Fatalf("tasks=%d", len(list.Tasks))
 	}
 	d := parse[TaskDetail](t, h.request("GET", "/api/admin/request-tasks/"+base.TaskID, nil, "", true))
@@ -195,6 +195,67 @@ func TestTasksIncludeWholeGroupAndLegacyWithMissingBodies(t *testing.T) {
 		t.Fatal("active call absent")
 	}
 	h.want(h.request("GET", "/api/admin/request-tasks/"+base.TaskID+"?offset=-1", nil, "", true), 400)
+}
+
+func TestTasksExcludeUngroupedCallsWithoutHidingRequests(t *testing.T) {
+	h := newHarness(t)
+	legacy := Record{ID: "legacy", ProjectID: "p", Started: 1000, State: "complete", Input: `{"messages":[{"role":"user","content":"历史提问"}]}`}
+	raw, _ := json.Marshal(legacy)
+	if _, err := h.g.db.Exec("INSERT INTO requests(id,project_id,started,summary,record) VALUES(?,?,?,?,?)", legacy.ID, legacy.ProjectID, legacy.Started, string(raw), string(raw)); err != nil {
+		t.Fatal(err)
+	}
+	// More than a full window of ungrouped metrics must not crowd out tasks.
+	for i := 0; i < 205; i++ {
+		rec := Record{ID: fmt.Sprintf("ungrouped-%03d", i), ProjectID: "p", Started: int64(1001 + i), State: "complete"}
+		h.g.saveMetric(rec)
+		stored, _ := json.Marshal(rec)
+		if _, err := h.g.db.Exec("INSERT INTO requests(id,project_id,started,summary,record) VALUES(?,?,?,?,?)", rec.ID, rec.ProjectID, rec.Started, string(stored), string(stored)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	active := Record{ID: "ungrouped-active", ProjectID: "p", Started: 2000, State: "running"}
+	h.g.metricsMu.Lock()
+	h.g.inflight[active.ID] = metricSummary(active)
+	h.g.metricsMu.Unlock()
+	list := func() []RequestTask {
+		rr := h.request("GET", "/api/admin/request-tasks", nil, "", true)
+		h.want(rr, 200)
+		return parse[struct{ Tasks []RequestTask }](t, rr).Tasks
+	}
+	if tasks := list(); tasks == nil || len(tasks) != 0 {
+		t.Fatalf("ungrouped-only history must return an empty task list: %+v", tasks)
+	}
+	for _, id := range []string{legacy.ID, "ungrouped-000", active.ID} {
+		h.want(h.request("GET", "/api/admin/request-tasks/"+id, nil, "", true), 404)
+		h.want(h.request("GET", "/api/admin/requests/"+id, nil, "", true), 200)
+	}
+	requestsBefore := h.request("GET", "/api/admin/requests", nil, "", true)
+	h.want(requestsBefore, 200)
+	if len(parse[[]Record](t, requestsBefore)) != 200 || !strings.Contains(requestsBefore.Body.String(), "ungrouped-204") {
+		t.Fatal("ungrouped calls missing from request list")
+	}
+	// One identified call is already a task, even if older than ungrouped traffic.
+	grouped := Record{ID: "grouped-single", ProjectID: "p", Started: 1, State: "complete"}
+	captureWorkBuddy(&grouped, buddyHeaders("single-root", "session", "turn", "main"), "")
+	h.g.saveMetric(grouped)
+	if tasks := list(); len(tasks) != 1 || !tasks[0].Grouped || tasks[0].ID != grouped.TaskID || tasks[0].Calls != 1 {
+		t.Fatalf("identified single call lost behind ungrouped calls: %+v", tasks)
+	}
+	// Also include a newly running task before its first database write.
+	grouped.ID, grouped.State = "grouped-active", "running"
+	captureWorkBuddy(&grouped, buddyHeaders("active-root", "session", "turn", "main"), "")
+	h.g.metricsMu.Lock()
+	h.g.inflight[grouped.ID] = metricSummary(grouped)
+	h.g.metricsMu.Unlock()
+	if tasks := list(); len(tasks) != 2 {
+		t.Fatalf("active identified task missing: %+v", tasks)
+	}
+	if after := h.request("GET", "/api/admin/requests", nil, "", true); after.Body.String() != requestsBefore.Body.String() {
+		t.Fatal("task filtering changed the request list")
+	}
+	if after := h.request("GET", "/api/admin/requests/"+legacy.ID, nil, "", true); parse[Record](t, after).Input != legacy.Input {
+		t.Fatal("task filtering changed original request data")
+	}
 }
 
 func TestWorkBuddyQuestionExtraction(t *testing.T) {
