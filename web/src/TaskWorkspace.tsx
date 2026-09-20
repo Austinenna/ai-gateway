@@ -68,7 +68,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
         {visible.map(task => <button key={task.id} className={'request-item task-item ' + (id === task.id ? 'selected' : '')} onClick={() => select(task)}>
           <span><small>{task.project_name}</small><small>{dateTime(task.started)}</small></span>
           <b className="task-title">{task.title}</b>
-          <span className="task-badges"><em className="task-tag">WorkBuddy · 明确分组</em><small className={task.state === 'replied' ? 'good-text' : 'warning-text'}>{taskState(task)}</small></span>
+          <span className="task-badges"><em className="task-tag">WorkBuddy</em><small className={task.state === 'replied' ? 'good-text' : 'warning-text'}>{taskState(task)}</small></span>
           <span><small>{task.calls} 次调用</small></span>
           {task.failed > 0 && <span className="task-failure">{task.failed} 次调用失败</span>}
         </button>)}
