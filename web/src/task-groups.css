@@ -21,11 +21,12 @@
 .task-stats b { font-size: 20px; font-weight: 550; overflow-wrap: anywhere; }
 .task-content { display: grid; gap: 22px; }
 .task-explanation { color: var(--muted); font-size: 12px; line-height: 1.8; }
-.task-message { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
-.task-message-label { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 11px; }
+.task-message { --task-message-bg: var(--bg); --task-message-role: var(--accent); min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--task-message-bg); }
+.task-message-label { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; color: var(--task-message-role); font-size: 11px; font-weight: 500; }
 .task-message-label .link { font-size: 11px; }
 .task-message p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.9; }
-.task-message .text-preview-window.is-clipped::after { background: linear-gradient(transparent, var(--bg)); }
+.task-answer { --task-message-bg: var(--surface); --task-message-role: var(--green); }
+.task-message .text-preview-window.is-clipped::after { background: linear-gradient(transparent, var(--task-message-bg)); }
 .task-process-link { justify-content: flex-start; white-space: normal; font-size: 12px; padding: 14px; }
 .task-process-link > svg:last-child { margin-left: auto; flex: none; }
 .task-calls { display: grid; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
