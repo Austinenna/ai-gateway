@@ -18,6 +18,7 @@ export type RequestRecord = {
   output_reported?: boolean; usage_status?: string; output_tps?: number | null; tpot_ms?: number | null;
   record_missing?: boolean;
   adaptations?: RequestAdaptation[];
+  audio_seconds?: number | null;
 };
 export type Distribution = { count: number; p50: number | null; p95: number | null };
 export type MetricSummary = {
@@ -45,6 +46,7 @@ export const dateTime = (value: number) => new Date(value).toLocaleString('zh-CN
 export const errorName = (kind?: string) => ({ authentication: '凭证无效', permission: '模型未授权或停用', invalid_request: '请求格式错误', gateway_error: '网关错误', gateway_restart: '服务重启中断', upstream_connection: '上游连接失败', upstream_protocol: '上游响应格式错误', upstream_error: '上游错误', rate_limit: '上游限流 · 429', timeout: '请求超时', stream_interrupted: '流式传输中断', client_canceled: '客户端取消／断开' }[kind || ''] || kind || '未分类错误');
 export const recordStatus = (r: RequestRecord) => ({ complete: '完成', canceled: '已取消', truncated: '未完整结束', timeout: '已超时', rejected: '已拒绝', interrupted: '异常中断', running: '进行中' }[r.state] || '失败');
 export function firstTiming(r: RequestRecord, content = false) {
+  if (r.protocol === 'dashscope-asr') return '不适用';
   if (r.metrics_version && r.stream === false) return '非流式';
   if (!content && !r.timing_version) return '未记录';
   const v = content ? r.first_text_ms : r.first_token_ms;

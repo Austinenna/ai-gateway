@@ -57,6 +57,10 @@ func (g *Gateway) discoverModels(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "请选择连接已配置的协议")
 		return
 	}
+	if in.Protocol == "dashscope-asr" {
+		problem(w, 400, "当前不支持获取百炼 ASR 模型列表，请手动填写模型 ID")
+		return
+	}
 	if c.Provider == "demo" {
 		writeJSON(w, 200, modelCatalog{Models: []catalogModel{{ID: "demo-v1", DisplayName: "本地演示模型"}}, Protocol: in.Protocol})
 		return
@@ -85,6 +89,9 @@ func (g *Gateway) discoverModels(w http.ResponseWriter, r *http.Request) {
 
 func (g *Gateway) fetchModelCatalog(ctx context.Context, endpoint, protocol, token string) (modelCatalog, error) {
 	out := modelCatalog{Models: []catalogModel{}, Protocol: protocol}
+	if protocol == "dashscope-asr" {
+		return out, errors.New("当前不支持获取百炼 ASR 模型列表，请手动填写模型 ID")
+	}
 	byID := map[string]catalogModel{}
 	cursors := map[string]bool{}
 	cursor := ""

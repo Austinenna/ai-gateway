@@ -19,7 +19,7 @@ func TestModelCatalogDiscovery(t *testing.T) {
 	c.Endpoints["messages"] = "https://catalog.test/anthropic/v1"
 	h.want(h.request("PUT", "/api/admin/connections/"+c.ID, c, "", true), 200)
 	path := "/api/admin/connections/" + c.ID + "/models"
-	for _, protocol := range supportedProtocols {
+	for _, protocol := range []string{"chat", "messages"} {
 		calls := 0
 		h.g.client = doerFunc(func(r *http.Request) (*http.Response, error) {
 			calls++
@@ -122,7 +122,7 @@ func TestModelCatalogErrorsAndAccess(t *testing.T) {
 
 func TestModelCatalogBoundsAndCancellation(t *testing.T) {
 	h := newHarness(t)
-	for _, protocol := range supportedProtocols {
+	for _, protocol := range []string{"chat", "messages"} {
 		calls := 0
 		h.g.client = doerFunc(func(r *http.Request) (*http.Response, error) {
 			calls++

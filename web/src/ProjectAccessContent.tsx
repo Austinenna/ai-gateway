@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, KeyRound, RefreshCw, ShieldCheck } from 'lucide-react';
+import { asrExample } from './asr.mjs';
 
 type Props = {
   project: { id: string; name: string; enabled: boolean; token_prefix: string; has_saved_token?: boolean };
@@ -23,7 +24,8 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 3500); return () => clearTimeout(t); }, [notice]);
-  const endpoint = protocol === 'messages' ? baseURL.replace(/\/v1\/?$/, '') : baseURL;
+  const isAsr = protocol === 'dashscope-asr';
+  const endpoint = isAsr ? baseURL.replace(/\/$/, '') + '/asr/transcriptions' : protocol === 'messages' ? baseURL.replace(/\/v1\/?$/, '') : baseURL;
   const availableModels = models.filter(m => m.enabled && m.protocols.includes(protocol));
   const selectedAlias = availableModels.some(m => m.alias === alias) ? alias : availableModels[0]?.alias || '';
 
@@ -38,7 +40,7 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
       let value = endpoint;
       if (kind !== 'endpoint') {
         const token = await resolveToken();
-        value = kind === 'token' ? token : `BASE_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${selectedAlias}`;
+        value = kind === 'token' ? token : `${isAsr ? 'ASR_URL' : 'BASE_URL'}=${endpoint}\nAPI_KEY=${token}\nMODEL=${selectedAlias}${isAsr ? '\n\nPOST ' + endpoint + '\nContent-Type: application/json\nAuthorization: Bearer ' + token + '\n\n' + asrExample(selectedAlias) : ''}`;
       }
       if (!alive.current) return;
       try {
@@ -54,13 +56,14 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
     <p className="access-intro">把端点和 Token 填入程序，模型名称使用下面的调用别名。</p>
     {!project.enabled && <p className="impact">项目已停用。接入信息可以复制，启用项目后才能调用。</p>}
     <section className="access-field">
-      <div className="access-field-heading"><label htmlFor="access-protocol">网关端点 <span>Base URL</span></label>
+      <div className="access-field-heading"><label htmlFor="access-protocol">网关端点 <span>{isAsr ? 'POST URL' : 'Base URL'}</span></label>
         <select id="access-protocol" aria-label="客户端协议" value={protocol} disabled={busy} onChange={e => setProtocol(e.target.value)}>
           <option value="chat">Chat Completions</option><option value="messages">Anthropic SDK</option>
+          <option value="dashscope-asr">百炼 ASR</option>
         </select>
       </div>
       <div className="access-copy-row"><code>{endpoint}</code><button disabled={busy} onClick={() => copy('endpoint')}><Copy size={15}/>复制端点</button></div>
-      <p className="access-hint">{protocol === 'messages' ? 'Anthropic SDK 会自动添加 /v1/messages。' : '适用于 OpenAI 兼容客户端，调用 /v1/chat/completions。'}</p>
+      <p className="access-hint">{isAsr ? '将百炼原生 JSON 发送到此完整地址，使用项目 Token 进行 Bearer 鉴权。同步返回转写结果。' : protocol === 'messages' ? 'Anthropic SDK 会自动添加 /v1/messages。' : '适用于 OpenAI 兼容客户端，调用 /v1/chat/completions。'}</p>
     </section>
 
     <section className="access-field">
@@ -86,13 +89,14 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
       </select>
     </section>
 
+    {isAsr && <section className="access-field"><h3>音频请求示例</h3><pre>{asrExample(selectedAlias)}</pre><p className="access-hint">替换音频 Base64，format 与文件实际格式保持一致。热词可选；接口接收 JSON。</p></section>}
     <div className="access-feedback" aria-live="polite">
       {error && <div className="error" role="alert">{error}</div>}
       {notice && <p className="access-success" role="status"><Check size={15}/>{notice}</p>}
       {fallback && <div className="access-fallback">{showFallback ? <textarea aria-label="待手动复制的内容" readOnly value={fallback} onFocus={e => e.target.select()}/> : <button onClick={() => setShowFallback(true)}>显示内容以手动复制</button>}</div>}
     </div>
     <button className="primary access-copy-all" disabled={busy || !project.has_saved_token || !selectedAlias} onClick={() => copy('all')}><Copy size={16}/>{busy ? '正在处理…' : '复制完整接入配置'}</button>
-    <p className="access-hint access-format">包含 BASE_URL、API_KEY 和 MODEL，可粘贴到配置文件。</p>
+    <p className="access-hint access-format">{isAsr ? '包含 ASR_URL、API_KEY、MODEL 与音频 JSON 示例。' : '包含 BASE_URL、API_KEY 和 MODEL，可粘贴到配置文件。'}</p>
 
     <div className="access-reset">
       {confirmReset ? <>

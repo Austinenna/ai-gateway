@@ -10,7 +10,7 @@ export function ModelCatalogField({ connection, value, onChange, onSelect }: {
   connection?: Connection; value: string; onChange: (value: string) => void;
   onSelect: (id: string, name: string) => void;
 }) {
-  const protocols = connectionProtocols(connection);
+  const protocols = connectionProtocols(connection).filter(p => p !== 'dashscope-asr');
   const [protocol, setProtocol] = useState<string>(protocols[0] || '');
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [search, setSearch] = useState('');

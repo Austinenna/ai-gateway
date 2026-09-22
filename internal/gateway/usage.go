@@ -22,6 +22,10 @@ func tokenValue(v *int64) *int64 {
 	return nil
 }
 func (rec *Record) readUsage(data []byte) {
+	if rec.Protocol == "dashscope-asr" {
+		rec.readASRUsage(data)
+		return
+	}
 	type usage struct {
 		Input      *int64 `json:"input_tokens"`
 		Output     *int64 `json:"output_tokens"`

@@ -19,10 +19,10 @@ func validEndpoint(c Connection) bool {
 	if c.Provider == "demo" {
 		return len(c.Endpoints) == 1 && c.Endpoints["chat"] == "demo://local"
 	}
-	if c.Provider != "zhipu" && c.Provider != "minimax" && c.Provider != "deepseek" && c.Provider != "custom" {
+	if c.Provider != "zhipu" && c.Provider != "minimax" && c.Provider != "deepseek" && c.Provider != "dashscope" && c.Provider != "custom" {
 		return false
 	}
-	if len(c.Endpoints) == 0 || len(c.Endpoints) > 2 {
+	if len(c.Endpoints) == 0 || len(c.Endpoints) > len(supportedProtocols) {
 		return false
 	}
 	for protocol, endpoint := range c.Endpoints {
@@ -224,7 +224,7 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if len(m.Protocols) == 0 || len(m.Protocols) > 2 {
+	if len(m.Protocols) == 0 || len(m.Protocols) > len(supportedProtocols) {
 		problem(w, 400, "请至少选择一种模型调用协议")
 		return
 	}

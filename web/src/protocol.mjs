@@ -10,10 +10,15 @@ function contentText(content) {
   if (Array.isArray(content)) return content.filter(x => x && x.type === 'text' && typeof x.text === 'string').map(x => x.text).join('');
   return '';
 }
+function asrText(value) {
+  const content = value?.output?.choices?.[0]?.message?.content;
+  return contentText(value?.output?.text) || contentText(value?.output?.sentence?.text) ||
+    (Array.isArray(content) ? content.filter(x => x && typeof x.text === 'string').map(x => x.text).join('') : contentText(content));
+}
 export function responseText(output) {
   let value;
   try { value = JSON.parse(output); } catch { value = null; }
-  if (value) return contentText(value.choices?.[0]?.message?.content) || contentText(value.content) || contentText(value.error?.message);
+  if (value) return asrText(value) || contentText(value.choices?.[0]?.message?.content) || contentText(value.content) || contentText(value.error?.message);
   return dataFrames(output).map(x => contentText(x.choices?.[0]?.delta?.content) || (x.delta?.type === 'text_delta' ? contentText(x.delta.text) : '') || (x.content_block?.type === 'text' ? contentText(x.content_block.text) : '') || '').join('');
 }
 export function messageList(input) {
@@ -21,7 +26,8 @@ export function messageList(input) {
   if (!value || typeof value !== 'object') return [];
   const result = [];
   if (value.system) result.push({role: 'system', content: value.system});
-  if (Array.isArray(value.messages)) for (const message of value.messages) {
+  const messages = value.input?.messages || value.messages;
+  if (Array.isArray(messages)) for (const message of messages) {
     if (!message || typeof message !== 'object') continue;
     result.push({role: typeof message.role === 'string' ? message.role : 'unknown', content: message.content ?? '', tool_calls: message.tool_calls});
   }

@@ -2,7 +2,7 @@
 
 客户端通过 Skill 创建自己的项目，**立即领取尚未启用的项目 Token 并完成配置**。管理员随后在「项目权限」页面点击「批准」，同一个 Token 即刻生效；客户端不必等待审批、重新领 Token 或重写配置。拒绝后 Token 保持不可用。
 
-默认接入 OpenAI Chat Completions；按客户端需要选择 Anthropic Messages。当前不支持 Responses。成本、速度和模型效果选型不在这次范围。
+默认接入 OpenAI Chat Completions；按客户端需要选择 Anthropic Messages 或百炼 ASR。当前不支持 Responses。成本、速度和模型效果选型不在这次范围。
 
 ## 正常流程
 
@@ -24,7 +24,7 @@
 {"name":"项目名称","client":"客户端名称","protocol":"chat","models":["coding"],"note":"可选用途"}
 ```
 
-`protocol` 默认 `chat`；可用值为 `chat` 和 `messages`。`models` 可省略，最多 20 个；`note` 最多 500 字。网关需已解锁，以便加密保存项目 Token。
+`protocol` 默认 `chat`；可用值为 `chat`、`messages` 和 `dashscope-asr`。`models` 可省略，最多 20 个；`note` 最多 500 字。网关需已解锁，以便加密保存项目 Token。
 
 响应为 201，包含 `application`（申请 ID、项目 ID、状态、协议、申请模型）、`token`、`model`、`base_url`、`endpoint` 和 `approval_url`。同一回执和相同内容在 24 小时内重试返回 200，复用同一 Token 和项目；不同内容返回 409。回执过期、申请拒绝、项目删除或 Token 重置后返回 410，不生成替代项目。24 小时只限制重新领取，不限制已保存 Token 的使用，也不使待批准申请自动失效。
 
@@ -46,8 +46,11 @@
 | --- | --- | --- |
 | Chat Completions | 网关根地址 + `/v1` | 网关根地址 + `/v1/chat/completions` |
 | Messages | 网关根地址 | 网关根地址 + `/v1/messages` |
+| 百炼 ASR | 网关根地址 + `/v1` | 网关根地址 + `/v1/asr/transcriptions` |
 
 以客户端实际字段含义为准，不重复追加 `/v1`。仅支持 Responses 的客户端不能直接使用本网关。远程机器或容器内的 `127.0.0.1` 指向它自身，需要明确可达的网关地址。
+
+ASR 客户端应直接向完整 `endpoint` 发送 [DashScope 原生 JSON](asr.md)，不使用 OpenAI 的 multipart 转写接口。此处扩展的是网关申请 API；本轮未修改独立 Skill 的客户端配置脚本，使用该脚本前需核对它是否接受新的协议值。
 
 ## Skill 源码与验证
 

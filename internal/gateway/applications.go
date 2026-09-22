@@ -255,6 +255,9 @@ func (g *Gateway) applyProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) applicationEndpoints(protocol string) (string, string) {
+	if protocol == "dashscope-asr" {
+		return g.origin + "/v1", g.origin + "/v1/asr/transcriptions"
+	}
 	if protocol == "messages" {
 		return g.origin, g.origin + "/v1/messages"
 	}

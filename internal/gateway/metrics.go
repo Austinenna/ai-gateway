@@ -32,6 +32,7 @@ type MetricsFields struct {
 	CacheRead       *int64   `json:"cache_read_tokens"`
 	CacheWrite      *int64   `json:"cache_write_tokens"`
 	OutputReported  bool     `json:"output_reported"`
+	AudioSeconds    *float64 `json:"audio_seconds,omitempty"`
 	UsageStatus     string   `json:"usage_status"`
 	OutputTPS       *float64 `json:"output_tps"`
 	TPOT            *float64 `json:"tpot_ms"`
@@ -103,11 +104,7 @@ func (g *Gateway) observeCall(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		t := &callTrace{start: time.Now()}
 		t.rec = Record{ID: id("req_"), Started: t.start.UnixMilli(), ProjectName: "未识别项目", State: "running", TimingVersion: 1, MetricsFields: MetricsFields{MetricsVersion: 1, UsageStatus: "unknown"}}
-		if r.URL.Path == "/v1/messages" {
-			t.rec.Protocol = "messages"
-		} else {
-			t.rec.Protocol = "chat"
-		}
+		t.rec.Protocol = requestProtocol(r.URL.Path)
 		w.Header().Set("X-Request-ID", t.rec.ID)
 		g.snapshotCall(t)
 		g.saveMetric(t.rec)
@@ -172,6 +169,15 @@ func isTimeout(err error) bool {
 
 func finalizeUsage(rec *Record) {
 	rec.UsageStatus = "unknown"
+	if rec.Protocol == "dashscope-asr" {
+		if rec.AudioSeconds != nil {
+			rec.UsageStatus = "partial"
+			if rec.State == "complete" {
+				rec.UsageStatus = "complete"
+			}
+		}
+		return
+	}
 	if rec.InputTotal != nil || rec.InputUncached != nil || rec.OutputReported || rec.CacheRead != nil || rec.CacheWrite != nil {
 		rec.UsageStatus = "partial"
 	}
@@ -222,6 +228,8 @@ type metricAggregate struct {
 	CacheWriteSamples           int                `json:"cache_write_samples"`
 	UsageComplete               int                `json:"usage_complete"`
 	UsageEligible               int                `json:"usage_eligible"`
+	AudioSeconds                float64            `json:"audio_seconds,omitempty"`
+	AudioSamples                int                `json:"audio_samples,omitempty"`
 	CacheRatio                  *float64           `json:"cache_ratio"`
 	TTFT                        metricDistribution `json:"ttft"`
 	TTFC                        metricDistribution `json:"ttfc"`
@@ -247,10 +255,14 @@ func (a *metricAggregate) add(rec Record) {
 		a.Failed++
 		a.Errors[rec.ErrorType]++
 	}
-	if rec.Forwarded {
+	if rec.AudioSeconds != nil {
+		a.AudioSeconds += *rec.AudioSeconds
+		a.AudioSamples++
+	}
+	if rec.Forwarded && rec.Protocol != "dashscope-asr" {
 		a.UsageEligible++
 	}
-	if rec.UsageStatus == "complete" {
+	if rec.UsageStatus == "complete" && rec.Protocol != "dashscope-asr" {
 		a.UsageComplete++
 	}
 	if rec.InputTotal != nil {

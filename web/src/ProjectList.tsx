@@ -1,5 +1,7 @@
 import { Check, Copy, ShieldCheck, Terminal, Trash2, X } from 'lucide-react';
 
+import { protocolName } from './connection-protocols';
+
 type ProjectInfo = { id: string; name: string; token_prefix: string; enabled: boolean; model_ids: string[] };
 export type ProjectApplication = { id:string; project_id:string; client:string; protocol:string; models:string[]; note:string; created:number; decided:number; status:'pending'|'approved'|'rejected' };
 type ModelInfo = { id: string; alias: string };
@@ -24,7 +26,7 @@ export function ProjectList<T extends ProjectInfo>({ projects, models, applicati
       <tbody>{projects.map(p => { const application=byProject.get(p.id); const pending=application?.status==='pending'; const rejected=application?.status==='rejected'; return <tr key={p.id} className={'project-card project-row'+(pending?' project-pending':'')}>
         <td className="project-identity-cell"><div className="project-identity">
           <span className="project-symbol"><Terminal size={18}/></span>
-          <div><strong>{p.name}</strong><code>{p.token_prefix}••••••••</code>{application&&<div className="project-applicant"><span>{application.client} · {application.protocol==='chat'?'Chat Completions':'Messages'}</span>{application.note&&<small>{application.note}</small>}{pending&&<small>客户端已领取 Token，批准后即可调用。</small>}</div>}</div>
+          <div><strong>{p.name}</strong><code>{p.token_prefix}••••••••</code>{application&&<div className="project-applicant"><span>{application.client} · {protocolName(application.protocol)}</span>{application.note&&<small>{application.note}</small>}{pending&&<small>客户端已领取 Token，批准后即可调用。</small>}</div>}</div>
         </div></td>
         <td className="project-grants-cell" data-label="授权模型">
           <div className="project-grants">{p.model_ids.length ? p.model_ids.map(id => <code className="project-grant-chip" key={id}>{aliases.get(id) || id}</code>) : <span className="project-no-grants">尚未授权模型</span>}</div>

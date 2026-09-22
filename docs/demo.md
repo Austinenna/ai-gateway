@@ -5,11 +5,13 @@
 这是可以在本机运行的 Go＋React／TypeScript＋Vite＋SQLite 应用。前端构建后嵌入 Go 可执行文件，运行时不需要 Node 服务。
 
 1. 首次打开设置管理密码。当前本机启用自动解锁：已有密钥库仅首次切换需要原密码，之后每次启动即可调用；管理页可留空登录。
-2. 在“厂商连接”选择智谱、MiniMax 或自定义连接，分别启用所需的 Chat Completions／Anthropic Messages 协议并填写各自的基础端点，至少一种即可，两个入口共用厂商 Token。可以编辑、停用或重新验证密码查看 Token。
+2. 在“厂商连接”选择智谱、MiniMax、DeepSeek、阿里百炼或自定义连接，启用所需的 Chat Completions／Anthropic Messages／百炼 ASR 协议并填写各自的基础端点；同一连接的协议共用厂商 Token。可以编辑、停用或重新验证密码查看 Token。
 3. 在“模型配置”设置显示名称、调用别名、厂商模型 ID、关联连接、启用的协议和默认参数。
 4. 在“项目权限”创建项目，勾选可调用模型，取得单独的项目凭证。在项目列表的“接入信息”中复制网关端点、完整 Token 或整份接入配置。
 5. 程序用网关端点、项目凭证和模型别名调用。可以在页面的“试调用”里直接验证。
 6. 在“请求记录”查看消息、响应详情、原始数据和性能与用量，也可按项目、状态和关键词筛选。“响应详情”整理上游实际返回的思考文本、回答正文、工具名称与参数、结束原因；流式片段会合并，多个工具调用分别展示，可独立折叠。没有回答正文不代表没有返回，消息页会提示已返回的思考／工具调用。工具执行结果由客户端带入后续请求，可在那条请求的 TOOL 消息中查看。点击 SYSTEM、USER、ASSISTANT 等角色标题可独立展开／收起消息，支持 Enter／空格操作；切换请求时恢复默认展开。
+
+百炼 ASR 的配置、原生 JSON 请求示例与限制见 [百炼 ASR 接入](asr.md)。模型测试／项目试调用可选择音频和热词，请求记录展示转写内容、时间戳及音频秒数。音频正文只用于转发，不保存到记录；本轮未替用户修改 Dustoff 或迁移其 Key。
 
 也可以在空白概览中点击“载入本地演示”：会创建模拟连接、模型和项目，并打开试调用。模拟模型直接在本机返回固定说明文字，不访问厂商、不消耗额度。它用于验证流程，不提供真实推理。
 
@@ -113,7 +115,7 @@ bash scripts/start.sh
 
 ## 真实模型配置
 
-一条连接可以配置一种或两种协议的基础端点。每个端点包含版本路径；网关根据客户端请求路径确定协议，再选择该协议的端点并添加末尾调用路径：
+一条连接可以配置所需协议的基础端点。每个端点包含版本路径；网关根据客户端请求路径确定协议，再选择该协议的端点并添加末尾调用路径：
 
 | 厂商／协议 | 基础端点示例 | 网关添加 |
 | --- | --- | --- |
@@ -124,6 +126,7 @@ bash scripts/start.sh
 | MiniMax 国际站 | 使用账号对应的 `api.minimax.io` 端点 | 同协议路径 |
 | DeepSeek Chat Completions | `https://api.deepseek.com` | `/chat/completions` |
 | DeepSeek Anthropic Messages | `https://api.deepseek.com/anthropic/v1` | `/messages` |
+| 阿里百炼 ASR | `https://dashscope.aliyuncs.com/api/v1` | `/services/aigc/multimodal-generation/generation` |
 | 自定义 Chat Completions | 例如 `https://example.com/v1`，按服务文档填写 | `/chat/completions` |
 | 自定义 Anthropic Messages | 例如 `https://example.com/anthropic/v1`，按服务文档填写 | `/messages` |
 

@@ -33,6 +33,9 @@ func validateModelDefaults(defaults map[string]json.RawMessage) error {
 }
 
 func applyModelDefaults(body, defaults map[string]json.RawMessage, provider, protocol string) {
+	if protocol == "dashscope-asr" {
+		return
+	}
 	for key, value := range defaults {
 		switch key {
 		case "reasoning_split":

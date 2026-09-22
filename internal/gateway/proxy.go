@@ -16,13 +16,33 @@ type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
+type asrTransportKey struct{}
+
+type protocolTransport struct {
+	text, asr *http.Transport
+}
+
+func (t *protocolTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if asr, _ := r.Context().Value(asrTransportKey{}).(bool); asr {
+		return t.asr.RoundTrip(r)
+	}
+	return t.text.RoundTrip(r)
+}
+
+func (t *protocolTransport) CloseIdleConnections() {
+	t.text.CloseIdleConnections()
+	t.asr.CloseIdleConnections()
+}
+
 func newHTTPClient() *http.Client {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.MaxIdleConns = 32
 	t.MaxIdleConnsPerHost = 8
 	t.ResponseHeaderTimeout = 45 * time.Second
 	t.DisableCompression = true
-	return &http.Client{Transport: t, Timeout: 10 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}
+	asr := t.Clone()
+	asr.ResponseHeaderTimeout = 10 * time.Minute
+	return &http.Client{Transport: &protocolTransport{text: t, asr: asr}, Timeout: 10 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}
 }
 func projectCredential(r *http.Request) string {
 	b := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
@@ -103,9 +123,14 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	t.rec.ProjectID, t.rec.ProjectName = p.ID, p.Name
 	captureWorkBuddy(&t.rec, r.Header, projectCredential(r))
 	g.snapshotCall(t)
-	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, 2*1024*1024))
+	protocol := requestProtocol(r.URL.Path)
+	limit := int64(2 * 1024 * 1024)
+	if protocol == "dashscope-asr" {
+		limit = maxASRRequestBytes
+	}
+	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 	if e != nil {
-		problem(w, 413, "请求超过 2 MB 上限")
+		problem(w, 413, fmt.Sprintf("请求超过 %d MiB 上限", limit/(1024*1024)))
 		return
 	}
 	var body map[string]json.RawMessage
@@ -129,10 +154,6 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "此项目未获模型授权，或模型／连接已停用")
 		return
 	}
-	protocol := "chat"
-	if r.URL.Path == "/v1/messages" {
-		protocol = "messages"
-	}
 	c, e = selectProtocol(m, c, protocol)
 	if e != nil {
 		problem(w, 400, e.Error())
@@ -145,10 +166,13 @@ func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 	t.rec.ProjectID, t.rec.ProjectName = "admin-test", "管理员测试"
 	g.snapshotCall(t)
 	var in struct {
-		Message  string `json:"message"`
-		Protocol string `json:"protocol"`
+		Message    string          `json:"message"`
+		Protocol   string          `json:"protocol"`
+		Input      json.RawMessage `json:"input"`
+		Parameters json.RawMessage `json:"parameters"`
+		Stream     json.RawMessage `json:"stream"`
 	}
-	if !decode(w, r, &in) {
+	if !decodeLimit(w, r, &in, maxASRRequestBytes) {
 		return
 	}
 	var alias string
@@ -174,11 +198,22 @@ func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, e.Error())
 		return
 	}
+	aliasJSON, _ := json.Marshal(alias)
+	if c.Protocol == "dashscope-asr" {
+		body := map[string]json.RawMessage{"model": aliasJSON, "input": in.Input}
+		if len(in.Parameters) > 0 {
+			body["parameters"] = in.Parameters
+		}
+		if len(in.Stream) > 0 {
+			body["stream"] = in.Stream
+		}
+		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, body)
+		return
+	}
 	if in.Message == "" {
 		in.Message = "请简短回复：连接成功。"
 	}
 	messages, _ := json.Marshal([]map[string]string{{"role": "user", "content": in.Message}})
-	aliasJSON, _ := json.Marshal(alias)
 	body := map[string]json.RawMessage{"model": aliasJSON, "messages": messages, "max_tokens": json.RawMessage("128"), "stream": json.RawMessage("false")}
 	g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, body)
 }
@@ -213,6 +248,12 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	rec.ProjectID, rec.ProjectName, rec.ModelID, rec.Alias, rec.UpstreamModel, rec.Protocol = p.ID, p.Name, m.ID, m.Alias, m.UpstreamModel, c.Protocol
 	rec.ConnectionID, rec.ConnectionName, rec.Provider = c.ID, c.Name, c.Provider
 	g.snapshotCall(t)
+	if c.Protocol == "dashscope-asr" {
+		if err := validateASRRequest(body); err != nil {
+			problem(w, 400, err.Error())
+			return
+		}
+	}
 	key := g.key()
 	defer wipe(key)
 	if len(key) == 0 {
@@ -230,6 +271,9 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 		delete(body, k)
 	}
 	original, _ := json.Marshal(body)
+	if c.Protocol == "dashscope-asr" {
+		original = asrLogPayload(original)
+	}
 	rec.Input = redact(string(original), string(secret), projectCredential(r))
 	if rec.TaskID != "" {
 		rec.Question = questionExcerpt(rec.Input)
@@ -271,9 +315,14 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	path := "/chat/completions"
 	if c.Protocol == "messages" {
 		path = "/messages"
+	} else if c.Protocol == "dashscope-asr" {
+		path = "/services/aigc/multimodal-generation/generation"
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
+	if c.Protocol == "dashscope-asr" {
+		ctx = context.WithValue(ctx, asrTransportKey{}, true)
+	}
 	req, e := http.NewRequestWithContext(ctx, "POST", c.BaseURL+path, bytes.NewReader(payload))
 	if e != nil {
 		problem(w, 502, "创建上游请求失败")
@@ -427,7 +476,12 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 		return
 	}
 	data = []byte(redact(string(data), string(secret), projectCredential(r)))
-	captured.add(data)
+	if c.Protocol == "dashscope-asr" {
+		captured.add(asrLogPayload(data))
+		rec.readUsage(data)
+	} else {
+		captured.add(data)
+	}
 	if rec.Status >= 200 && rec.Status < 300 {
 		rec.State = "complete"
 		if kind := responseError(data); kind != "" {

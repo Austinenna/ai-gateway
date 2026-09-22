@@ -10,7 +10,7 @@ export function RequestHeader({ record: r }: { record: RequestRecord }) {
     <div className="detail-metadata">
       <span>模型 <code>{r.alias || '未路由'}</code></span>
       {r.connection_name && <span>连接 <b>{r.connection_name}</b></span>}
-      <span className="detail-mode">{r.stream === true ? '流式' : r.stream === false ? '非流式' : '历史记录'}</span>
+      <span className="detail-mode">{r.protocol === 'dashscope-asr' ? '百炼 ASR · 同步转写' : r.stream === true ? '流式' : r.stream === false ? '非流式' : '历史记录'}</span>
       <code className="detail-request-id" title={'请求 ID：' + r.id}>{r.id}</code>
     </div>
     {r.error_type && <div className="request-outcome-note">{errorName(r.error_type)} · HTTP {r.status || '—'}</div>}
@@ -20,6 +20,10 @@ export function RequestHeader({ record: r }: { record: RequestRecord }) {
 
 export function RequestMetrics({ record: r }: { record: RequestRecord }) {
   const input = inputTotal(r), output = outputTotal(r);
+  if (r.protocol === 'dashscope-asr') return <div className="detail-metric-grid">
+    <div><span>总耗时</span><b>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</b></div>
+    <div><span>音频时长</span><b>{number(r.audio_seconds, 2)} <em>秒</em></b></div>
+  </div>;
   return <div className="detail-metric-grid">
     <div title="从开始转发到首段有效思考、正文或工具内容"><span>首个 Token · TTFT</span><b>{firstTiming(r)}</b></div>
     <div title="从开始转发到首段非空正文，不含思考和工具调用"><span>正文首字 · TTFC</span><b>{firstTiming(r, true)}</b></div>
@@ -30,6 +34,11 @@ export function RequestMetrics({ record: r }: { record: RequestRecord }) {
   </div>;
 }
 export function RequestTiming({ record: r }: { record: RequestRecord }) {
+  if (r.protocol === 'dashscope-asr') return <div className="request-metrics-detail">
+    <section className="detail-timing"><h3>同步转写耗时</h3><dl className="usage-breakdown"><div><dt>网关收到请求</dt><dd>{dateTime(r.started)}</dd></div><div><dt>总耗时</dt><dd>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</dd></div></dl></section>
+    <section className="detail-usage"><h3>音频用量</h3><dl className="usage-breakdown"><div><dt>音频时长</dt><dd>{number(r.audio_seconds, 2)} <small>秒</small></dd></div></dl><p className="metric-explanation">时长采用厂商返回值，未报告时显示 —。转写文本及词时间戳见响应详情。</p></section>
+    <section className="detail-outcome"><h3>请求结果</h3><dl className="usage-breakdown"><div><dt>最终结果</dt><dd>{recordStatus(r)}</dd></div><div><dt>客户端 HTTP / 上游 HTTP</dt><dd>{r.status || '—'} / {r.upstream_status || '—'}</dd></div></dl>{r.error_type && <p className="metric-explanation">{errorName(r.error_type)}</p>}</section>
+  </div>;
   const modern = !!r.metrics_version, offset = modern ? r.forward_offset_ms || 0 : 0;
   const input = inputTotal(r), output = outputTotal(r);
   const autoCache = r.input_total_basis === 'minimax_auto_cache';

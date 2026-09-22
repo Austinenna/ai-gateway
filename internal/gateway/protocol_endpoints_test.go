@@ -65,7 +65,7 @@ func TestSingleAliasRoutesBothProtocols(t *testing.T) {
 		"messages": {"model": m.Alias, "system": "messages-system", "messages": []any{map[string]string{"role": "user", "content": "hello"}}},
 	}
 	paths := map[string]string{"chat": "/v1/chat/completions", "messages": "/v1/messages"}
-	for _, protocol := range supportedProtocols {
+	for _, protocol := range []string{"chat", "messages"} {
 		for _, stream := range []bool{false, true} {
 			bodies[protocol]["stream"] = stream
 			rr := h.request("POST", paths[protocol], bodies[protocol], p.Token, false)
@@ -127,7 +127,7 @@ func TestProtocolEndpointValidationAndModelTests(t *testing.T) {
 		bad.Protocols = protocols
 		h.want(h.request("PUT", "/api/admin/models/"+m.ID, bad, "", true), 400)
 	}
-	for _, protocol := range supportedProtocols {
+	for _, protocol := range []string{"chat", "messages"} {
 		h.g.client = doerFunc(func(r *http.Request) (*http.Response, error) {
 			path := "/chat/completions"
 			if protocol == "messages" {

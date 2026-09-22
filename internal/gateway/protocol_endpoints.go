@@ -6,7 +6,18 @@ import (
 	"slices"
 )
 
-var supportedProtocols = []string{"chat", "messages"}
+var supportedProtocols = []string{"chat", "messages", "dashscope-asr"}
+
+func requestProtocol(path string) string {
+	switch path {
+	case "/v1/messages":
+		return "messages"
+	case "/v1/asr/transcriptions":
+		return "dashscope-asr"
+	default:
+		return "chat"
+	}
+}
 
 func migrateProtocolEndpoints(db *sql.DB) error {
 	tx, err := db.Begin()

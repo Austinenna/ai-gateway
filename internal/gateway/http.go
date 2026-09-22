@@ -21,7 +21,10 @@ func problem(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]any{"error": map[string]string{"message": message, "type": "gateway_error"}})
 }
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, 256*1024)
+	return decodeLimit(w, r, v, 256*1024)
+}
+func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if d.Decode(v) != nil {
@@ -197,8 +200,9 @@ func (g *Gateway) Handler(assets fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/admin/applications/{id}/decision", g.admin(g.decideApplication))
 	mux.HandleFunc("POST /v1/chat/completions", g.observeCall(g.proxy))
 	mux.HandleFunc("POST /v1/messages", g.observeCall(g.proxy))
+	mux.HandleFunc("POST /v1/asr/transcriptions", g.observeCall(g.proxy))
 	mux.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {
-		problem(w, 404, "此 Demo 仅支持 Chat Completions、Messages 和模型列表")
+		problem(w, 404, "网关当前支持 Chat Completions、Messages、百炼 ASR 和模型列表")
 	})
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { problem(w, 404, "接口不存在") })
 	if assets != nil {

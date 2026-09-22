@@ -1,13 +1,13 @@
 # AI Gateway
 
-个人工具与 Agent 共用的轻量 LLM 网关：在页面管理厂商 Key、模型与项目权限，用项目凭证调用模型，并查看请求和响应。
+个人工具与 Agent 共用的轻量 AI 网关：在页面管理厂商 Key、模型与项目权限，用项目凭证调用 LLM 或百炼语音转写，并查看请求和响应。
 
 **当前状态：第一版已实现，已转为正式开发项目，仍需完成真实厂商与实际客户端的系统联调。** 正式目录为 `/Users/enna/Projects/apps/ai-gateway`。转正保留原有实现和数据，不代表已完成生产环境验收。
 
 ## 已确认的范围和方案
 
 - **先在本地实现，为未来迁移单台 Linux 服务器做好准备。** 现在不部署远程服务，也不引入分布式组件。
-- **第一版只做大语言模型。** 提供智谱、MiniMax、DeepSeek 模板与自定义连接，每条连接可配置 Chat Completions、Anthropic Messages 中的一种或两种；百炼 ASR、豆包 ASR、火山视频生成等属于后续候选能力。
+- **已在大语言模型之外增加百炼同步 ASR。** 提供智谱、MiniMax、DeepSeek、阿里百炼模板与自定义连接，支持 Chat Completions、Anthropic Messages 和百炼 ASR；豆包 ASR、图像与视频生成仍为后续候选能力。
 - 技术栈固定为 **Go＋React／TypeScript＋Vite＋SQLite**：Go 标准库处理 HTTP 与 SSE，前端嵌入一个可执行文件，SQLite 保存配置和记录。运行时无需 Node 服务。
 - 界面采用 A 的整体侧栏结构＋B 的请求检查器，已根据实际使用调整项目列表、接入信息、删除流程和独立滚动。
 
@@ -48,13 +48,15 @@ bash scripts/start.sh
 
 已实现 `GET /v1/models`、`POST /v1/chat/completions`、`POST /v1/messages`。同一模型别名可用于两种请求路径，网关按路径选择连接中相应的上游端点。普通与 SSE 调用采用同协议转发，内部按实际厂商、模型和协议适配参数，外部继续使用统一端点与模型别名；保留工具调用及相关内容块，工具由客户端执行。当前已支持 MiniMax M3 的 Messages 思考参数从 `enabled` 转为 `adaptive`，转换记录可在请求详情查看。当前不支持 Responses，也不进行任意协议互转。
 
+百炼 ASR 使用 `POST /v1/asr/transcriptions`，接受原生 DashScope JSON 音频请求并保留原生响应，支持热词、转写文本、逐词时间戳与音频秒数。它沿用连接、模型别名和项目授权；音频正文不会写入请求记录。管理页可选择音频文件测试，具体配置与客户端示例见 [百炼 ASR 接入](docs/asr.md)。本轮仅扩展网关，未修改 Dustoff 或迁移其凭据。
+
 公开模型目录为 `GET /api/public/models`，无需 Token 或管理登录，返回全网关已启用且有可用协议的模型别名、显示名称与协议。`GET /v1/models` 仍需项目凭证，仅返回该项目获授权的模型；实际调用也继续校验项目权限。用法见 [模型列表接口](docs/demo.md#模型列表接口)。
 
 左侧「任务记录」只展示有可靠分组标识的任务，支持 WorkBuddy 按一次提问汇总主／子代理调用，展示用户提问、最新主代理回复、调用过程与累计用量；有标识的单次调用也可成为任务。「请求记录」逐次展示全部请求，未分组调用仅在这里展示。仅新请求中的有效显式标识用于分组，旧记录不猜测合并。使用与统计边界见 [WorkBuddy 任务分组](docs/workbuddy-tasks.md)。
 
 ## 项目自助接入
 
-其他项目或客户端可通过 Skill 自行申请项目，立即领取待启用 Token 并写入自己的配置。你在「项目权限」页面点击「批准」后，同一个 Token 生效；客户端不用等待或再次配置。默认 Chat Completions，可选 Messages。接口、审批行为和 Skill 开发源码见 [项目自助申请与审批](docs/project-enrollment.md)。
+其他项目或客户端可通过自助申请 API 领取待启用 Token 并写入自己的配置。你在「项目权限」页面点击「批准」后，同一个 Token 生效；客户端不用等待或再次配置。默认 Chat Completions，接口也接受 Messages 和百炼 ASR。已有 Skill 的支持范围、接口及审批行为见 [项目自助申请与审批](docs/project-enrollment.md)。
 
 ## 数据与迁移
 
@@ -79,6 +81,7 @@ npm run test:local-unlock
 - [HANDOFF.md](HANDOFF.md)：当前进度、决定、待验证事项与下一步起点。
 - [当前架构与实现逻辑](docs/current-architecture.md)：路由、权限、存储、转发与 Linux 边界。
 - [运行与使用](docs/demo.md)：启动、操作、凭证与删除行为、验证记录。
+- [百炼 ASR 接入](docs/asr.md)：音频转写配置、请求示例、记录与验证边界。
 - [配置与项目权限设计](docs/configuration-and-permissions.md)、[当前界面说明](docs/design-directions.md)。
 - [项目理解报告](docs/project-understanding-report.md)：2026-09-15 的说明快照，生成方式见 [报告说明](docs/report-assets/README.md)。
 - [原始技术选型](docs/archive/technology-options.md)、[三版独立界面方向](docs/archive/ui-directions.md)：历史比较，已被现行方案替代。

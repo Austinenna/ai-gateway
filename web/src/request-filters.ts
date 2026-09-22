@@ -5,7 +5,7 @@ type Model = { id: string; alias: string; name: string };
 type Connection = { provider: string };
 export const recordModelValue = (record: RequestRecord) => record.model_id ? `id:${record.model_id}` : record.alias ? `alias:${record.alias}` : 'unknown';
 export const recordProviderValue = (record: RequestRecord) => record.provider || 'unknown';
-const providerName = (value: string) => ({ zhipu: '智谱', minimax: 'MiniMax', deepseek: 'DeepSeek', custom: '自定义', demo: '本地演示', unknown: '未记录厂商' }[value] || value);
+const providerName = (value: string) => ({ zhipu: '智谱', minimax: 'MiniMax', deepseek: 'DeepSeek', dashscope: '阿里云百炼', custom: '自定义', demo: '本地演示', unknown: '未记录厂商' }[value] || value);
 
 export function requestFilterOptions(records: RequestRecord[], models: Model[], connections: Connection[]) {
   const modelOptions = new Map<string, FilterOption>(models.map(model => [
