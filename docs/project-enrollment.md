@@ -50,11 +50,13 @@
 
 以客户端实际字段含义为准，不重复追加 `/v1`。仅支持 Responses 的客户端不能直接使用本网关。远程机器或容器内的 `127.0.0.1` 指向它自身，需要明确可达的网关地址。
 
-ASR 客户端应直接向完整 `endpoint` 发送 [DashScope 原生 JSON](asr.md)，不使用 OpenAI 的 multipart 转写接口。此处扩展的是网关申请 API；本轮未修改独立 Skill 的客户端配置脚本，使用该脚本前需核对它是否接受新的协议值。
+ASR 客户端应直接向完整 `endpoint` 发送 [DashScope 原生 JSON](asr.md)，不使用 OpenAI 的 multipart 转写接口。独立 Skill 的脚本已接受 `--protocol dashscope-asr`；客户端配置字段要求完整 URL 时使用 `--url-kind endpoint`，将 `endpoint` 写入 `--base-field` 指定的字段。默认 `--url-kind base` 仍写入基础地址，兼容原有 Chat 与 Messages 用法。
 
 ## Skill 源码与验证
 
-开发源码位于 `~/Projects/skills/connect-ai-gateway/`，入口为 `SKILL.md`；未安装到任何全局 Skill 目录。可在其他支持读取 Skill 的模型／客户端中按路径使用。脚本只依赖 Python 3 标准库，在 macOS／Linux 使用文件锁避免并发重复申请。
+开发源码位于 `~/Projects/skills/connect-ai-gateway/`，入口为 `SKILL.md`。按用户授权，在 Codex 的 `~/.codex/skills/connect-ai-gateway/` 和 WorkBuddy 的 `~/.workbuddy/skills/connect-ai-gateway/` 安装经过验证的独立稳定副本，不使用软链接；后续仍从开发源码修改、验证后再发布。其他客户端可按源码路径读取使用。脚本只依赖 Python 3 标准库，在 macOS／Linux 使用文件锁避免并发重复申请。
+
+Skill 根据用途选择 Chat、Messages 或 ASR；ASR 的原生请求、热词、响应及用量说明在技能内的 `references/asr.md`。同一项目和客户端的已有申请不能直接切换协议重新提交；已批准的 LLM 项目若要沿用 Token，应由管理员增加 ASR 模型授权，再更新客户端的 ASR 配置。不要为绕过已有申请而随意新建项目。
 
 `scripts/connect.py` 支持实际环境文件和普通 JSON 对象中的指定字段；其他客户端格式由 Skill 先核对其配置规则，再从私有状态文件读取 Token 写入。不能把任意 `.env.local` 文件的生成当作客户端已经会加载它。脚本拒绝向 Git 已跟踪文件写 Token，未跟踪配置加入本地 Git 排除，配置／状态／备份权限为 0600；不会在输出中打印凭证，不会登录管理或代替用户批准，不轮询审批、不发起真实推理验证。
 

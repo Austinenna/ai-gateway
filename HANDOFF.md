@@ -40,6 +40,10 @@ bash scripts/start.sh
 
 ## 验证边界
 
+2026-09-22 接入 Skill 支持 ASR 并启用：更新独立开发源码 `~/Projects/skills/connect-ai-gateway/`，新增 `--protocol dashscope-asr` 和 `--url-kind endpoint`，使客户端能够保存完整转写地址；补齐原生 JSON、热词、响应结构、音频用量及已有项目复用凭证的说明，保留 Chat／Messages 行为。Skill 格式检查、独立 Python 客户端接入演练、临时网关集成测试均通过；覆盖 env／JSON、待批准权限、批准后原 Token 调用、重试与丢失响应恢复、协议模型不匹配拒绝及凭据不输出。集成测试只有一次本机模拟 ASR 上游调用，未调用真实厂商。
+
+按用户明确授权将 7 个发布文件复制到 `~/.codex/skills/connect-ai-gateway/` 和 `~/.workbuddy/skills/connect-ai-gateway/`，均为独立稳定副本，逐文件哈希与源码一致。Codex `skills/list` 实际发现唯一副本并返回 `enabled: true`；WorkBuddy 已按本机实现核实技能目录、frontmatter、无禁用覆盖及默认启用规则，未改动其设置或重启客户端。WorkBuddy UI 核对因界面工具返回 `noWindowsAvailable` 未完成，不作为已验证项。原技能源码目录没有 Git，按规范未新建仓库；本仓库仅提交接入文档更新。测试记录留在技能源码的 `tests/verification.json`，备份及安装验收位于 `output/skill-asr-qa/`。未修改 Dustoff、真实项目接入配置或网关运行数据。
+
 2026-09-22 百炼同步 ASR：新增 `dashscope-asr` 协议、阿里云百炼模板和 `POST /v1/asr/transcriptions`，沿用原有连接／模型别名／项目授权。原生音频、热词、参数、转写和词时间戳透传；记录在截断前去除音频 Data URI，音频秒数单独保存并排除 Token 指标。管理员测试与项目试调用支持音频文件和热词，模型配置、接入信息、请求详情与自助申请均支持 ASR。请求上限 32 MiB，页面音频文件上限 20 MiB；同步 ASR 响应头等待最多 10 分钟，LLM 仍为 45 秒。无需数据库迁移。
 
 完整 Go 竞态回归（71 个顶层测试）、最终 8 组 ASR 专项竞态回归、14 项前端单测、TypeScript／Vite 与本机二进制构建通过；新增 ASR 端到端和 8 项既有配置、目录、授权、接入信息及检查器浏览器回归通过，已核对桌面／390px 手机截图。端到端实际经过页面、临时网关与本机模拟百炼，涵盖授权拒绝、模型映射、原生请求／响应、无音频日志、时间戳与用量。独立代码复核未发现剩余明确 P1／P2 问题。
