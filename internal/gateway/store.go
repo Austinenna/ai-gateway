@@ -39,6 +39,7 @@ type Model struct {
 	ConnectionID  string                     `json:"connection_id"`
 	Protocols     []string                   `json:"protocols"`
 	UpstreamModel string                     `json:"upstream_model"`
+	ContextWindow int                        `json:"context_window"`
 	Defaults      map[string]json.RawMessage `json:"defaults"`
 	Enabled       bool                       `json:"enabled"`
 }
@@ -173,7 +174,7 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	if e = db.QueryRow("PRAGMA user_version").Scan(&v); e != nil {
 		return fail(e)
 	}
-	if v > 7 {
+	if v > 8 {
 		return fail(errors.New("database was created by a newer gateway"))
 	}
 	_, e = db.Exec(`
@@ -214,6 +215,11 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	}
 	if v < 7 {
 		if e = migrateApplications(db); e != nil {
+			return fail(e)
+		}
+	}
+	if v < 8 {
+		if e = migrateContextWindows(db); e != nil {
 			return fail(e)
 		}
 	}
@@ -329,7 +335,7 @@ func (g *Gateway) connections() ([]Connection, error) {
 	return out, rows.Err()
 }
 func (g *Gateway) models() ([]Model, error) {
-	rows, e := g.db.Query("SELECT id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json FROM models ORDER BY rowid")
+	rows, e := g.db.Query("SELECT id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,context_window FROM models ORDER BY rowid")
 	if e != nil {
 		return nil, e
 	}
@@ -338,7 +344,7 @@ func (g *Gateway) models() ([]Model, error) {
 	for rows.Next() {
 		var m Model
 		var d, protocols string
-		if e = rows.Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &d, &m.Enabled, &protocols); e != nil {
+		if e = rows.Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &d, &m.Enabled, &protocols, &m.ContextWindow); e != nil {
 			return nil, e
 		}
 		if e = json.Unmarshal([]byte(protocols), &m.Protocols); e != nil {

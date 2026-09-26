@@ -177,7 +177,7 @@ func TestApplicationMigrationAndRestart(t *testing.T) {
 	in, receipt, _ := fixtureApplication(h, "chat")
 	// Exercise the real v5 upgrade while retaining existing projects/credentials.
 	p := h.project("Existing")
-	if _, err := h.g.db.Exec("DROP TABLE project_applications; PRAGMA user_version=5"); err != nil {
+	if _, err := h.g.db.Exec("DROP TABLE project_applications; ALTER TABLE models DROP COLUMN context_window; PRAGMA user_version=5"); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.g.Close(); err != nil {
@@ -216,7 +216,7 @@ func TestApplicationMigrationAndRestart(t *testing.T) {
 	h.want(h.request("GET", "/v1/models", nil, out.Token, false), 200)
 	var version int
 	_ = g.db.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 7 {
+	if version != 8 {
 		t.Fatal("migration version")
 	}
 }

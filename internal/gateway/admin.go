@@ -190,10 +190,14 @@ func (g *Gateway) reveal(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]string{"token": string(token)})
 }
 func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
-	var m Model
-	if !decode(w, r, &m) {
+	var in struct {
+		Model
+		ContextWindow *int `json:"context_window"`
+	}
+	if !decode(w, r, &in) {
 		return
 	}
+	m := in.Model
 	m.ID = r.PathValue("id")
 	m.Name = strings.TrimSpace(m.Name)
 	m.Alias = strings.TrimSpace(m.Alias)
@@ -236,6 +240,23 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 		}
 		seen[protocol] = true
 	}
+	if in.ContextWindow != nil {
+		m.ContextWindow = *in.ContextWindow
+	} else if m.ID != "" {
+		// Older clients do not send capacity. Preserve it only for the same route.
+		var oldConnection, oldModel string
+		var oldWindow int
+		if err := g.db.QueryRow("SELECT connection_id,upstream_model,context_window FROM models WHERE id=?", m.ID).Scan(&oldConnection, &oldModel, &oldWindow); err == nil && oldConnection == m.ConnectionID && oldModel == m.UpstreamModel {
+			m.ContextWindow = oldWindow
+		}
+	}
+	if m.ContextWindow < 0 || m.ContextWindow > maxContextWindow {
+		problem(w, 400, "上下文窗口必须为 0 到 2147483647 的整数，0 表示未设置")
+		return
+	}
+	if !seen["chat"] && !seen["messages"] {
+		m.ContextWindow = 0
+	}
 	if m.Defaults == nil {
 		m.Defaults = map[string]json.RawMessage{}
 	}
@@ -258,9 +279,9 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 	var result sql.Result
 	var e error
 	if creating {
-		result, e = g.db.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json) VALUES(?,?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols))
+		result, e = g.db.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,context_window) VALUES(?,?,?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow)
 	} else {
-		result, e = g.db.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=?,protocols_json=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ID)
+		result, e = g.db.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=?,protocols_json=?,context_window=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow, m.ID)
 	}
 	if e != nil {
 		problem(w, 409, "模型保存失败，请检查调用别名是否重复")

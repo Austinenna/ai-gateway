@@ -1,6 +1,6 @@
 # AI Gateway：开发交接
 
-更新日期：2026-09-22。项目转正后位于 `/Users/enna/Projects/apps/ai-gateway`，阶段为 LLM 与百炼同步 ASR 已实现、继续开发与实际联调。
+更新日期：2026-09-26。项目转正后位于 `/Users/enna/Projects/apps/ai-gateway`，阶段为 LLM 与百炼同步 ASR 已实现、继续开发与实际联调。
 
 ## 先理解什么
 
@@ -21,7 +21,7 @@
 
 ## 当前实现
 
-已具备连接／Token、模型、项目的增改停用与删除，项目凭证加密取回和显式重置，项目授权、普通／SSE 转发、请求检查器、六组运行监控、模拟上游，以及本地临时免密。SQLite 当前版本为 7，包含旧数据库的升级路径。
+已具备连接／Token、模型、项目的增改停用与删除，项目凭证加密取回和显式重置，项目授权、普通／SSE 转发、请求检查器、六组运行监控、模拟上游，以及本地临时免密。SQLite 当前版本为 8，包含旧数据库的升级路径。
 
 核心代码在 `internal/gateway/`，界面状态与页面入口在 `web/src/main.tsx`，列表和复杂窗口已分组件。当前没有额外服务层、消息队列、外部数据库或 Agent 编排框架，避免在实际需求出现前扩展这些组成。
 
@@ -39,6 +39,14 @@ bash scripts/start.sh
 文件迁移不代表当前聊天和应用项目入口自动迁移。后续对话应从上述正式目录打开；不要继续在旧 `drafts` 路径下新建同名项目。转正记录由技能脚本保存在 `~/Projects/_meta/promotions/`。
 
 ## 验证边界
+
+2026-09-26 模型最大上下文配置：新增独立 `context_window`（总 Token 容量）字段、模型编辑控件及列表显示，SQLite v8 事务迁移保留原数据；未知容量用 0 表示，并在 `/v1/models` 与 `/api/public/models` 中省略。已设置的容量由两个目录返回，项目授权过滤沿用原规则。旧管理客户端省略新字段且路由未变时保留已有值；界面切换厂商模型 ID 或连接时清空旧容量。ASR 不声明文本 Token 窗口。该字段不注入上游、不裁剪历史、不改变 `max_tokens` 默认值或客户端覆盖行为。LLM 请求正文上限从 2 MiB 提升为 64 MiB，ASR 仍为 32 MiB。
+
+标准脚本通过 14 项前端单测、TypeScript／Vite 构建与 76 个 Go 顶层竞态测试（317 秒）；项目构建脚本通过。5 项浏览器回归覆盖上下文保存／回显／清空、目录、思考参数、ASR 与项目接入；另补拍手机上下文表单。已检查桌面、390px 与手机深色截图。专项测试覆盖 v7 升级及重启、旧管理调用兼容、非法容量、授权隔离、3 MiB 中文消息原样转发、64 MiB 边界与超限拒绝，均使用临时数据库和模拟上游。
+
+确认正式网关无活动调用后，使用 SQLite backup API 备份并正常重启 8317；已应用并回读 `glm` 为 1,000,000、MiniMax M2.5／M2.7 highspeed 各 204,800、M3 及指向它的 `claude-sonnet-5` 各 1,000,000、`deepseek-flash` 为 1,048,576。百炼 ASR 保持未设置文本窗口。数据库完整性、原 5 个连接／7 个模型／4 个项目、凭据密文和授权的配置摘要、467 条历史请求保留及嵌入资源一致性核验通过。备份在 `.data/backups/before-context-window-v8-20260926-215048/`，旧二进制、验收截图和运行核对在 `output/context-window-qa/`。未调用真实厂商，未推送。
+
+容量依据（2026-09-26 核对）：[智谱 API 文档](https://docs.bigmodel.cn/cn/guide/models/vlm/glm-5.3-flash) 标注 1M，按 API 公开口径登记为 1,000,000；[MiniMax 兼容接口](https://platform.minimax.cn/docs/api-reference/text-anthropic-api) 给出 204,800／1,000,000；[DeepSeek 模型接口](https://api-docs.deepseek.com/api/list-models/) 给出 1,048,576。模型自托管配置不替代当前厂商 API 规格。以上是容量声明和网关本地验证，尚未做真实百万 Token 联调；上游限制、超时和客户端压缩策略仍独立生效。只读检查发现 OpenClaw 的网关 M3 已设 `contextWindow: 1000000`，WorkBuddy 的网关模型配置未显式填写输入／上下文窗口；本轮未改客户端。
 
 2026-09-22 接入 Skill 支持 ASR 并启用：更新独立开发源码 `~/Projects/skills/connect-ai-gateway/`，新增 `--protocol dashscope-asr` 和 `--url-kind endpoint`，使客户端能够保存完整转写地址；补齐原生 JSON、热词、响应结构、音频用量及已有项目复用凭证的说明，保留 Chat／Messages 行为。Skill 格式检查、独立 Python 客户端接入演练、临时网关集成测试均通过；覆盖 env／JSON、待批准权限、批准后原 Token 调用、重试与丢失响应恢复、协议模型不匹配拒绝及凭据不输出。集成测试只有一次本机模拟 ASR 上游调用，未调用真实厂商。
 

@@ -16,6 +16,8 @@ type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
+const maxLLMRequestBytes = 64 * 1024 * 1024
+
 type asrTransportKey struct{}
 
 type protocolTransport struct {
@@ -73,7 +75,7 @@ func (g *Gateway) modelList(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "项目凭证无效或项目已停用")
 		return
 	}
-	rows, e := g.db.Query(`SELECT m.alias FROM models m JOIN project_models pm ON pm.model_id=m.id JOIN connections c ON c.id=m.connection_id WHERE pm.project_id=? AND m.enabled=1 AND c.enabled=1 AND EXISTS(SELECT 1 FROM json_each(m.protocols_json) mp JOIN json_each(c.endpoints_json) ce ON ce.key=mp.value) ORDER BY m.alias`, p.ID)
+	rows, e := g.db.Query(`SELECT m.alias,m.context_window FROM models m JOIN project_models pm ON pm.model_id=m.id JOIN connections c ON c.id=m.connection_id WHERE pm.project_id=? AND m.enabled=1 AND c.enabled=1 AND EXISTS(SELECT 1 FROM json_each(m.protocols_json) mp JOIN json_each(c.endpoints_json) ce ON ce.key=mp.value) ORDER BY m.alias`, p.ID)
 	if e != nil {
 		problem(w, 500, "查询失败")
 		return
@@ -82,11 +84,20 @@ func (g *Gateway) modelList(w http.ResponseWriter, r *http.Request) {
 	out := []any{}
 	for rows.Next() {
 		var a string
-		if rows.Scan(&a) != nil {
+		var window int
+		if rows.Scan(&a, &window) != nil {
 			problem(w, 500, "查询失败")
 			return
 		}
-		out = append(out, map[string]any{"id": a, "object": "model", "owned_by": "local-gateway", "created": 0})
+		item := map[string]any{"id": a, "object": "model", "owned_by": "local-gateway", "created": 0}
+		if window > 0 {
+			item["context_window"] = window
+		}
+		out = append(out, item)
+	}
+	if rows.Err() != nil {
+		problem(w, 500, "查询失败")
+		return
 	}
 	writeJSON(w, 200, map[string]any{"object": "list", "data": out})
 }
@@ -124,7 +135,7 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	captureWorkBuddy(&t.rec, r.Header, projectCredential(r))
 	g.snapshotCall(t)
 	protocol := requestProtocol(r.URL.Path)
-	limit := int64(2 * 1024 * 1024)
+	limit := int64(maxLLMRequestBytes)
 	if protocol == "dashscope-asr" {
 		limit = maxASRRequestBytes
 	}
