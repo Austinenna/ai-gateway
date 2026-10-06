@@ -8,7 +8,7 @@ export type RequestRecord = {
   upstream_model: string; protocol: string; started: number; duration_ms: number;
   first_text_ms: number | null; first_token_ms?: number | null; timing_version?: number;
   status: number; state: string; input?: string; output?: string;
-  input_tokens: number; output_tokens: number; truncated: boolean;
+  input_tokens: number; output_tokens: number; truncated: boolean; input_truncated?: boolean; output_truncated?: boolean;
   metrics_version?: number; connection_id?: string; connection_name?: string; provider?: string;
   stream?: boolean | null; forwarded?: boolean; forward_offset_ms?: number;
   last_token_ms?: number | null; content_chunks?: number; error_type?: string; upstream_status?: number;

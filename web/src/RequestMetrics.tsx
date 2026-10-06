@@ -1,6 +1,7 @@
 import { type RequestRecord, firstTiming, inputTotal, outputTotal, number, percent, duration, dateTime, recordStatus, errorName } from './monitoring';
 
 export function RequestHeader({ record: r }: { record: RequestRecord }) {
+  const outcomeHTTP = r.error_type === 'client_canceled' && r.upstream_status ? `上游 HTTP ${r.upstream_status}` : `HTTP ${r.status || '—'}`;
   return <header className="detail-head">
     <div className="detail-identity">
       <h2>{r.project_name}</h2>
@@ -13,7 +14,7 @@ export function RequestHeader({ record: r }: { record: RequestRecord }) {
       <span className="detail-mode">{r.protocol === 'dashscope-asr' ? '百炼 ASR · 同步转写' : r.stream === true ? '流式' : r.stream === false ? '非流式' : '历史记录'}</span>
       <code className="detail-request-id" title={'请求 ID：' + r.id}>{r.id}</code>
     </div>
-    {r.error_type && <div className="request-outcome-note">{errorName(r.error_type)} · HTTP {r.status || '—'}</div>}
+    {r.error_type && <div className="request-outcome-note">{errorName(r.error_type)} · {outcomeHTTP}</div>}
     <RequestMetrics record={r}/>
   </header>;
 }

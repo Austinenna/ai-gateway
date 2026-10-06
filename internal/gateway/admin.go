@@ -417,6 +417,7 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 			problem(w, 500, "读取记录失败")
 			return
 		}
+		rec.normalizeStoredTruncation()
 		rec.RecordMissing = true
 		rec.normalizeStoredUsage()
 		writeJSON(w, 200, rec)
@@ -427,6 +428,7 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "读取记录失败")
 		return
 	}
+	rec.normalizeStoredTruncation()
 	rec.normalizeStoredUsage()
 	writeJSON(w, 200, rec)
 }

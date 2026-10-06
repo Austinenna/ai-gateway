@@ -26,7 +26,8 @@ test.beforeEach(async ({ page }) => {
   const records = [record, { ...record, id: 'timing-old', project_name: '旧记录', timing_version: undefined, first_token_ms: undefined },
     { ...record, id: 'timing-empty', project_name: '空响应', first_token_ms: null, first_text_ms: null },
     { ...record, id: 'tools', project_name: '工具调用演示', first_text_ms: null, output: toolOutput },
-    { ...record, id: 'preview', project_name: '长消息预览', output: JSON.stringify({ choices: [{ message: { content: Array.from({ length: 40 }, (_, i) => `回答第 ${i + 1} 行：这是用于预览与全文展开验收的本地模拟内容。`).join('\n') } }] }) }];
+    { ...record, id: 'preview', project_name: '长消息预览', output: JSON.stringify({ choices: [{ message: { content: Array.from({ length: 40 }, (_, i) => `回答第 ${i + 1} 行：这是用于预览与全文展开验收的本地模拟内容。`).join('\n') } }] }) },
+    { ...record, id: 'truncated-input', project_name: '输入记录截断', state: 'canceled', error_type: 'client_canceled', status: 200, upstream_status: 200, truncated: true, input_truncated: true }];
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname;
     const json = path === '/api/status' ? { configured: true, authenticated: true, locked: false } :
@@ -170,4 +171,10 @@ test('长消息预览和全文都随页面滚动，支持键盘展开及切换�
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath('message-preview-mobile.png'), fullPage: true, animations: 'disabled' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('区分客户端取消与输入记录截断', async ({ page }) => {
+  await page.locator('.request-item').filter({ hasText: '输入记录截断' }).click();
+  await expect(page.locator('.request-outcome-note')).toHaveText('客户端取消／断开 · 上游 HTTP 200');
+  await expect(page.locator('.detail-content > .error')).toHaveText('输入记录达到 1 MiB 上限，已截断；这是检查器保存副本的限制，不代表模型响应本身被截断。');
 });

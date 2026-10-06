@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"strings"
+	"unicode/utf8"
 )
 
 func eventData(s string) []byte {
@@ -128,6 +129,18 @@ func (rec *Record) normalizeStoredUsage() {
 	if rec.MetricsVersion > 0 && rec.minimaxAutoCache() {
 		rec.normalizeMessagesInput()
 	}
+}
+
+// Older records only persisted the aggregate truncated flag. Infer its scope
+// when the stored copy is exactly at one of the bounded body-log limits.
+func (rec *Record) normalizeStoredTruncation() {
+	if !rec.InputTruncated && len(rec.Input) >= maxLog-utf8.UTFMax {
+		rec.InputTruncated = true
+	}
+	if !rec.OutputTruncated && len(rec.Output) >= maxLog-utf8.UTFMax {
+		rec.OutputTruncated = true
+	}
+	rec.Truncated = rec.Truncated || rec.InputTruncated || rec.OutputTruncated
 }
 
 // Do not mistake an HTTP 200 error payload/event for a successful completion.

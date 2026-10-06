@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type HTTPDoer interface {
@@ -245,6 +246,18 @@ func (c *capture) add(b []byte) {
 		c.data = append(c.data, b...)
 	}
 }
+
+func truncateUTF8(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+	s = s[:limit]
+	for len(s) > 0 && !utf8.ValidString(s) {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
 func redact(s string, secrets ...string) string {
 	for _, v := range secrets {
 		if v != "" {
@@ -294,12 +307,13 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	rec.ForwardOffset = time.Since(t.start).Milliseconds()
 	var captured capture
 	defer func() {
-		rec.Truncated = captured.truncated
+		rec.OutputTruncated = captured.truncated
 		rec.Output = redact(string(captured.data), string(secret), projectCredential(r))
 		if len(rec.Input) > maxLog {
-			rec.Input = rec.Input[:maxLog]
-			rec.Truncated = true
+			rec.InputTruncated = true
+			rec.Input = truncateUTF8(rec.Input, maxLog)
 		}
+		rec.Truncated = rec.InputTruncated || rec.OutputTruncated
 	}()
 	applyModelDefaults(body, m.Defaults, c.Provider, c.Protocol)
 	rec.Adaptations = adaptProviderRequest(body, c.Provider, m.UpstreamModel, c.Protocol)
@@ -438,6 +452,7 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 			event.WriteString(line)
 			event.WriteByte('\n')
 			if event.Len() > maxLog {
+				captured.truncated = true
 				rec.State = "truncated"
 				rec.ErrorType = "upstream_protocol"
 				return
