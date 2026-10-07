@@ -1,0 +1,23 @@
+[Unit]
+Description=AI Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/ai-gateway
+# Replace SERVER_IPV4 before installing this template on a server.
+ExecStart=/opt/ai-gateway/bin/gateway --addr 127.0.0.1:8317 --data-dir /var/lib/ai-gateway --public-url https://SERVER_IPV4
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/ai-gateway
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target
