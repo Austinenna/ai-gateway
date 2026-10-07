@@ -110,6 +110,8 @@ jobs:
           set -euo pipefail
           cd dist
           sha256sum -c SHA256SUMS
+          gzip -9 -c gateway-linux-amd64 > "$RUNNER_TEMP/gateway-linux-amd64.gz"
+          gzip -t "$RUNNER_TEMP/gateway-linux-amd64.gz"
 
       - name: Configure SSH
         shell: bash
@@ -140,9 +142,9 @@ jobs:
           target="$DEPLOY_USER@$DEPLOY_HOST"
           echo 'Creating remote staging directory'
           remote_tmp="$(ssh "${ssh_opts[@]}" "$target" 'umask 077 && mktemp -d "$HOME/.ai-gateway-deploy.XXXXXX"')"
-          remote_artifact="$remote_tmp/gateway"
+          remote_artifact="$remote_tmp/gateway.gz"
           echo 'Uploading Linux amd64 artifact'
-          scp "${scp_opts[@]}" dist/gateway-linux-amd64 "$target:$remote_artifact"
+          scp "${scp_opts[@]}" "$RUNNER_TEMP/gateway-linux-amd64.gz" "$target:$remote_artifact"
           echo 'Starting fixed remote deploy script'
           ssh "${ssh_opts[@]}" "$target" \
             "test -x /usr/local/sbin/ai-gateway-deploy && sudo -n /usr/local/sbin/ai-gateway-deploy '$RELEASE' '$remote_artifact'"

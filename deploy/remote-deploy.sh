@@ -14,7 +14,7 @@ data_dir=/var/lib/ai-gateway
 health_url=http://127.0.0.1:8317/healthz
 
 if [[ ! "$release" =~ ^[0-9a-f]{40}-[0-9]+$ ]] \
-  || "$artifact" != */gateway; then
+  || "$artifact" != */gateway.gz; then
   echo '部署参数不符合固定生产路径' >&2
   exit 2
 fi
@@ -25,9 +25,10 @@ binary="$bin_dir/gateway"
 new_binary="$binary.new"
 previous_binary="$release_dir/previous-gateway"
 backup_dir="$data_dir/backups/deploy-$release"
+binary_upload="${artifact%.gz}"
 
 cleanup() {
-  rm -f -- "$artifact"
+  rm -f -- "$artifact" "$binary_upload"
   if [[ "$0" != /usr/local/sbin/ai-gateway-deploy ]]; then
     rm -f -- "$0"
   fi
@@ -42,7 +43,9 @@ if [[ -z "$service_user" ]]; then
 fi
 sudo install -d -m 0755 "$bin_dir" "$release_dir"
 sudo install -d -m 0700 "$data_dir/backups" "$backup_dir"
-sudo install -m 0755 "$artifact" "$release_dir/gateway"
+gzip -t "$artifact"
+gzip -dc "$artifact" > "$binary_upload"
+sudo install -m 0755 "$binary_upload" "$release_dir/gateway"
 
 if sudo test -e "$binary"; then
   sudo cp -p "$binary" "$previous_binary"
