@@ -1,23 +1,19 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ $# -ne 6 ]]; then
-  echo "用法：$0 RELEASE ARTIFACT SERVICE INSTALL_ROOT DATA_DIR HEALTH_URL" >&2
+if [[ $# -ne 2 ]]; then
+  echo "用法：$0 RELEASE ARTIFACT" >&2
   exit 2
 fi
 
 release="$1"
 artifact="$2"
-service="$3"
-install_root="$4"
-data_dir="$5"
-health_url="$6"
+service=ai-gateway.service
+install_root=/opt/ai-gateway
+data_dir=/var/lib/ai-gateway
+health_url=http://127.0.0.1:8317/healthz
 
 if [[ ! "$release" =~ ^[0-9a-f]{40}-[0-9]+$ ]] \
-  || "$service" != ai-gateway.service \
-  || "$install_root" != /opt/ai-gateway \
-  || "$data_dir" != /var/lib/ai-gateway \
-  || "$health_url" != http://127.0.0.1:8317/healthz \
   || "$artifact" != */gateway; then
   echo '部署参数不符合固定生产路径' >&2
   exit 2
@@ -31,7 +27,10 @@ previous_binary="$release_dir/previous-gateway"
 backup_dir="$data_dir/backups/deploy-$release"
 
 cleanup() {
-  rm -f -- "$artifact" "$0"
+  rm -f -- "$artifact"
+  if [[ "$0" != /usr/local/sbin/ai-gateway-deploy ]]; then
+    rm -f -- "$0"
+  fi
   rmdir -- "$(dirname "$artifact")" 2>/dev/null || true
 }
 trap cleanup EXIT

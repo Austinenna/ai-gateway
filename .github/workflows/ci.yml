@@ -78,10 +78,6 @@ jobs:
       DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-      DEPLOY_SERVICE: ai-gateway.service
-      DEPLOY_ROOT: /opt/ai-gateway
-      DEPLOY_DATA_DIR: /var/lib/ai-gateway
-      DEPLOY_HEALTH_URL: http://127.0.0.1:8317/healthz
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -139,8 +135,6 @@ jobs:
           target="$DEPLOY_USER@$DEPLOY_HOST"
           remote_tmp="$(ssh "${ssh_opts[@]}" "$target" 'umask 077 && mktemp -d "$HOME/.ai-gateway-deploy.XXXXXX"')"
           remote_artifact="$remote_tmp/gateway"
-          remote_script="$remote_tmp/deploy.sh"
           scp "${scp_opts[@]}" dist/gateway-linux-amd64 "$target:$remote_artifact"
-          scp "${scp_opts[@]}" deploy/remote-deploy.sh "$target:$remote_script"
           ssh "${ssh_opts[@]}" "$target" \
-            "chmod 700 '$remote_script' && bash '$remote_script' '$RELEASE' '$remote_artifact' '$DEPLOY_SERVICE' '$DEPLOY_ROOT' '$DEPLOY_DATA_DIR' '$DEPLOY_HEALTH_URL'"
+            "test -x /usr/local/sbin/ai-gateway-deploy && sudo -n /usr/local/sbin/ai-gateway-deploy '$RELEASE' '$remote_artifact'"
