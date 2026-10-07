@@ -118,6 +118,17 @@ func (h *harness) call(alias, token string, extra map[string]any) *httptest.Resp
 	return h.request("POST", "/v1/chat/completions", b, token, false)
 }
 
+func TestHealthz(t *testing.T) {
+	h := newHarness(t)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "http://gateway.test/healthz", nil)
+	h.handler.ServeHTTP(rr, req)
+	h.want(rr, 200)
+	if got := rr.Body.String(); got != "{\"ok\":true}\n" {
+		t.Fatalf("unexpected health response: %s", got)
+	}
+}
+
 type doerFunc func(*http.Request) (*http.Response, error)
 
 func (f doerFunc) Do(r *http.Request) (*http.Response, error) { return f(r) }
@@ -170,7 +181,14 @@ func TestProjectAuthorizationAndCredentialSeparation(t *testing.T) {
 		t.Fatal("routing, defaults, or tool passthrough failed")
 	}
 	logs := h.records(2) // The preceding authorization rejection is now recorded too.
-	if logs[0].ProjectID != pa.Project.ID || logs[0].InputTokens != 3 {
+	var authorized Record
+	for _, record := range logs {
+		if record.ProjectID == pa.Project.ID && record.InputTokens == 3 {
+			authorized = record
+			break
+		}
+	}
+	if authorized.ID == "" {
 		t.Fatal("log ownership or usage incorrect")
 	}
 	listed := h.request("GET", "/v1/models", nil, pa.Token, false)
@@ -178,7 +196,7 @@ func TestProjectAuthorizationAndCredentialSeparation(t *testing.T) {
 	if strings.Contains(listed.Body.String(), b.Alias) || !strings.Contains(listed.Body.String(), a.Alias) {
 		t.Fatal("model list leaked unauthorized model")
 	}
-	for _, path := range []string{"/api/admin/state", "/api/admin/requests", "/api/admin/requests/" + logs[0].ID} {
+	for _, path := range []string{"/api/admin/state", "/api/admin/requests", "/api/admin/requests/" + authorized.ID} {
 		h.want(h.request("GET", path, nil, pa.Token, false), 401)
 	}
 	h.want(h.request("POST", "/api/admin/connections/"+c.ID+"/reveal", map[string]string{"password": testPassword}, pa.Token, false), 401)

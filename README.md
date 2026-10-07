@@ -83,6 +83,7 @@ npm run test:local-unlock
 - [HANDOFF.md](HANDOFF.md)：当前进度、决定、待验证事项与下一步起点。
 - [当前架构与实现逻辑](docs/current-architecture.md)：路由、权限、存储、转发与 Linux 边界。
 - [运行与使用](docs/demo.md)：启动、操作、凭证与删除行为、验证记录。
+- [GitHub 推送后自动部署](docs/deployment/github-actions-cd.md)：生产环境 Secrets、部署检查与自动回滚。
 - [百炼 ASR 接入](docs/asr.md)：音频转写配置、请求示例、记录与验证边界。
 - [配置与项目权限设计](docs/configuration-and-permissions.md)、[当前界面说明](docs/design-directions.md)。
 - [项目理解报告](docs/project-understanding-report.md)：2026-09-15 的说明快照，生成方式见 [报告说明](docs/report-assets/README.md)。

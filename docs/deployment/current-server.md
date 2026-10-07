@@ -75,8 +75,11 @@ https://<SERVER_IPV4>/v1
 
 本地仓库已包含：
 
-- `.github/workflows/ci.yml`：测试并构建 Linux amd64/arm64 artifact
+- `.github/workflows/ci.yml`：测试、构建 Linux amd64/arm64 artifact，并在 `main` push 后触发 production 部署
 - `deploy/systemd/ai-gateway.service`：服务器 systemd 单元模板
+- `deploy/remote-deploy.sh`：生产部署、健康检查与失败回滚脚本
+
+GitHub Actions 的生产部署说明见 [GitHub 推送后自动部署](github-actions-cd.md)。
 
 部署时验证的 Linux amd64 二进制 SHA-256：
 

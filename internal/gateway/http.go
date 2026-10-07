@@ -147,6 +147,9 @@ func (g *Gateway) auth(w http.ResponseWriter, r *http.Request) {
 }
 func (g *Gateway) Handler(assets fs.FS) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	})
 	mux.HandleFunc("GET /api/status", func(w http.ResponseWriter, r *http.Request) {
 		if !g.sameOrigin(r) {
 			problem(w, 403, "地址不允许")

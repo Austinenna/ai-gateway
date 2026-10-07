@@ -8,13 +8,12 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   test-build:
     runs-on: ubuntu-24.04
+    concurrency:
+      group: ci-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -49,7 +48,8 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 bash scripts/go.sh build \
             -trimpath -ldflags='-s -w' \
             -o dist/gateway-linux-arm64 ./cmd/gateway
-          sha256sum dist/gateway-linux-* > dist/SHA256SUMS
+          cd dist
+          sha256sum gateway-linux-* > SHA256SUMS
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -58,3 +58,89 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 14
+
+  deploy-production:
+    name: Deploy production
+    needs: test-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: production-deploy
+      # Do not cancel a production deployment halfway through an SSH transaction.
+      cancel-in-progress: false
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_SERVICE: ai-gateway.service
+      DEPLOY_ROOT: /opt/ai-gateway
+      DEPLOY_DATA_DIR: /var/lib/ai-gateway
+      DEPLOY_HEALTH_URL: http://127.0.0.1:8317/healthz
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate deployment settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PORT DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "缺少 production environment secret: $name" >&2
+              exit 1
+            fi
+          done
+          if [[ ! "$DEPLOY_PORT" =~ ^[0-9]+$ ]]; then
+            echo 'DEPLOY_PORT 必须是数字' >&2
+            exit 1
+          fi
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ai-gateway-${{ github.sha }}
+          path: dist
+
+      - name: Verify artifact checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c SHA256SUMS
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$RUNNER_TEMP/ai-gateway-ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/ai-gateway-ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/ai-gateway-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/ai-gateway-ssh/id_ed25519"
+          chmod 644 "$RUNNER_TEMP/ai-gateway-ssh/known_hosts"
+
+      - name: Upload and deploy
+        shell: bash
+        env:
+          RELEASE: ${{ github.sha }}-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          ssh_opts=(-p "$DEPLOY_PORT" -i "$RUNNER_TEMP/ai-gateway-ssh/id_ed25519" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ai-gateway-ssh/known_hosts")
+          scp_opts=(-P "$DEPLOY_PORT" -i "$RUNNER_TEMP/ai-gateway-ssh/id_ed25519" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ai-gateway-ssh/known_hosts")
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          remote_tmp="$(ssh "${ssh_opts[@]}" "$target" 'umask 077 && mktemp -d "$HOME/.ai-gateway-deploy.XXXXXX"')"
+          remote_artifact="$remote_tmp/gateway"
+          remote_script="$remote_tmp/deploy.sh"
+          scp "${scp_opts[@]}" dist/gateway-linux-amd64 "$target:$remote_artifact"
+          scp "${scp_opts[@]}" deploy/remote-deploy.sh "$target:$remote_script"
+          ssh "${ssh_opts[@]}" "$target" \
+            "chmod 700 '$remote_script' && bash '$remote_script' '$RELEASE' '$remote_artifact' '$DEPLOY_SERVICE' '$DEPLOY_ROOT' '$DEPLOY_DATA_DIR' '$DEPLOY_HEALTH_URL'"
