@@ -64,6 +64,7 @@ jobs:
     needs: test-build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     concurrency:
       group: production-deploy
       # Do not cancel a production deployment halfway through an SSH transaction.
@@ -128,13 +129,20 @@ jobs:
           set -euo pipefail
           ssh_opts=(-p "$DEPLOY_PORT" -i "$RUNNER_TEMP/ai-gateway-ssh/id_ed25519" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$RUNNER_TEMP/ai-gateway-ssh/known_hosts")
+            -o UserKnownHostsFile="$RUNNER_TEMP/ai-gateway-ssh/known_hosts" \
+            -o ConnectTimeout=15 -o ConnectionAttempts=1 \
+            -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
           scp_opts=(-P "$DEPLOY_PORT" -i "$RUNNER_TEMP/ai-gateway-ssh/id_ed25519" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$RUNNER_TEMP/ai-gateway-ssh/known_hosts")
+            -o UserKnownHostsFile="$RUNNER_TEMP/ai-gateway-ssh/known_hosts" \
+            -o ConnectTimeout=15 -o ConnectionAttempts=1 \
+            -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
           target="$DEPLOY_USER@$DEPLOY_HOST"
+          echo 'Creating remote staging directory'
           remote_tmp="$(ssh "${ssh_opts[@]}" "$target" 'umask 077 && mktemp -d "$HOME/.ai-gateway-deploy.XXXXXX"')"
           remote_artifact="$remote_tmp/gateway"
+          echo 'Uploading Linux amd64 artifact'
           scp "${scp_opts[@]}" dist/gateway-linux-amd64 "$target:$remote_artifact"
+          echo 'Starting fixed remote deploy script'
           ssh "${ssh_opts[@]}" "$target" \
             "test -x /usr/local/sbin/ai-gateway-deploy && sudo -n /usr/local/sbin/ai-gateway-deploy '$RELEASE' '$remote_artifact'"
