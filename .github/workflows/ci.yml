@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.x
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Run project tests
+        run: bash scripts/test.sh
+
+      - name: Build Linux binaries
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cd web
+          npm ci --no-audit --no-fund
+          npm run build
+          cd ..
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 bash scripts/go.sh build \
+            -trimpath -ldflags='-s -w' \
+            -o dist/gateway-linux-amd64 ./cmd/gateway
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 bash scripts/go.sh build \
+            -trimpath -ldflags='-s -w' \
+            -o dist/gateway-linux-arm64 ./cmd/gateway
+          sha256sum dist/gateway-linux-* > dist/SHA256SUMS
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-gateway-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
