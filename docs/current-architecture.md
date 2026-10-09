@@ -144,7 +144,7 @@ MODEL=coding
 
 Messages 转发配置 `x-api-key`、Bearer 鉴权及 `anthropic-version`，并允许传递客户端的 `anthropic-beta`。没有提供自动 Chat↔Messages 转换、Responses、Realtime、Token Counting 或任意代理路径。
 
-Anthropic SDK 的 Base URL 应填写网关根地址，由 SDK 添加 `/v1/messages`；管理页“接入信息”会按所选客户端协议给出不同地址。
+Anthropic SDK 的 Base URL 应填写网关根地址，由 SDK 添加 `/v1/messages`；管理页“接入信息”的“复制端点”显示并复制完整的 `/v1/messages` 请求地址，完整配置中的 `BASE_URL` 仍按 SDK 语义生成。Chat Completions 同理，复制端点为 `/v1/chat/completions`，SDK 的 `BASE_URL` 保留 `/v1`。
 
 ASR 复用上述鉴权、模型别名、启停、加密凭据与记录流程，但请求上限为 32 MiB，接受 `input.messages` 中的音频 Data URI 和热词，以及原生 `parameters`。只支持同步，拒绝 `stream:true`；不注入 LLM 默认参数。转发保留音频原文、厂商响应及错误；记录副本在截断前移除音频正文。ASR 的模型目录需手填，管理员测试接受音频输入，项目自助申请返回对应 ASR 端点。详见 [ASR 接入约定](asr.md)。
 

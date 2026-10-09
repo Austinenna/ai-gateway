@@ -45,7 +45,7 @@ MiniMax 的两种列表格式已按[官方 Chat 列表](https://platform.minimax
 
 打开 **项目权限 → 对应项目行 → 接入信息**：
 
-- **复制端点**：复制客户端所需的 Base URL，不读取项目 Token。Chat Completions 使用含 `/v1` 的地址；Anthropic SDK 使用根地址，由 SDK 添加 `/v1/messages`。
+- **复制端点**：复制实际请求所需的完整地址，不读取项目 Token。Chat Completions 为 `/v1/chat/completions`，Anthropic Messages 为 `/v1/messages`；如果客户端使用 SDK，请按下方完整配置中的 `BASE_URL` 语义填写基础地址。
 - **复制 Token**：只在点击时取回并复制完整项目 Token。平时仅显示前缀与遮罩；复制失败时可主动显示内容后手动复制。
 - **复制完整接入配置**：复制包含 `BASE_URL`、`API_KEY`、`MODEL` 的三行配置。模型下拉只显示该项目已授权、与所选协议对应的模型别名。
 - **重置项目 Token**：先展示旧 Token 失效提示，明确确认后才生成新 Token。取消或打开窗口不会重置。

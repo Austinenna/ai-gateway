@@ -36,9 +36,10 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
 
   await test.step('只按需取 Token；复制端点、完整 Token 和按协议匹配的配置', async () => {
     expect(credentialReads).toBe(0);
+    await expect(modal.locator('.access-copy-row code').first()).toHaveText('http://127.0.0.1:18318/v1/chat/completions');
     await modal.getByRole('button', { name: '复制端点', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('网关端点已复制');
-    expect(await clipboard()).toBe('http://127.0.0.1:18318/v1');
+    expect(await clipboard()).toBe('http://127.0.0.1:18318/v1/chat/completions');
     expect(credentialReads).toBe(0);
     await modal.getByRole('button', { name: '复制 Token', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整项目 Token 已复制');
@@ -49,6 +50,10 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     expect((await clipboard()) === `BASE_URL=http://127.0.0.1:18318/v1\nAPI_KEY=${original}\nMODEL=coding`).toBe(true);
     await modal.getByLabel('客户端协议').selectOption('messages');
     await expect(modal.getByLabel('模型别名 Model')).toHaveValue('writing');
+    await expect(modal.locator('.access-copy-row code').first()).toHaveText('http://127.0.0.1:18318/v1/messages');
+    await modal.getByRole('button', { name: '复制端点', exact: true }).click();
+    await expect(modal.getByRole('status')).toHaveText('网关端点已复制');
+    expect(await clipboard()).toBe('http://127.0.0.1:18318/v1/messages');
     await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('接入配置已复制');
     expect((await clipboard()) === `BASE_URL=http://127.0.0.1:18318\nAPI_KEY=${original}\nMODEL=writing`).toBe(true);

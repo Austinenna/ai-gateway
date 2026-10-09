@@ -25,7 +25,10 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 3500); return () => clearTimeout(t); }, [notice]);
   const isAsr = protocol === 'dashscope-asr';
-  const endpoint = isAsr ? baseURL.replace(/\/$/, '') + '/asr/transcriptions' : protocol === 'messages' ? baseURL.replace(/\/v1\/?$/, '') : baseURL;
+  const gatewayBaseURL = baseURL.replace(/\/+$/, '');
+  const origin = gatewayBaseURL.replace(/\/v1$/, '');
+  const clientBaseURL = isAsr ? `${gatewayBaseURL}/asr/transcriptions` : protocol === 'messages' ? origin : gatewayBaseURL;
+  const requestEndpoint = isAsr ? clientBaseURL : `${origin}/v1/${protocol === 'messages' ? 'messages' : 'chat/completions'}`;
   const availableModels = models.filter(m => m.enabled && m.protocols.includes(protocol));
   const selectedAlias = availableModels.some(m => m.alias === alias) ? alias : availableModels[0]?.alias || '';
 
@@ -37,10 +40,10 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   }
   async function copy(kind: 'endpoint' | 'token' | 'all') {
     await action(async () => {
-      let value = endpoint;
+      let value = requestEndpoint;
       if (kind !== 'endpoint') {
         const token = await resolveToken();
-        value = kind === 'token' ? token : `${isAsr ? 'ASR_URL' : 'BASE_URL'}=${endpoint}\nAPI_KEY=${token}\nMODEL=${selectedAlias}${isAsr ? '\n\nPOST ' + endpoint + '\nContent-Type: application/json\nAuthorization: Bearer ' + token + '\n\n' + asrExample(selectedAlias) : ''}`;
+        value = kind === 'token' ? token : `${isAsr ? 'ASR_URL' : 'BASE_URL'}=${clientBaseURL}\nAPI_KEY=${token}\nMODEL=${selectedAlias}${isAsr ? '\n\nPOST ' + requestEndpoint + '\nContent-Type: application/json\nAuthorization: Bearer ' + token + '\n\n' + asrExample(selectedAlias) : ''}`;
       }
       if (!alive.current) return;
       try {
@@ -56,14 +59,14 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
     <p className="access-intro">把端点和 Token 填入程序，模型名称使用下面的调用别名。</p>
     {!project.enabled && <p className="impact">项目已停用。接入信息可以复制，启用项目后才能调用。</p>}
     <section className="access-field">
-      <div className="access-field-heading"><label htmlFor="access-protocol">网关端点 <span>{isAsr ? 'POST URL' : 'Base URL'}</span></label>
+      <div className="access-field-heading"><label htmlFor="access-protocol">请求端点 <span>{isAsr ? 'POST URL' : 'Endpoint'}</span></label>
         <select id="access-protocol" aria-label="客户端协议" value={protocol} disabled={busy} onChange={e => setProtocol(e.target.value)}>
           <option value="chat">Chat Completions</option><option value="messages">Anthropic SDK</option>
           <option value="dashscope-asr">百炼 ASR</option>
         </select>
       </div>
-      <div className="access-copy-row"><code>{endpoint}</code><button disabled={busy} onClick={() => copy('endpoint')}><Copy size={15}/>复制端点</button></div>
-      <p className="access-hint">{isAsr ? '将百炼原生 JSON 发送到此完整地址，使用项目 Token 进行 Bearer 鉴权。同步返回转写结果。' : protocol === 'messages' ? 'Anthropic SDK 会自动添加 /v1/messages。' : '适用于 OpenAI 兼容客户端，调用 /v1/chat/completions。'}</p>
+      <div className="access-copy-row"><code>{requestEndpoint}</code><button disabled={busy} onClick={() => copy('endpoint')}><Copy size={15}/>复制端点</button></div>
+      <p className="access-hint">{isAsr ? '将百炼原生 JSON 发送到此完整地址，使用项目 Token 进行 Bearer 鉴权。同步返回转写结果。' : protocol === 'messages' ? '可直接 POST 到此完整地址；Anthropic SDK 的 Base URL 请使用下方完整配置中的根地址。' : '可直接 POST 到此完整地址；OpenAI 兼容客户端的 Base URL 请使用下方完整配置中的 /v1。'}</p>
     </section>
 
     <section className="access-field">
