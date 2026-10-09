@@ -51,26 +51,19 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     await expect(modal.getByRole('status')).toHaveText('完整项目 Token 已复制');
     expect((await clipboard()) === original).toBe(true);
     expect(await modal.evaluate((el, token) => el.textContent!.includes(token), original)).toBe(false);
-    await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
+    await modal.getByRole('button', { name: '复制当前模型配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
     expect(await clipboard()).toBe(`# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1\nAPI_KEY=${original}\nMODEL=coding`);
-    await modal.getByLabel('复制模型范围').selectOption('all');
-    await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
+    await modal.getByRole('button', { name: '复制全部模型配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
     expect(await clipboard()).toContain('# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1');
     expect(await clipboard()).toContain('# Chat Completions · coding-fast\nBASE_URL=http://127.0.0.1:18318/v1');
-    await modal.getByRole('button', { name: 'Chat + Anthropic', exact: true }).click();
-    await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
+    await expect(modal.getByRole('checkbox')).toHaveCount(0);
+    await modal.locator('.access-model-item').filter({ hasText: 'coding-fast' }).click();
+    await expect(modal.getByRole('radio', { name: '默认模型 coding-fast', exact: true })).toBeChecked();
+    await modal.getByRole('button', { name: '复制当前模型配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
-    expect(await clipboard()).toContain('# Anthropic Messages · writing\nBASE_URL=http://127.0.0.1:18318\nAPI_KEY=');
-    await modal.getByRole('tab', { name: 'Chat Completions', exact: true }).click();
-    await modal.getByLabel('批量复制 coding', { exact: true }).uncheck();
-    await modal.getByLabel('批量复制 coding-fast', { exact: true }).uncheck();
-    await modal.getByLabel('复制模型范围').selectOption('selected');
-    await expect(modal.getByRole('button', { name: '复制完整接入配置', exact: true })).toBeDisabled();
-    await expect(modal.locator('.access-format')).toContainText('请至少选择一个模型');
-    await modal.getByLabel('批量复制 coding', { exact: true }).check();
-    await modal.getByLabel('复制模型范围').selectOption('default');
+    expect(await clipboard()).toBe(`# Chat Completions · coding-fast\nBASE_URL=http://127.0.0.1:18318/v1\nAPI_KEY=${original}\nMODEL=coding-fast`);
     await modal.getByRole('tab', { name: 'Anthropic Messages', exact: true }).click();
     await expect(modal.getByRole('radio', { name: '默认模型 writing', exact: true })).toBeChecked();
     await expect(modal.locator('.access-copy-row code').nth(0)).toHaveText('http://127.0.0.1:18318');
@@ -78,7 +71,7 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     await modal.getByRole('button', { name: '复制端点', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('端点已复制');
     expect(await clipboard()).toBe('http://127.0.0.1:18318/v1/messages');
-    await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
+    await modal.getByRole('button', { name: '复制当前模型配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
     expect(await clipboard()).toBe(`# Anthropic Messages · writing\nBASE_URL=http://127.0.0.1:18318\nAPI_KEY=${original}\nMODEL=writing`);
     await modal.getByRole('tab', { name: 'Chat Completions', exact: true }).click();
@@ -93,8 +86,8 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     for (const [name, width, height] of [['desktop', 1440, 1000], ['mobile', 390, 844]] as const) {
       await page.setViewportSize({ width, height });
       await checkLayout();
-      await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).scrollIntoViewIfNeeded();
-      await expect(modal.getByRole('button', { name: '复制完整接入配置', exact: true })).toBeInViewport();
+      await modal.getByRole('button', { name: '复制当前模型配置', exact: true }).scrollIntoViewIfNeeded();
+      await expect(modal.getByRole('button', { name: '复制当前模型配置', exact: true })).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('project-access-' + name + '.png') });
     }
     await page.setViewportSize({ width: 1440, height: 1000 });

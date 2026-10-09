@@ -101,7 +101,7 @@ test('百炼 ASR 配置、原生音频调用、项目授权与转写详情', asy
     await expect(modal.locator('.access-copy-row code').nth(1)).toHaveText('http://127.0.0.1:18318/v1/asr/transcriptions');
     await expect(modal).toContainText('http://127.0.0.1:18318/v1/asr/transcriptions');
     await expect(modal.locator('pre')).toContainText('"model": "browser-asr"');
-    await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
+    await modal.getByRole('button', { name: '复制当前模型配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toContain('ASR_URL=http://127.0.0.1:18318/v1/asr/transcriptions');

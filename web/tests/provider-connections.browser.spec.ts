@@ -150,7 +150,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       for (const p of ['chat','messages']) {
         await modal.getByRole('tab',{name:p==='chat'?'Chat Completions':'Anthropic Messages',exact:true}).click();
         await expect(modal.getByRole('radio',{name:'默认模型 dual-protocol-ui',exact:true})).toBeChecked();
-        await modal.getByRole('button',{name:'复制完整接入配置',exact:true}).click();
+        await modal.getByRole('button',{name:'复制当前模型配置',exact:true}).click();
         await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
         const value=await page.evaluate(()=>navigator.clipboard.readText());
         expect(value).toBe(`# ${p==='chat'?'Chat Completions':'Anthropic Messages'} · dual-protocol-ui\nBASE_URL=http://127.0.0.1:18318${p==='chat'?'/v1':''}\nAPI_KEY=${project.token}\nMODEL=dual-protocol-ui`);

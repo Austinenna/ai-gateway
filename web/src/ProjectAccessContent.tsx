@@ -4,8 +4,6 @@ import { asrExample } from './asr.mjs';
 import { protocolName } from './connection-protocols';
 
 type Protocol = 'chat' | 'messages' | 'dashscope-asr';
-type CopyProtocolScope = 'current' | 'both';
-type CopyModelScope = 'default' | 'selected' | 'all';
 type Model = { id: string; alias: string; name?: string; protocols: string[]; enabled: boolean };
 
 type Props = {
@@ -24,9 +22,6 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   const visibleProtocols = protocolOptions.length ? protocolOptions : ['chat' as Protocol];
   const [protocol, setProtocol] = useState<Protocol>(visibleProtocols[0]);
   const [alias, setAlias] = useState(models.find(m => m.enabled)?.alias || '');
-  const [selectedModelIDs, setSelectedModelIDs] = useState<string[]>(() => models.filter(m => m.enabled).map(m => m.id));
-  const [copyProtocolScope, setCopyProtocolScope] = useState<CopyProtocolScope>('current');
-  const [copyModelScope, setCopyModelScope] = useState<CopyModelScope>('default');
   const [existing, setExisting] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -60,14 +55,11 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
     return `${origin}/v1/${target === 'messages' ? 'messages' : 'chat/completions'}`;
   }
 
-  function modelsForCopy(target: Protocol): Model[] {
+  function modelsForCopy(target: Protocol, scope: 'current' | 'all'): Model[] {
     const candidates = models.filter(model => model.enabled && model.protocols.includes(target));
-    if (copyModelScope === 'all') return candidates;
-    if (copyModelScope === 'selected') {
-      return candidates.filter(model => selectedModelIDs.includes(model.id));
-    }
+    if (scope === 'all') return candidates;
     const current = candidates.find(model => model.alias === selectedAlias);
-    return current ? [current] : candidates.slice(0, 1);
+    return current ? [current] : [];
   }
 
   async function action(fn: () => Promise<void>) {
@@ -102,18 +94,17 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
     });
   }
 
-  async function copyUnified() {
+  async function copyConfiguration(scope: 'current' | 'all') {
     await action(async () => {
       const token = await resolveToken();
-      const copyTargets: Protocol[] = copyProtocolScope === 'both' && canCopyBoth && !isAsr ? ['chat', 'messages'] : [protocol];
-      const blocks = copyTargets.flatMap(target => modelsForCopy(target).map(model => {
-        if (target === 'dashscope-asr') {
-          const endpoint = endpointFor(target);
-          return `# ${protocolName(target)} · ${model.alias}\nASR_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${model.alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${asrExample(model.alias)}`;
+      const blocks = modelsForCopy(protocol, scope).map(model => {
+        if (protocol === 'dashscope-asr') {
+          const endpoint = endpointFor(protocol);
+          return `# ${protocolName(protocol)} · ${model.alias}\nASR_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${model.alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${asrExample(model.alias)}`;
         }
-        const title = `${protocolName(target)} · ${model.alias}`;
-        return `# ${title}\nBASE_URL=${baseURLFor(target)}\nAPI_KEY=${token}\nMODEL=${model.alias}`;
-      }));
+        const title = `${protocolName(protocol)} · ${model.alias}`;
+        return `# ${title}\nBASE_URL=${baseURLFor(protocol)}\nAPI_KEY=${token}\nMODEL=${model.alias}`;
+      });
       const value = blocks.join('\n\n');
       if (!value) throw new Error('当前没有可复制的模型');
       try {
@@ -127,30 +118,12 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
 
   function selectProtocol(next: Protocol) {
     setProtocol(next);
-    setCopyProtocolScope('current');
   }
 
-  function toggleModel(id: string) {
-    setSelectedModelIDs(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
-  }
-
-  const selectedForBatch = availableModels.filter(model => selectedModelIDs.includes(model.id));
-  const canCopyBoth = protocolOptions.includes('chat') && protocolOptions.includes('messages');
-  const targetProtocols: Protocol[] = copyProtocolScope === 'both' && canCopyBoth && !isAsr ? ['chat', 'messages'] : [protocol];
-  const targetModelCounts = targetProtocols.map(target => ({ target, count: modelsForCopy(target).length }));
-  const hasCopyableModels = targetModelCounts.some(item => item.count > 0);
-  const batchLabel = copyProtocolScope === 'both' && canCopyBoth
-    ? copyModelScope === 'default'
-      ? '各协议当前模型'
-      : targetModelCounts.map(({ target, count }) => `${target === 'chat' ? 'Chat' : 'Anthropic'} ${count} 个`).join(' + ')
-    : copyModelScope === 'all'
-      ? `全部模型（${availableModels.length} 个）`
-      : copyModelScope === 'selected'
-        ? `已选模型（${selectedForBatch.length} 个）`
-        : `当前模型（${selectedAlias || '未选择'}）`;
+  const hasCurrentModel = modelsForCopy(protocol, 'current').length > 0;
 
   return <div className="project-access-content">
-    <p className="access-intro">按协议查看 Base URL、请求端点、项目凭证和授权模型；底部可以一次复制完整配置。</p>
+    <p className="access-intro">按协议查看 Base URL、请求端点、项目凭证和授权模型；底部可以复制当前模型或全部模型的完整配置。</p>
     {!project.enabled && <p className="impact">项目已停用。接入信息可以复制，启用项目后才能调用。</p>}
 
     <nav className="access-tabs" role="tablist" aria-label="接入协议">
@@ -187,17 +160,15 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
     <section className="access-field access-model-field">
       <div className="access-field-heading"><h3>授权模型 <span>Model</span></h3><span className="access-count">{availableModels.length} 个{protocolName(protocol)}模型</span></div>
       {availableModels.length ? <div className="access-model-list">
-        {availableModels.map(model => <div className={'access-model-item' + (model.alias === selectedAlias ? ' active' : '')} key={model.id}>
+        {availableModels.map(model => <div className={'access-model-item' + (model.alias === selectedAlias ? ' active' : '')} key={model.id} onClick={() => { if (!busy) setAlias(model.alias); }}>
           <label className="access-model-main">
             <input type="radio" name="access-default-model" aria-label={`默认模型 ${model.alias}`} checked={model.alias === selectedAlias} disabled={busy} onChange={() => setAlias(model.alias)}/>
             <span><strong>{model.alias}</strong>{model.name && <small>{model.name}</small>}</span>
           </label>
-          {availableModels.length > 1 && <label className="access-model-batch"><input type="checkbox" aria-label={`批量复制 ${model.alias}`} checked={selectedModelIDs.includes(model.id)} disabled={busy} onChange={() => toggleModel(model.id)}/>批量</label>}
-          <button type="button" className="link" disabled={busy} onClick={() => copyValue(model.alias, '模型名已复制')}>复制模型名</button>
+          <button type="button" className="link" disabled={busy} onClick={event => { event.stopPropagation(); void copyValue(model.alias, '模型名已复制'); }}>复制模型名</button>
         </div>)}
       </div> : <p className="muted">尚未授权此协议的可用模型。</p>}
       {availableModels.length > 1 && <button type="button" className="link access-copy-models" disabled={busy} onClick={() => copyValue(availableModels.map(model => model.alias).join('\n'), '模型列表已复制')}><Copy size={14}/>复制全部模型名</button>}
-      {availableModels.length > 1 && <p className="access-hint">勾选模型用于统一复制的“已选模型”范围；选择在协议之间共享。</p>}
       {isAsr && <p className="access-hint">音频请求的模型别名也从这里选择；下方会显示对应的原生 JSON 示例。</p>}
     </section>
 
@@ -205,20 +176,11 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
 
     <section className="access-unified">
       <div className="access-field-heading"><h3>统一复制 <span>配置范围</span></h3></div>
-      <p className="access-hint access-unified-intro">按协议和模型范围生成可直接粘贴的配置。多个模型会分别生成配置块，不会合并到同一个 MODEL 字段。</p>
-      <div className="access-unified-options">
-        <div className="access-toggle-group" role="group" aria-label="复制协议范围">
-          <button type="button" className={copyProtocolScope === 'current' ? 'active' : ''} aria-pressed={copyProtocolScope === 'current'} disabled={busy} onClick={() => setCopyProtocolScope('current')}>当前协议</button>
-          {canCopyBoth && !isAsr && <button type="button" className={copyProtocolScope === 'both' ? 'active' : ''} aria-pressed={copyProtocolScope === 'both'} disabled={busy} onClick={() => setCopyProtocolScope('both')}>Chat + Anthropic</button>}
-        </div>
-        <label className="access-copy-model-scope">模型范围<select aria-label="复制模型范围" value={copyModelScope} disabled={busy || !availableModels.length} onChange={e => setCopyModelScope(e.target.value as CopyModelScope)}>
-          <option value="default">当前模型（{selectedAlias || '未选择'}）</option>
-          <option value="selected">已选模型（{selectedForBatch.length} 个）</option>
-          <option value="all">全部模型（{availableModels.length} 个）</option>
-        </select></label>
+      <p className="access-hint access-unified-intro">按上方选中的协议生成可直接粘贴的配置；多个模型会分别生成配置块，不会合并到同一个 MODEL 字段。</p>
+      <div className="access-copy-actions">
+        <button className="primary access-copy-config" disabled={busy || !project.has_saved_token || !hasCurrentModel} onClick={() => copyConfiguration('current')}><Copy size={16}/>{busy ? '正在处理…' : '复制当前模型配置'}</button>
+        <button className="access-copy-config" disabled={busy || !project.has_saved_token || !availableModels.length} onClick={() => copyConfiguration('all')}><Copy size={16}/>{busy ? '正在处理…' : '复制全部模型配置'}</button>
       </div>
-      <button className="primary access-copy-all" disabled={busy || !project.has_saved_token || !selectedAlias || !hasCopyableModels} onClick={copyUnified}><Copy size={16}/>{busy ? '正在处理…' : '复制完整接入配置'}</button>
-      <p className="access-hint access-format">当前范围：{copyProtocolScope === 'both' && canCopyBoth && !isAsr ? 'Chat + Anthropic' : protocolName(protocol)} · {batchLabel}{copyModelScope === 'selected' && !hasCopyableModels ? '（请至少选择一个模型）' : ''}</p>
     </section>
 
     <div className="access-feedback" aria-live="polite">
