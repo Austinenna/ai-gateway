@@ -17,9 +17,10 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
   };
   const connection = await create('connections', { name: '接入复制演示连接', provider: 'demo', protocol: 'chat', base_url: 'demo://local', enabled: true });
   const model = await create('models', { name: '代码助手', alias: 'coding', upstream_model: 'demo', connection_id: connection.id, defaults: {}, enabled: true });
+  const secondModel = await create('models', { name: '快速代码助手', alias: 'coding-fast', upstream_model: 'demo-fast', connection_id: connection.id, defaults: {}, enabled: true });
   const messages = await create('connections', { name: 'Messages 复制演示', provider: 'minimax', protocol: 'messages', base_url: 'https://api.minimax.cn/anthropic/v1', enabled: true, token: 'fake-access-copy-test-secret' });
   const messagesModel = await create('models', { name: '文档助手', alias: 'writing', upstream_model: 'test', connection_id: messages.id, defaults: {}, enabled: true });
-  const created = await create('projects', { name: '代码助手 · 开发环境', enabled: true, model_ids: [model.id, messagesModel.id] });
+  const created = await create('projects', { name: '代码助手 · 开发环境', enabled: true, model_ids: [model.id, secondModel.id, messagesModel.id] });
   const projectID = created.project.id;
   const original = created.token;
   const base = '/api/admin/projects/' + projectID;
@@ -36,9 +37,14 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
 
   await test.step('只按需取 Token；复制端点、完整 Token 和按协议匹配的配置', async () => {
     expect(credentialReads).toBe(0);
-    await expect(modal.locator('.access-copy-row code').first()).toHaveText('http://127.0.0.1:18318/v1/chat/completions');
+    await expect(modal.getByRole('tab', { name: 'Chat Completions', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(modal.locator('.access-copy-row code').nth(0)).toHaveText('http://127.0.0.1:18318/v1');
+    await expect(modal.locator('.access-copy-row code').nth(1)).toHaveText('http://127.0.0.1:18318/v1/chat/completions');
+    await modal.getByRole('button', { name: '复制 Base URL', exact: true }).click();
+    await expect(modal.getByRole('status')).toHaveText('Base URL 已复制');
+    expect(await clipboard()).toBe('http://127.0.0.1:18318/v1');
     await modal.getByRole('button', { name: '复制端点', exact: true }).click();
-    await expect(modal.getByRole('status')).toHaveText('网关端点已复制');
+    await expect(modal.getByRole('status')).toHaveText('端点已复制');
     expect(await clipboard()).toBe('http://127.0.0.1:18318/v1/chat/completions');
     expect(credentialReads).toBe(0);
     await modal.getByRole('button', { name: '复制 Token', exact: true }).click();
@@ -46,18 +52,36 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     expect((await clipboard()) === original).toBe(true);
     expect(await modal.evaluate((el, token) => el.textContent!.includes(token), original)).toBe(false);
     await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
-    await expect(modal.getByRole('status')).toHaveText('接入配置已复制');
-    expect((await clipboard()) === `BASE_URL=http://127.0.0.1:18318/v1\nAPI_KEY=${original}\nMODEL=coding`).toBe(true);
-    await modal.getByLabel('客户端协议').selectOption('messages');
-    await expect(modal.getByLabel('模型别名 Model')).toHaveValue('writing');
-    await expect(modal.locator('.access-copy-row code').first()).toHaveText('http://127.0.0.1:18318/v1/messages');
+    await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
+    expect(await clipboard()).toBe(`# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1\nAPI_KEY=${original}\nMODEL=coding`);
+    await modal.getByLabel('复制模型范围').selectOption('all');
+    await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
+    await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
+    expect(await clipboard()).toContain('# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1');
+    expect(await clipboard()).toContain('# Chat Completions · coding-fast\nBASE_URL=http://127.0.0.1:18318/v1');
+    await modal.getByRole('button', { name: 'Chat + Anthropic', exact: true }).click();
+    await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
+    await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
+    expect(await clipboard()).toContain('# Anthropic Messages · writing\nBASE_URL=http://127.0.0.1:18318\nAPI_KEY=');
+    await modal.getByRole('tab', { name: 'Chat Completions', exact: true }).click();
+    await modal.getByLabel('批量复制 coding', { exact: true }).uncheck();
+    await modal.getByLabel('批量复制 coding-fast', { exact: true }).uncheck();
+    await modal.getByLabel('复制模型范围').selectOption('selected');
+    await expect(modal.getByRole('button', { name: '复制完整接入配置', exact: true })).toBeDisabled();
+    await expect(modal.locator('.access-format')).toContainText('请至少选择一个模型');
+    await modal.getByLabel('批量复制 coding', { exact: true }).check();
+    await modal.getByLabel('复制模型范围').selectOption('default');
+    await modal.getByRole('tab', { name: 'Anthropic Messages', exact: true }).click();
+    await expect(modal.getByRole('radio', { name: '默认模型 writing', exact: true })).toBeChecked();
+    await expect(modal.locator('.access-copy-row code').nth(0)).toHaveText('http://127.0.0.1:18318');
+    await expect(modal.locator('.access-copy-row code').nth(1)).toHaveText('http://127.0.0.1:18318/v1/messages');
     await modal.getByRole('button', { name: '复制端点', exact: true }).click();
-    await expect(modal.getByRole('status')).toHaveText('网关端点已复制');
+    await expect(modal.getByRole('status')).toHaveText('端点已复制');
     expect(await clipboard()).toBe('http://127.0.0.1:18318/v1/messages');
     await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
-    await expect(modal.getByRole('status')).toHaveText('接入配置已复制');
-    expect((await clipboard()) === `BASE_URL=http://127.0.0.1:18318\nAPI_KEY=${original}\nMODEL=writing`).toBe(true);
-    await modal.getByLabel('客户端协议').selectOption('chat');
+    await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
+    expect(await clipboard()).toBe(`# Anthropic Messages · writing\nBASE_URL=http://127.0.0.1:18318\nAPI_KEY=${original}\nMODEL=writing`);
+    await modal.getByRole('tab', { name: 'Chat Completions', exact: true }).click();
   });
 
   async function checkLayout() {
@@ -149,6 +173,6 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
   // Clear the clipboard and delete only fixtures owned by this test.
   await page.evaluate(() => navigator.clipboard.writeText(''));
   await page.request.delete(base, { headers });
-  for (const m of [model, messagesModel]) await page.request.delete('/api/admin/models/' + m.id, { headers });
+  for (const m of [model, secondModel, messagesModel]) await page.request.delete('/api/admin/models/' + m.id, { headers });
   for (const c of [connection, messages]) await page.request.delete('/api/admin/connections/' + c.id, { headers });
 });

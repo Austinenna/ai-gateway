@@ -1,19 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, KeyRound, RefreshCw, ShieldCheck } from 'lucide-react';
 import { asrExample } from './asr.mjs';
+import { protocolName } from './connection-protocols';
+
+type Protocol = 'chat' | 'messages' | 'dashscope-asr';
+type CopyProtocolScope = 'current' | 'both';
+type CopyModelScope = 'default' | 'selected' | 'all';
+type Model = { id: string; alias: string; name?: string; protocols: string[]; enabled: boolean };
 
 type Props = {
   project: { id: string; name: string; enabled: boolean; token_prefix: string; has_saved_token?: boolean };
   baseURL: string;
-  models: { id: string; alias: string; protocols: string[]; enabled: boolean }[];
+  models: Model[];
   resolveToken: () => Promise<string>;
   saveToken: (token: string) => Promise<void>;
   rotateToken: () => Promise<void>;
 };
 
+const protocolOrder: Protocol[] = ['chat', 'messages', 'dashscope-asr'];
+
 export function ProjectAccessContent({ project, baseURL, models, resolveToken, saveToken, rotateToken }: Props) {
-  const [protocol, setProtocol] = useState(models.find(m => m.enabled && m.protocols.length)?.protocols[0] || 'chat');
-  const [alias, setAlias] = useState(models[0]?.alias || '');
+  const protocolOptions = protocolOrder.filter(protocol => models.some(model => model.enabled && model.protocols.includes(protocol)));
+  const visibleProtocols = protocolOptions.length ? protocolOptions : ['chat' as Protocol];
+  const [protocol, setProtocol] = useState<Protocol>(visibleProtocols[0]);
+  const [alias, setAlias] = useState(models.find(m => m.enabled)?.alias || '');
+  const [selectedModelIDs, setSelectedModelIDs] = useState<string[]>(() => models.filter(m => m.enabled).map(m => m.id));
+  const [copyProtocolScope, setCopyProtocolScope] = useState<CopyProtocolScope>('current');
+  const [copyModelScope, setCopyModelScope] = useState<CopyModelScope>('default');
   const [existing, setExisting] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -24,13 +37,38 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(''), 3500); return () => clearTimeout(t); }, [notice]);
-  const isAsr = protocol === 'dashscope-asr';
+
   const gatewayBaseURL = baseURL.replace(/\/+$/, '');
   const origin = gatewayBaseURL.replace(/\/v1$/, '');
-  const clientBaseURL = isAsr ? `${gatewayBaseURL}/asr/transcriptions` : protocol === 'messages' ? origin : gatewayBaseURL;
-  const requestEndpoint = isAsr ? clientBaseURL : `${origin}/v1/${protocol === 'messages' ? 'messages' : 'chat/completions'}`;
-  const availableModels = models.filter(m => m.enabled && m.protocols.includes(protocol));
-  const selectedAlias = availableModels.some(m => m.alias === alias) ? alias : availableModels[0]?.alias || '';
+  const availableModels = models.filter(model => model.enabled && model.protocols.includes(protocol));
+  const selectedModel = availableModels.find(model => model.alias === alias) || availableModels[0];
+  const selectedAlias = selectedModel?.alias || '';
+  const isAsr = protocol === 'dashscope-asr';
+
+  useEffect(() => {
+    if (!visibleProtocols.includes(protocol)) setProtocol(visibleProtocols[0]);
+  }, [protocol, visibleProtocols.join('|')]);
+  useEffect(() => {
+    if (selectedModel && selectedModel.alias !== alias) setAlias(selectedModel.alias);
+  }, [alias, selectedModel?.alias]);
+
+  function baseURLFor(target: Protocol) {
+    return target === 'messages' ? origin : gatewayBaseURL;
+  }
+  function endpointFor(target: Protocol) {
+    if (target === 'dashscope-asr') return `${gatewayBaseURL}/asr/transcriptions`;
+    return `${origin}/v1/${target === 'messages' ? 'messages' : 'chat/completions'}`;
+  }
+
+  function modelsForCopy(target: Protocol): Model[] {
+    const candidates = models.filter(model => model.enabled && model.protocols.includes(target));
+    if (copyModelScope === 'all') return candidates;
+    if (copyModelScope === 'selected') {
+      return candidates.filter(model => selectedModelIDs.includes(model.id));
+    }
+    const current = candidates.find(model => model.alias === selectedAlias);
+    return current ? [current] : candidates.slice(0, 1);
+  }
 
   async function action(fn: () => Promise<void>) {
     if (busy) return;
@@ -38,42 +76,104 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
     try { await fn(); } catch (e) { if (alive.current) setError((e as Error).message); }
     finally { if (alive.current) setBusy(false); }
   }
-  async function copy(kind: 'endpoint' | 'token' | 'all') {
+
+  async function copyValue(value: string, message: string) {
     await action(async () => {
-      let value = requestEndpoint;
-      if (kind !== 'endpoint') {
-        const token = await resolveToken();
-        value = kind === 'token' ? token : `${isAsr ? 'ASR_URL' : 'BASE_URL'}=${clientBaseURL}\nAPI_KEY=${token}\nMODEL=${selectedAlias}${isAsr ? '\n\nPOST ' + requestEndpoint + '\nContent-Type: application/json\nAuthorization: Bearer ' + token + '\n\n' + asrExample(selectedAlias) : ''}`;
-      }
       if (!alive.current) return;
       try {
         await navigator.clipboard.writeText(value);
-        if (alive.current) setNotice(kind === 'endpoint' ? '网关端点已复制' : kind === 'token' ? '完整项目 Token 已复制' : '接入配置已复制');
+        if (alive.current) setNotice(message);
       } catch {
         if (alive.current) { setFallback(value); setError('浏览器未允许复制，可以显示内容后手动复制。'); }
       }
     });
   }
 
+  async function copyToken() {
+    await action(async () => {
+      const token = await resolveToken();
+      if (!alive.current) return;
+      try {
+        await navigator.clipboard.writeText(token);
+        if (alive.current) setNotice('完整项目 Token 已复制');
+      } catch {
+        if (alive.current) { setFallback(token); setError('浏览器未允许复制，可以显示内容后手动复制。'); }
+      }
+    });
+  }
+
+  async function copyUnified() {
+    await action(async () => {
+      const token = await resolveToken();
+      const copyTargets: Protocol[] = copyProtocolScope === 'both' && canCopyBoth && !isAsr ? ['chat', 'messages'] : [protocol];
+      const blocks = copyTargets.flatMap(target => modelsForCopy(target).map(model => {
+        if (target === 'dashscope-asr') {
+          const endpoint = endpointFor(target);
+          return `# ${protocolName(target)} · ${model.alias}\nASR_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${model.alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${asrExample(model.alias)}`;
+        }
+        const title = `${protocolName(target)} · ${model.alias}`;
+        return `# ${title}\nBASE_URL=${baseURLFor(target)}\nAPI_KEY=${token}\nMODEL=${model.alias}`;
+      }));
+      const value = blocks.join('\n\n');
+      if (!value) throw new Error('当前没有可复制的模型');
+      try {
+        await navigator.clipboard.writeText(value);
+        if (alive.current) setNotice('完整接入配置已复制');
+      } catch {
+        if (alive.current) { setFallback(value); setError('浏览器未允许复制，可以显示内容后手动复制。'); }
+      }
+    });
+  }
+
+  function selectProtocol(next: Protocol) {
+    setProtocol(next);
+    setCopyProtocolScope('current');
+  }
+
+  function toggleModel(id: string) {
+    setSelectedModelIDs(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
+  }
+
+  const selectedForBatch = availableModels.filter(model => selectedModelIDs.includes(model.id));
+  const canCopyBoth = protocolOptions.includes('chat') && protocolOptions.includes('messages');
+  const targetProtocols: Protocol[] = copyProtocolScope === 'both' && canCopyBoth && !isAsr ? ['chat', 'messages'] : [protocol];
+  const targetModelCounts = targetProtocols.map(target => ({ target, count: modelsForCopy(target).length }));
+  const hasCopyableModels = targetModelCounts.some(item => item.count > 0);
+  const batchLabel = copyProtocolScope === 'both' && canCopyBoth
+    ? copyModelScope === 'default'
+      ? '各协议当前模型'
+      : targetModelCounts.map(({ target, count }) => `${target === 'chat' ? 'Chat' : 'Anthropic'} ${count} 个`).join(' + ')
+    : copyModelScope === 'all'
+      ? `全部模型（${availableModels.length} 个）`
+      : copyModelScope === 'selected'
+        ? `已选模型（${selectedForBatch.length} 个）`
+        : `当前模型（${selectedAlias || '未选择'}）`;
+
   return <div className="project-access-content">
-    <p className="access-intro">把端点和 Token 填入程序，模型名称使用下面的调用别名。</p>
+    <p className="access-intro">按协议查看 Base URL、请求端点、项目凭证和授权模型；底部可以一次复制完整配置。</p>
     {!project.enabled && <p className="impact">项目已停用。接入信息可以复制，启用项目后才能调用。</p>}
+
+    <nav className="access-tabs" role="tablist" aria-label="接入协议">
+      {visibleProtocols.map(item => <button key={item} type="button" role="tab" aria-selected={protocol === item} className={protocol === item ? 'active' : ''} disabled={busy} onClick={() => selectProtocol(item)}>{protocolName(item)}</button>)}
+    </nav>
+
     <section className="access-field">
-      <div className="access-field-heading"><label htmlFor="access-protocol">请求端点 <span>{isAsr ? 'POST URL' : 'Endpoint'}</span></label>
-        <select id="access-protocol" aria-label="客户端协议" value={protocol} disabled={busy} onChange={e => setProtocol(e.target.value)}>
-          <option value="chat">Chat Completions</option><option value="messages">Anthropic SDK</option>
-          <option value="dashscope-asr">百炼 ASR</option>
-        </select>
-      </div>
-      <div className="access-copy-row"><code>{requestEndpoint}</code><button disabled={busy} onClick={() => copy('endpoint')}><Copy size={15}/>复制端点</button></div>
-      <p className="access-hint">{isAsr ? '将百炼原生 JSON 发送到此完整地址，使用项目 Token 进行 Bearer 鉴权。同步返回转写结果。' : protocol === 'messages' ? '可直接 POST 到此完整地址；Anthropic SDK 的 Base URL 请使用下方完整配置中的根地址。' : '可直接 POST 到此完整地址；OpenAI 兼容客户端的 Base URL 请使用下方完整配置中的 /v1。'}</p>
+      <div className="access-field-heading"><h3>Base URL <span>SDK 基础地址</span></h3></div>
+      <div className="access-copy-row"><code>{baseURLFor(protocol)}</code><button disabled={busy} onClick={() => copyValue(baseURLFor(protocol), 'Base URL 已复制')}><Copy size={15}/>复制 Base URL</button></div>
+      <p className="access-hint">{isAsr ? '用于构造百炼 ASR 请求；直接请求请复制下面的完整端点。' : protocol === 'messages' ? 'Anthropic SDK 使用网关根地址，SDK 会自动补充 /v1/messages。' : 'OpenAI 兼容客户端使用包含 /v1 的基础地址，SDK 会自动补充 /chat/completions。'}</p>
     </section>
 
     <section className="access-field">
-      <div className="access-field-heading"><h3>项目 Token <span>API Key</span></h3>
+      <div className="access-field-heading"><h3>请求端点 <span>Endpoint</span></h3></div>
+      <div className="access-copy-row"><code>{endpointFor(protocol)}</code><button disabled={busy} onClick={() => copyValue(endpointFor(protocol), '端点已复制')}><Copy size={15}/>复制端点</button></div>
+      <p className="access-hint">{isAsr ? '将百炼原生 JSON 发送到此完整地址，使用项目 Token 进行 Bearer 鉴权。' : '直接发送 HTTP 请求时使用此完整地址。'}</p>
+    </section>
+
+    <section className="access-field">
+      <div className="access-field-heading"><h3>项目凭证 <span>API Key</span></h3>
         {project.has_saved_token && <span className="access-saved"><ShieldCheck size={13}/>已加密保管</span>}
       </div>
-      <div className="access-copy-row"><code className="access-token"><KeyRound size={16}/>{project.token_prefix || 'gw_'}••••••••</code><button disabled={busy || !project.has_saved_token} onClick={() => copy('token')}><Copy size={15}/>复制 Token</button></div>
+      <div className="access-copy-row"><code className="access-token"><KeyRound size={16}/>{project.token_prefix || 'gw_'}••••••••</code><button disabled={busy || !project.has_saved_token} onClick={copyToken}><Copy size={15}/>复制 Token</button></div>
       {project.has_saved_token ? <p className="access-hint">复制的是完整 Token。重新登录管理页面后，仍可在这里复制。</p> : <div className="access-legacy">
         <p>此项目由旧版本创建，尚未保存可复制的 Token。粘贴已有 Token 保存后，即可随时复制。</p>
         <form onSubmit={e => { e.preventDefault(); action(async () => { await saveToken(existing); if (alive.current) { setExisting(''); setNotice('已有 Token 已加密保存，正在使用的凭证保持有效'); } }); }}>
@@ -84,22 +184,48 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
       </div>}
     </section>
 
-    <section className="access-field">
-      <div className="access-field-heading"><label htmlFor="access-model">模型别名 <span>Model</span></label></div>
-      <select id="access-model" value={selectedAlias} disabled={busy || !availableModels.length} onChange={e => setAlias(e.target.value)}>
-        {!availableModels.length && <option value="">尚未授权此协议的模型</option>}
-        {availableModels.map(m => <option key={m.id} value={m.alias}>{m.alias}{m.enabled ? '' : ' · 已停用'}</option>)}
-      </select>
+    <section className="access-field access-model-field">
+      <div className="access-field-heading"><h3>授权模型 <span>Model</span></h3><span className="access-count">{availableModels.length} 个{protocolName(protocol)}模型</span></div>
+      {availableModels.length ? <div className="access-model-list">
+        {availableModels.map(model => <div className={'access-model-item' + (model.alias === selectedAlias ? ' active' : '')} key={model.id}>
+          <label className="access-model-main">
+            <input type="radio" name="access-default-model" aria-label={`默认模型 ${model.alias}`} checked={model.alias === selectedAlias} disabled={busy} onChange={() => setAlias(model.alias)}/>
+            <span><strong>{model.alias}</strong>{model.name && <small>{model.name}</small>}</span>
+          </label>
+          {availableModels.length > 1 && <label className="access-model-batch"><input type="checkbox" aria-label={`批量复制 ${model.alias}`} checked={selectedModelIDs.includes(model.id)} disabled={busy} onChange={() => toggleModel(model.id)}/>批量</label>}
+          <button type="button" className="link" disabled={busy} onClick={() => copyValue(model.alias, '模型名已复制')}>复制模型名</button>
+        </div>)}
+      </div> : <p className="muted">尚未授权此协议的可用模型。</p>}
+      {availableModels.length > 1 && <button type="button" className="link access-copy-models" disabled={busy} onClick={() => copyValue(availableModels.map(model => model.alias).join('\n'), '模型列表已复制')}><Copy size={14}/>复制全部模型名</button>}
+      {availableModels.length > 1 && <p className="access-hint">勾选模型用于统一复制的“已选模型”范围；选择在协议之间共享。</p>}
+      {isAsr && <p className="access-hint">音频请求的模型别名也从这里选择；下方会显示对应的原生 JSON 示例。</p>}
     </section>
 
     {isAsr && <section className="access-field"><h3>音频请求示例</h3><pre>{asrExample(selectedAlias)}</pre><p className="access-hint">替换音频 Base64，format 与文件实际格式保持一致。热词可选；接口接收 JSON。</p></section>}
+
+    <section className="access-unified">
+      <div className="access-field-heading"><h3>统一复制 <span>配置范围</span></h3></div>
+      <p className="access-hint access-unified-intro">按协议和模型范围生成可直接粘贴的配置。多个模型会分别生成配置块，不会合并到同一个 MODEL 字段。</p>
+      <div className="access-unified-options">
+        <div className="access-toggle-group" role="group" aria-label="复制协议范围">
+          <button type="button" className={copyProtocolScope === 'current' ? 'active' : ''} aria-pressed={copyProtocolScope === 'current'} disabled={busy} onClick={() => setCopyProtocolScope('current')}>当前协议</button>
+          {canCopyBoth && !isAsr && <button type="button" className={copyProtocolScope === 'both' ? 'active' : ''} aria-pressed={copyProtocolScope === 'both'} disabled={busy} onClick={() => setCopyProtocolScope('both')}>Chat + Anthropic</button>}
+        </div>
+        <label className="access-copy-model-scope">模型范围<select aria-label="复制模型范围" value={copyModelScope} disabled={busy || !availableModels.length} onChange={e => setCopyModelScope(e.target.value as CopyModelScope)}>
+          <option value="default">当前模型（{selectedAlias || '未选择'}）</option>
+          <option value="selected">已选模型（{selectedForBatch.length} 个）</option>
+          <option value="all">全部模型（{availableModels.length} 个）</option>
+        </select></label>
+      </div>
+      <button className="primary access-copy-all" disabled={busy || !project.has_saved_token || !selectedAlias || !hasCopyableModels} onClick={copyUnified}><Copy size={16}/>{busy ? '正在处理…' : '复制完整接入配置'}</button>
+      <p className="access-hint access-format">当前范围：{copyProtocolScope === 'both' && canCopyBoth && !isAsr ? 'Chat + Anthropic' : protocolName(protocol)} · {batchLabel}{copyModelScope === 'selected' && !hasCopyableModels ? '（请至少选择一个模型）' : ''}</p>
+    </section>
+
     <div className="access-feedback" aria-live="polite">
       {error && <div className="error" role="alert">{error}</div>}
       {notice && <p className="access-success" role="status"><Check size={15}/>{notice}</p>}
       {fallback && <div className="access-fallback">{showFallback ? <textarea aria-label="待手动复制的内容" readOnly value={fallback} onFocus={e => e.target.select()}/> : <button onClick={() => setShowFallback(true)}>显示内容以手动复制</button>}</div>}
     </div>
-    <button className="primary access-copy-all" disabled={busy || !project.has_saved_token || !selectedAlias} onClick={() => copy('all')}><Copy size={16}/>{busy ? '正在处理…' : '复制完整接入配置'}</button>
-    <p className="access-hint access-format">{isAsr ? '包含 ASR_URL、API_KEY、MODEL 与音频 JSON 示例。' : '包含 BASE_URL、API_KEY 和 MODEL，可粘贴到配置文件。'}</p>
 
     <div className="access-reset">
       {confirmReset ? <>

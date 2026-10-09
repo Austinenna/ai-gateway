@@ -45,9 +45,11 @@ MiniMax 的两种列表格式已按[官方 Chat 列表](https://platform.minimax
 
 打开 **项目权限 → 对应项目行 → 接入信息**：
 
-- **复制端点**：复制实际请求所需的完整地址，不读取项目 Token。Chat Completions 为 `/v1/chat/completions`，Anthropic Messages 为 `/v1/messages`；如果客户端使用 SDK，请按下方完整配置中的 `BASE_URL` 语义填写基础地址。
+- **协议 Tab**：在 `Chat Completions`、`Anthropic Messages`（以及已授权时的 `百炼 ASR`）之间切换。每个 Tab 依次显示并可单独复制 `Base URL`、完整请求端点、项目 Token 和授权模型。
+- **复制端点**：复制实际请求所需的完整地址，不读取项目 Token。Chat Completions 为 `/v1/chat/completions`，Anthropic Messages 为 `/v1/messages`；如果客户端使用 SDK，请按同一 Tab 中的 `Base URL` 语义填写基础地址。
 - **复制 Token**：只在点击时取回并复制完整项目 Token。平时仅显示前缀与遮罩；复制失败时可主动显示内容后手动复制。
-- **复制完整接入配置**：复制包含 `BASE_URL`、`API_KEY`、`MODEL` 的三行配置。模型下拉只显示该项目已授权、与所选协议对应的模型别名。
+- **模型选择**：模型列表中的单选项决定当前默认模型；复选项用于批量范围，模型名和全部模型名也可以单独复制。
+- **统一复制**：可复制当前协议，或一次生成 Chat + Anthropic 两段配置；模型范围支持当前模型、已选模型和全部模型。多个模型会生成带协议／模型标题的独立配置块，不把多个别名塞入同一个 `MODEL` 字段。
 - **重置项目 Token**：先展示旧 Token 失效提示，明确确认后才生成新 Token。取消或打开窗口不会重置。
 
 新建、载入演示和重置得到的项目 Token 均加密保存在服务器，后续刷新、服务重启并登录管理页后仍能复制。复制原 Token 不改变权限或正在使用的配置。已停用项目仍可复制，但无法调用。

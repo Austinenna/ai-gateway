@@ -154,6 +154,12 @@
 .project-access-modal .modal-head h2{overflow-wrap:anywhere;min-width:0;font-size:1.0625rem}
 .project-access-content{padding:24px 26px;container-type:inline-size}
 .project-access-content .access-intro{font-size:.875rem;line-height:1.8;color:var(--muted);margin:0 0 25px}
+.access-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin:0 -26px 24px;padding:0 26px;scrollbar-width:none}
+.access-tabs::-webkit-scrollbar{display:none}
+.access-tabs button{flex:0 0 auto;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);font-size:.8125rem;padding:10px 12px 11px;white-space:nowrap}
+.access-tabs button:hover{color:var(--ink);background:var(--bg)}
+.access-tabs button.active{border-bottom-color:var(--accent);color:var(--ink);font-weight:600}
+.access-tabs button:disabled{opacity:.55;cursor:not-allowed}
 .access-field{margin-bottom:22px;min-width:0}
 .access-field-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .access-field-heading h3,.access-field-heading label{font-size:.875rem;font-weight:600;margin:0;line-height:1.7}
@@ -163,6 +169,32 @@
 .access-copy-row>code{flex:1;min-width:0;font-size:.8125rem;line-height:1.7;overflow-wrap:anywhere}
 .access-copy-row>button{font-size:.8125rem;padding:8px 11px;flex-shrink:0}
 .access-copy-row svg{flex:none}
+.access-model-field{margin-bottom:26px}
+.access-count{color:var(--muted);font-size:.75rem;font-weight:400}
+.access-model-list{display:grid;gap:7px}
+.access-model-item{display:flex;align-items:center;gap:10px;min-width:0;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.access-model-item.active{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));background:light-dark(#f7f9ff,#1d293d)}
+.access-model-main{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:9px;min-width:0;flex:1;cursor:pointer}
+.access-model-main input,.access-model-batch input{accent-color:var(--accent);flex:none}
+.access-model-main span{display:flex;align-items:baseline;gap:8px;min-width:0;flex:1;flex-wrap:wrap;max-width:100%}
+.access-model-main strong{font-size:.8125rem;overflow-wrap:anywhere}
+.access-model-main small{font-size:.75rem;color:var(--muted);overflow-wrap:anywhere}
+.access-model-batch{display:flex;align-items:center;gap:5px;flex:none;color:var(--muted);font-size:.75rem;cursor:pointer}
+.access-model-item>.link{flex:none;font-size:.75rem;padding:4px 2px}
+.access-copy-models{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:.75rem}
+.access-unified{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:17px 17px 15px;margin-top:4px}
+.access-unified .access-field-heading{margin-bottom:4px}
+.access-unified-intro{margin-top:0!important}
+.access-unified-options{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:15px 0 14px}
+.access-toggle-group{display:flex;gap:0;flex-wrap:wrap}
+.access-toggle-group button{border:1px solid var(--line);border-radius:0;background:var(--surface,transparent);color:var(--muted);font-size:.75rem;padding:7px 10px}
+.access-toggle-group button:first-child{border-radius:6px 0 0 6px}
+.access-toggle-group button:last-child{border-radius:0 6px 6px 0;margin-left:-1px}
+.access-toggle-group button:only-child{border-radius:6px}
+.access-toggle-group button.active{position:relative;z-index:1;border-color:var(--accent);background:var(--accent-bg);color:var(--ink);font-weight:600}
+.access-copy-model-scope{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:.75rem;margin-left:auto}
+.access-copy-model-scope select{font-size:.75rem;padding:7px 8px;max-width:100%}
+.access-format{margin-bottom:0!important}
 .access-token{display:flex;align-items:center;gap:9px;color:var(--muted);flex-wrap:wrap}
 .access-saved{display:inline-flex;align-items:center;gap:5px;color:var(--green);font-size:.75rem}
 .project-access-content .access-hint{font-size:.75rem;line-height:1.8;color:var(--muted);margin:9px 0 0;overflow-wrap:anywhere}
@@ -184,8 +216,8 @@
 .access-reset>p{font-size:.8125rem;line-height:1.8;width:100%;margin:0;color:var(--red)}
 .access-reset>div{display:flex;justify-content:flex-end;gap:9px;width:100%;flex-wrap:wrap}
 .access-fallback{margin-bottom:16px}.access-fallback button{font-size:.8125rem}.access-fallback textarea{font-size:.8125rem;min-height:110px;word-break:break-all}
-@container (max-width:25rem){.access-copy-row{flex-wrap:wrap;gap:9px;padding:12px}.access-copy-row>code{flex-basis:100%}.access-copy-row>button{margin-left:auto}.access-field-heading{gap:7px}.access-reset{gap:8px}}
-@media(max-width:550px){.project-access-content{padding:20px}.project-access-modal .modal-head h2{font-size:1rem}.access-legacy input,.access-field>select{font-size:16px}.project-list{min-width:0}.project-title>div{min-width:0}.project-title h2{overflow-wrap:anywhere}}
+@container (max-width:25rem){.access-tabs{margin-left:-20px;margin-right:-20px;padding-left:20px;padding-right:20px}.access-copy-row{flex-wrap:wrap;gap:9px;padding:12px}.access-copy-row>code{flex-basis:100%}.access-copy-row>button{margin-left:auto}.access-field-heading{gap:7px}.access-reset{gap:8px}.access-unified{padding:15px}.access-copy-model-scope{width:100%;margin-left:0}.access-copy-model-scope select{flex:1;min-width:0}.access-model-item{align-items:flex-start;flex-wrap:wrap}.access-model-main{flex-basis:calc(100% - 2px)}.access-model-batch{margin-left:25px}.access-model-item>.link{margin-left:auto}}
+@media(max-width:550px){.project-access-content{padding:20px}.project-access-modal .modal-head h2{font-size:1rem}.access-legacy input,.access-field>select{font-size:16px}.project-list{min-width:0}.project-title>div{min-width:0}.project-title h2{overflow-wrap:anywhere}.access-tabs{margin-left:-20px;margin-right:-20px;padding-left:20px;padding-right:20px}.access-copy-model-scope{font-size:.8125rem}.access-copy-model-scope select{font-size:16px}}
 
 .projects-panel{container-type:inline-size;overflow:hidden;border-radius:12px}
 .projects-table{table-layout:fixed;width:100%;font-size:.875rem}

@@ -97,11 +97,12 @@ test('百炼 ASR 配置、原生音频调用、项目授权与转写详情', asy
     await page.locator('nav').getByRole('button', { name: /^项目权限/ }).click();
     const row = page.locator('.project-card').filter({ hasText: 'ASR 授权验证' });
     await row.getByRole('button', { name: '接入信息', exact: true }).click();
-    await expect(modal.getByRole('combobox', { name: '客户端协议', exact: true })).toHaveValue('dashscope-asr');
+    await expect(modal.getByRole('tab', { name: '百炼 ASR', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(modal.locator('.access-copy-row code').nth(1)).toHaveText('http://127.0.0.1:18318/v1/asr/transcriptions');
     await expect(modal).toContainText('http://127.0.0.1:18318/v1/asr/transcriptions');
     await expect(modal.locator('pre')).toContainText('"model": "browser-asr"');
     await modal.getByRole('button', { name: '复制完整接入配置', exact: true }).click();
-    await expect(modal.getByRole('status')).toHaveText('接入配置已复制');
+    await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toContain('ASR_URL=http://127.0.0.1:18318/v1/asr/transcriptions');
     expect(copied).toContain('Authorization: Bearer ' + project.token);
