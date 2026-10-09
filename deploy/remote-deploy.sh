@@ -13,8 +13,7 @@ install_root=/opt/ai-gateway
 data_dir=/var/lib/ai-gateway
 health_url=http://127.0.0.1:8317/healthz
 
-if [[ ! "$release" =~ ^[0-9a-f]{40}-[0-9]+$ ]] \
-  || "$artifact" != */gateway.gz; then
+if [[ ! "$release" =~ ^[0-9a-f]{40}-[0-9]+$ || "$artifact" != */gateway.gz ]]; then
   echo '部署参数不符合固定生产路径' >&2
   exit 2
 fi
