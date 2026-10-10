@@ -281,7 +281,10 @@ func TestEncryptedPersistenceRestartAndLock(t *testing.T) {
 	h.want(h.call(m.Alias, p.Token, nil), 200)
 	h.want(h.request("POST", "/api/admin/lock", map[string]any{}, "", true), 200)
 	h.want(h.request("GET", "/api/admin/state", nil, "", true), 401)
-	h.want(h.call(m.Alias, p.Token, nil), 503)
+	// Locking the management page must not interrupt project traffic. The
+	// running process already has the master key needed to decrypt the vendor
+	// credential, even though no admin session remains.
+	h.want(h.call(m.Alias, p.Token, nil), 200)
 }
 
 func TestAdminOriginAndCSRF(t *testing.T) {

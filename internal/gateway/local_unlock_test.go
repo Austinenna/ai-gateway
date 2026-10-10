@@ -138,7 +138,7 @@ func TestLocalPasswordlessOriginAndCSRF(t *testing.T) {
 		t.Fatal(err)
 	}
 	wipe(key)
-	h.g.lock()
+	h.g.clearMaster()
 	for _, crossOrigin := range []bool{false, true} {
 		req := httptest.NewRequest("POST", "http://gateway.test/api/login", bytes.NewBufferString(`{"password":""}`))
 		if crossOrigin {
@@ -229,7 +229,7 @@ func TestLocalAutoUnlockRejectsDamagedMaterial(t *testing.T) {
 		t.Fatal(err)
 	}
 	wipe(key)
-	h.g.lock()
+	h.g.clearMaster()
 	if _, err := h.g.db.Exec("UPDATE meta SET value=? WHERE key='local_wrapped_master'", []byte("damaged")); err != nil {
 		t.Fatal(err)
 	}

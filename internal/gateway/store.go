@@ -253,7 +253,7 @@ func (g *Gateway) Close() error {
 	g.active.Wait()
 	close(g.records)
 	<-g.writerDone
-	g.lock()
+	g.clearMaster()
 	return g.db.Close()
 }
 func (g *Gateway) configured() bool {
@@ -266,7 +266,20 @@ func (g *Gateway) key() []byte {
 	defer g.mu.RUnlock()
 	return append([]byte(nil), g.master...)
 }
+
+// lock ends all management sessions without interrupting the running gateway.
+// Project traffic uses the already loaded master key and is intentionally
+// independent from whether an administrator currently has the UI open.
 func (g *Gateway) lock() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.sessions = map[string]session{}
+}
+
+// clearMaster is reserved for process shutdown or tests that need to model a
+// fresh process. An explicit management lock must not call it: doing so would
+// make every project request fail until an administrator revisits the UI.
+func (g *Gateway) clearMaster() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	wipe(g.master)
