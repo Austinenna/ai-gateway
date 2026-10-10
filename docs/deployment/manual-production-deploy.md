@@ -7,6 +7,7 @@
 - 只上传本次构建出的 Linux amd64 网关二进制压缩包。
 - 前端必须先构建；前端资源会嵌入 Go 二进制，不能只替换前端 `dist`。
 - 不上传本机 `.data/`，不覆盖生产 `/var/lib/ai-gateway`，不重置项目 Token、厂商 Key 或管理密码。
+- 不上传或替换生产数据目录中的 `service-unlock.key`；它由生产管理页首次成功登录时生成，供服务启动恢复主密钥。
 - 不把私钥、主机指纹、真实项目 Token 或厂商 Key 写入仓库、构建产物和命令输出。
 - 生产替换必须通过服务器固定的 `/usr/local/sbin/ai-gateway-deploy`，不要手动覆盖正在运行的二进制。
 
@@ -111,6 +112,8 @@ curl --silent --show-error --max-time 15 \
 ```
 
 成功标准是：systemd 为 `active` 且 `enabled`，远程二进制 SHA-256 与本地 Linux 二进制一致，`/healthz` 成功，公网首页返回 200。没有项目 Token 时，`/v1/models` 返回 401 是预期的认证结果，不应因此判定部署失败。
+
+已有生产库首次启用服务自动解锁时，发布后需要在管理页面输入一次管理密码生成 `service-unlock.key`；完成后后续服务重启会直接接收项目请求，管理页面仍然要求密码登录。
 
 如果验收失败，先查看：
 

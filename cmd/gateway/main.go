@@ -51,6 +51,9 @@ func main() {
 		log.Fatal(e)
 	}
 	defer g.Close()
+	if e = g.EnableServiceAutoUnlock(); e != nil {
+		log.Fatal(e)
+	}
 	if *localPasswordless {
 		if e = g.EnableLocalPasswordless(); e != nil {
 			log.Fatal(e)

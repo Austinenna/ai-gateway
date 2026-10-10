@@ -86,6 +86,7 @@ type Gateway struct {
 	monitoringSince   int64
 	active            sync.WaitGroup
 	db                *sql.DB
+	dataDir           string
 	mu                sync.RWMutex
 	master            []byte
 	sessions          map[string]session
@@ -93,6 +94,7 @@ type Gateway struct {
 	secure            bool
 	allowSetup        bool
 	localPasswordless bool
+	serviceAutoUnlock bool
 	authMu            sync.Mutex
 	attempts          int
 	attemptWindow     time.Time
@@ -225,7 +227,7 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 			return fail(e)
 		}
 	}
-	g := &Gateway{db: db, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient()}
+	g := &Gateway{db: db, dataDir: dataDir, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient()}
 	if e = g.initMetrics(); e != nil {
 		return fail(e)
 	}

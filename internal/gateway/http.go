@@ -130,6 +130,10 @@ func (g *Gateway) auth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if g.saveServiceUnlock(master) != nil {
+		problem(w, 500, "服务自动解锁材料保存失败，请重试")
+		return
+	}
 	token := newToken()
 	g.mu.Lock()
 	wipe(g.master)
