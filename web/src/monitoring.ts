@@ -2,6 +2,10 @@ import type { WorkBuddyGrouping } from './request-tasks';
 export type RequestAdaptation = {
   rule: string; field: string; before: string; after: string; removed_fields?: string[];
 };
+export type RequestDiagnostic = {
+  code: string; message: string; phase: string; source: string;
+  upstream_contacted: boolean; retryable: boolean; recommended_action?: string;
+};
 export type RequestRecord = {
   task_id?: string; grouping?: WorkBuddyGrouping; question_excerpt?: string; reply_kind?: string;
   id: string; project_id: string; project_name: string; model_id: string; alias: string;
@@ -19,6 +23,7 @@ export type RequestRecord = {
   record_missing?: boolean;
   adaptations?: RequestAdaptation[];
   audio_seconds?: number | null;
+  diagnostic?: RequestDiagnostic;
 };
 export type Distribution = { count: number; p50: number | null; p95: number | null };
 export type MetricSummary = {
@@ -39,11 +44,31 @@ export type Metrics = {
   metrics_errors: number; dropped_records: number;
 };
 
+export type DiagnosticGroup = {
+  code: string; message: string; phase: string; source: string;
+  status: number; error_type: string; upstream_status: number; count: number;
+  first_started: number; last_started: number; retryable: boolean;
+  upstream_contacted: boolean; recommended_action?: string; example_id: string;
+  models: string[]; providers: string[]; protocols: string[]; projects: string[];
+};
+export type DiagnosticOption = { id: string; name: string };
+export type Diagnostics = {
+  from: number; to: number; monitoring_since: number;
+  summary: { requests: number; failed: number; active: number; groups: number; errors: Record<string, number>; latest_failure: number | null };
+  groups: DiagnosticGroup[]; recent: RequestRecord[];
+  options: { codes: DiagnosticOption[]; providers: DiagnosticOption[]; protocols: DiagnosticOption[]; models: DiagnosticOption[]; projects: DiagnosticOption[] };
+  runtime: { configured: boolean; locked: boolean; service_auto_unlock: boolean; monitoring_since: number };
+  metrics_errors: number; dropped_records: number;
+};
+
 export const number = (value: number | null | undefined, digits = 0) => value == null ? '—' : value.toLocaleString('zh-CN', { maximumFractionDigits: digits });
 export const percent = (value: number | null | undefined) => value == null ? '—' : `${number(value, 1)}%`;
 export const duration = (value: number | null | undefined) => value == null ? '—' : value < 1000 ? `${number(value)} ms` : `${number(value / 1000, 2)} s`;
 export const dateTime = (value: number) => new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
-export const errorName = (kind?: string) => ({ authentication: '凭证无效', permission: '模型未授权或停用', invalid_request: '请求格式错误', gateway_error: '网关错误', gateway_restart: '服务重启中断', upstream_connection: '上游连接失败', upstream_protocol: '上游响应格式错误', upstream_error: '上游错误', rate_limit: '上游限流 · 429', timeout: '请求超时', stream_interrupted: '流式传输中断', client_canceled: '客户端取消／断开' }[kind || ''] || kind || '未分类错误');
+export const errorName = (kind?: string) => ({ authentication: '凭证无效', authentication_failed: '凭证无效', permission: '模型未授权或停用', permission_denied: '模型未授权或停用', invalid_request: '请求格式错误', gateway_error: '网关错误', gateway_locked: '网关已锁定', gateway_restart: '服务重启中断', upstream_connection: '上游连接失败', upstream_protocol: '上游响应格式错误', upstream_error: '上游错误', upstream_rate_limit: '上游限流 · 429', rate_limit: '上游限流 · 429', upstream_timeout: '上游超时', timeout: '请求超时', stream_interrupted: '流式传输中断', client_canceled: '客户端取消／断开' }[kind || ''] || kind || '未分类错误');
+export const diagnosticPhaseName = (phase?: string) => ({ unlock: '解锁', authentication: '认证', authorization: '授权', validation: '请求校验', upstream_request: '上游请求', upstream_response: '上游响应', stream: '流式响应', client: '客户端', shutdown: '服务重启', gateway: '网关内部' }[phase || ''] || phase || '未分类阶段');
+export const diagnosticSourceName = (source?: string) => ({ gateway: '网关', upstream: '上游', client: '客户端' }[source || ''] || source || '未知来源');
+export const diagnosticActionName = (action?: string) => ({ admin_login: '登录管理页面解锁', check_project_credential: '检查项目凭证', check_model_access: '检查模型授权', fix_request: '检查请求格式', inspect_upstream: '检查上游连接与响应', retry_later: '稍后重试', retry_or_check_client: '重试或检查客户端', check_client: '检查客户端是否主动取消', retry: '重试请求', inspect_gateway: '检查网关状态' }[action || ''] || action || '检查网关状态');
 export const recordStatus = (r: RequestRecord) => ({ complete: '完成', canceled: '已取消', truncated: '未完整结束', timeout: '已超时', rejected: '已拒绝', interrupted: '异常中断', running: '进行中' }[r.state] || '失败');
 export function firstTiming(r: RequestRecord, content = false) {
   if (r.protocol === 'dashscope-asr') return '不适用';

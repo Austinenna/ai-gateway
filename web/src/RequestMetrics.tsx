@@ -1,4 +1,4 @@
-import { type RequestRecord, firstTiming, inputTotal, outputTotal, number, percent, duration, dateTime, recordStatus, errorName } from './monitoring';
+import { type RequestRecord, firstTiming, inputTotal, outputTotal, number, percent, duration, dateTime, recordStatus, errorName, diagnosticActionName, diagnosticPhaseName, diagnosticSourceName } from './monitoring';
 
 export function RequestHeader({ record: r }: { record: RequestRecord }) {
   const outcomeHTTP = r.error_type === 'client_canceled' && r.upstream_status ? `上游 HTTP ${r.upstream_status}` : `HTTP ${r.status || '—'}`;
@@ -14,7 +14,7 @@ export function RequestHeader({ record: r }: { record: RequestRecord }) {
       <span className="detail-mode">{r.protocol === 'dashscope-asr' ? '百炼 ASR · 同步转写' : r.stream === true ? '流式' : r.stream === false ? '非流式' : '历史记录'}</span>
       <code className="detail-request-id" title={'请求 ID：' + r.id}>{r.id}</code>
     </div>
-    {r.error_type && <div className="request-outcome-note">{errorName(r.error_type)} · {outcomeHTTP}</div>}
+    {r.diagnostic ? <div className="request-diagnostic-note"><strong>{r.diagnostic.message}</strong><span>{errorName(r.diagnostic.code)} · {outcomeHTTP} · {diagnosticPhaseName(r.diagnostic.phase)} · {diagnosticSourceName(r.diagnostic.source)}</span><small>{r.diagnostic.upstream_contacted ? '已尝试联系上游' : '未联系上游'} · {r.diagnostic.retryable ? '可重试' : '需要处理'} · {diagnosticActionName(r.diagnostic.recommended_action)}</small></div> : r.error_type && <div className="request-outcome-note">{errorName(r.error_type)} · {outcomeHTTP}</div>}
     <RequestMetrics record={r}/>
   </header>;
 }
