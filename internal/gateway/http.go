@@ -18,6 +18,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 func problem(w http.ResponseWriter, status int, message string) {
+	if observer, ok := w.(interface{ recordGatewayProblem(string) }); ok {
+		observer.recordGatewayProblem(message)
+	}
 	writeJSON(w, status, map[string]any{"error": map[string]string{"message": message, "type": "gateway_error"}})
 }
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
@@ -180,6 +183,7 @@ func (g *Gateway) Handler(assets fs.FS) http.Handler {
 	}))
 	mux.HandleFunc("GET /api/admin/state", g.admin(g.state))
 	mux.HandleFunc("GET /api/admin/metrics", g.admin(g.metrics))
+	mux.HandleFunc("GET /api/admin/diagnostics", g.admin(g.diagnostics))
 	mux.HandleFunc("POST /api/admin/connections", g.admin(g.saveConnection))
 	mux.HandleFunc("PUT /api/admin/connections/{id}", g.admin(g.saveConnection))
 	mux.HandleFunc("DELETE /api/admin/connections/{id}", g.admin(g.deleteConnection))

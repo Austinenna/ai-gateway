@@ -51,30 +51,40 @@ type Project struct {
 	HasSavedToken bool     `json:"has_saved_token"`
 	ModelIDs      []string `json:"model_ids"`
 }
+type RequestDiagnostic struct {
+	Code              string `json:"code"`
+	Message           string `json:"message"`
+	Phase             string `json:"phase"`
+	Source            string `json:"source"`
+	UpstreamContacted bool   `json:"upstream_contacted"`
+	Retryable         bool   `json:"retryable"`
+	RecommendedAction string `json:"recommended_action,omitempty"`
+}
 type Record struct {
 	MetricsFields
 	TaskFields
-	ID              string `json:"id"`
-	ProjectID       string `json:"project_id"`
-	ProjectName     string `json:"project_name"`
-	ModelID         string `json:"model_id"`
-	Alias           string `json:"alias"`
-	UpstreamModel   string `json:"upstream_model"`
-	Protocol        string `json:"protocol"`
-	Started         int64  `json:"started"`
-	Duration        int64  `json:"duration_ms"`
-	FirstText       *int64 `json:"first_text_ms"`
-	FirstToken      *int64 `json:"first_token_ms"`
-	TimingVersion   int    `json:"timing_version,omitempty"`
-	Status          int    `json:"status"`
-	State           string `json:"state"`
-	Input           string `json:"input,omitempty"`
-	Output          string `json:"output,omitempty"`
-	InputTokens     int64  `json:"input_tokens"`
-	OutputTokens    int64  `json:"output_tokens"`
-	Truncated       bool   `json:"truncated"`
-	InputTruncated  bool   `json:"input_truncated,omitempty"`
-	OutputTruncated bool   `json:"output_truncated,omitempty"`
+	ID              string             `json:"id"`
+	ProjectID       string             `json:"project_id"`
+	ProjectName     string             `json:"project_name"`
+	ModelID         string             `json:"model_id"`
+	Alias           string             `json:"alias"`
+	UpstreamModel   string             `json:"upstream_model"`
+	Protocol        string             `json:"protocol"`
+	Started         int64              `json:"started"`
+	Duration        int64              `json:"duration_ms"`
+	FirstText       *int64             `json:"first_text_ms"`
+	FirstToken      *int64             `json:"first_token_ms"`
+	TimingVersion   int                `json:"timing_version,omitempty"`
+	Status          int                `json:"status"`
+	State           string             `json:"state"`
+	Input           string             `json:"input,omitempty"`
+	Output          string             `json:"output,omitempty"`
+	InputTokens     int64              `json:"input_tokens"`
+	OutputTokens    int64              `json:"output_tokens"`
+	Truncated       bool               `json:"truncated"`
+	InputTruncated  bool               `json:"input_truncated,omitempty"`
+	OutputTruncated bool               `json:"output_truncated,omitempty"`
+	Diagnostic      *RequestDiagnostic `json:"diagnostic,omitempty"`
 
 	Adaptations []RequestAdaptation `json:"adaptations,omitempty"`
 }

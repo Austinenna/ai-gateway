@@ -391,6 +391,7 @@ func (g *Gateway) listRecords(w http.ResponseWriter, r *http.Request) {
 		}
 		rec.Input = ""
 		rec.Output = ""
+		rec.ensureDiagnostic("")
 		rec.normalizeStoredUsage()
 		out = append(out, rec)
 	}
@@ -418,6 +419,7 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rec.normalizeStoredTruncation()
+		rec.ensureDiagnostic("")
 		rec.RecordMissing = true
 		rec.normalizeStoredUsage()
 		writeJSON(w, 200, rec)
@@ -429,6 +431,7 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rec.normalizeStoredTruncation()
+	rec.ensureDiagnostic("")
 	rec.normalizeStoredUsage()
 	writeJSON(w, 200, rec)
 }

@@ -77,10 +77,16 @@ func (g *Gateway) saveMetric(rec Record) {
 // The wrapper preserves ResponseController access to flushing and deadlines.
 type metricWriter struct {
 	http.ResponseWriter
-	status int
+	status         int
+	problemMessage string
 }
 
 func (w *metricWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+func (w *metricWriter) recordGatewayProblem(message string) {
+	if w.problemMessage == "" {
+		w.problemMessage = message
+	}
+}
 func (w *metricWriter) WriteHeader(status int) {
 	if w.status == 0 {
 		w.status = status
@@ -134,6 +140,7 @@ func (g *Gateway) observeCall(next http.HandlerFunc) http.HandlerFunc {
 					rec.ErrorType = "gateway_error"
 				}
 			}
+			rec.ensureDiagnostic(mw.problemMessage)
 			finalizeUsage(rec)
 			if rec.TaskID != "" {
 				rec.ReplyKind = taskReplyKind(*rec)
