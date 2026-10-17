@@ -12,10 +12,11 @@ test('项目试调用的凭证填入、校验、加密取回与退出管理', as
   page.on('request', r => { if (r.method() === 'POST' && r.url().includes('/v1/')) requests++; });
 
   await test.step('本地演示生成凭证，关闭重开仍可直接调用', async () => {
+    const status = await (await page.request.get('/api/status')).json();
     await page.goto('/');
     await page.getByLabel('管理密码', { exact: true }).fill(password);
-    await page.getByLabel('再次输入密码', { exact: true }).fill(password);
-    await page.getByRole('button', { name: '创建并进入', exact: true }).click();
+    if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill(password);
+    await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
     await page.getByRole('button', { name: '载入本地演示', exact: true }).click();
     await expect(key).toHaveValue(/^gw_[A-Za-z0-9_-]{43}$/);
     originalKey = await key.inputValue();

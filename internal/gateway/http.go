@@ -204,6 +204,7 @@ func (g *Gateway) Handler(assets fs.FS) http.Handler {
 	mux.HandleFunc("GET /api/admin/request-tasks/{id}", g.admin(g.getTask))
 	mux.HandleFunc("POST /api/admin/demo", g.admin(g.seedDemo))
 	mux.HandleFunc("POST /api/admin/models/{id}/test", g.admin(g.observeCall(g.testModel)))
+	mux.HandleFunc("POST /api/admin/chat", g.admin(g.observeCall(g.adminChat)))
 	mux.HandleFunc("GET /v1/models", g.modelList)
 	mux.HandleFunc("GET /api/public/models", g.publicModels)
 	mux.HandleFunc("POST /api/project-applications", g.applyProject)
