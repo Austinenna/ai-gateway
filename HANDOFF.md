@@ -1,6 +1,6 @@
 # AI Gateway：开发交接
 
-更新日期：2026-10-18。项目转正后位于 `/Users/enna/Projects/apps/ai-gateway`，阶段为 LLM 与百炼同步 ASR 已实现、继续开发与实际联调。
+更新日期：2026-10-31。项目转正后位于 `/Users/enna/Projects/apps/ai-gateway`，阶段为 LLM、百炼同步 ASR 与 DeepSeek 搜索／抓取转发已实现、继续开发与实际联调。
 
 ## 先理解什么
 
@@ -39,6 +39,10 @@ bash scripts/start.sh
 文件迁移不代表当前聊天和应用项目入口自动迁移。后续对话应从上述正式目录打开；不要继续在旧 `drafts` 路径下新建同名项目。转正记录由技能脚本保存在 `~/Projects/_meta/promotions/`。
 
 ## 验证边界
+
+2026-10-31 生产部署：将 DeepSeek 搜索与抓取版本 `33240143db254520c749e5ca5558979aa2afbd24`（后端 `0e77ac1`、管理页 `3324014`）构建为 Linux amd64 并通过服务器固定部署脚本发布。release 为 `33240143db254520c749e5ca5558979aa2afbd24-1793431126`，Linux 二进制 SHA-256 为 `7396c61cbdd38b7d737bb19dd1bfc653e441a74f3b2275bb306073f373f0ffc8`，`gateway.gz` 为 `82a24520814a729e6701eb8d8d81d32d6df8307ebf786548d4b4e93b39dbb22d`。发布前前端 21 项单测、39 项浏览器测试、TypeScript／Vite 构建和 Go 竞态回归通过，未上传本机运行数据。
+
+生产验收：systemd 为 active／enabled，远程二进制哈希与构建一致，`/healthz` 正常，公网首页 200，匿名 `/v1/models` 与 `/v1/tools/search` 均返回预期 401。部署脚本启动后第一次本机健康检查连接被拒（服务尚未监听），随后通过，未触发回滚。未修改数据库结构，未进行真实 DeepSeek 调用；搜索连接与 `web-search` 模型需在生产管理页配置后联调。部署前生产二进制为 2026-10-18 版本（`2e96300e…82b1`）。
 
 2026-10-18 生产部署：将对话调试版本 `beb24231d653c9428b927db796c815e18ca5d3c7` 构建为 Linux amd64 并通过服务器固定部署脚本发布。release 为 `beb24231d653c9428b927db796c815e18ca5d3c7-1792257629`，Linux 二进制 SHA-256 为 `2e96300e2699eedbfccd89cb6613ea254acaa26a7ea202b973b257d8f13182b1`。发布前前端 19 项单测、TypeScript／Vite 构建和 Go 竞态回归通过，构建标记为干净的已提交版本，未上传本机运行数据。
 
