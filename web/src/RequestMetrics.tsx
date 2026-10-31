@@ -1,4 +1,6 @@
 import { type RequestRecord, firstTiming, inputTotal, outputTotal, number, percent, duration, dateTime, recordStatus, errorName, diagnosticActionName, diagnosticPhaseName, diagnosticSourceName } from './monitoring';
+import { protocolName } from './connection-protocols';
+import { isWebTool } from './web-tools.mjs';
 
 export function RequestHeader({ record: r }: { record: RequestRecord }) {
   const outcomeHTTP = r.error_type === 'client_canceled' && r.upstream_status ? `上游 HTTP ${r.upstream_status}` : `HTTP ${r.status || '—'}`;
@@ -11,7 +13,7 @@ export function RequestHeader({ record: r }: { record: RequestRecord }) {
     <div className="detail-metadata">
       <span>模型 <code>{r.alias || '未路由'}</code></span>
       {r.connection_name && <span>连接 <b>{r.connection_name}</b></span>}
-      <span className="detail-mode">{r.protocol === 'dashscope-asr' ? '百炼 ASR · 同步转写' : r.stream === true ? '流式' : r.stream === false ? '非流式' : '历史记录'}</span>
+      <span className="detail-mode">{r.protocol === 'dashscope-asr' ? '百炼 ASR · 同步转写' : isWebTool(r.protocol) ? protocolName(r.protocol) + ' · 同步' : r.stream === true ? '流式' : r.stream === false ? '非流式' : '历史记录'}</span>
       <code className="detail-request-id" title={'请求 ID：' + r.id}>{r.id}</code>
     </div>
     {r.diagnostic ? <div className="request-diagnostic-note"><strong>{r.diagnostic.message}</strong><span>{errorName(r.diagnostic.code)} · {outcomeHTTP} · {diagnosticPhaseName(r.diagnostic.phase)} · {diagnosticSourceName(r.diagnostic.source)}</span><small>{r.diagnostic.upstream_contacted ? '已尝试联系上游' : '未联系上游'} · {r.diagnostic.retryable ? '可重试' : '需要处理'} · {diagnosticActionName(r.diagnostic.recommended_action)}</small></div> : r.error_type && <div className="request-outcome-note">{errorName(r.error_type)} · {outcomeHTTP}</div>}
@@ -24,6 +26,10 @@ export function RequestMetrics({ record: r }: { record: RequestRecord }) {
   if (r.protocol === 'dashscope-asr') return <div className="detail-metric-grid">
     <div><span>总耗时</span><b>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</b></div>
     <div><span>音频时长</span><b>{number(r.audio_seconds, 2)} <em>秒</em></b></div>
+  </div>;
+  if (isWebTool(r.protocol)) return <div className="detail-metric-grid">
+    <div><span>总耗时</span><b>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</b></div>
+    <div><span>Token 用量</span><b>不适用</b></div>
   </div>;
   return <div className="detail-metric-grid">
     <div title="从开始转发到首段有效思考、正文或工具内容"><span>首个 Token · TTFT</span><b>{firstTiming(r)}</b></div>
@@ -38,6 +44,11 @@ export function RequestTiming({ record: r }: { record: RequestRecord }) {
   if (r.protocol === 'dashscope-asr') return <div className="request-metrics-detail">
     <section className="detail-timing"><h3>同步转写耗时</h3><dl className="usage-breakdown"><div><dt>网关收到请求</dt><dd>{dateTime(r.started)}</dd></div><div><dt>总耗时</dt><dd>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</dd></div></dl></section>
     <section className="detail-usage"><h3>音频用量</h3><dl className="usage-breakdown"><div><dt>音频时长</dt><dd>{number(r.audio_seconds, 2)} <small>秒</small></dd></div></dl><p className="metric-explanation">时长采用厂商返回值，未报告时显示 —。转写文本及词时间戳见响应详情。</p></section>
+    <section className="detail-outcome"><h3>请求结果</h3><dl className="usage-breakdown"><div><dt>最终结果</dt><dd>{recordStatus(r)}</dd></div><div><dt>客户端 HTTP / 上游 HTTP</dt><dd>{r.status || '—'} / {r.upstream_status || '—'}</dd></div></dl>{r.error_type && <p className="metric-explanation">{errorName(r.error_type)}</p>}</section>
+  </div>;
+  if (isWebTool(r.protocol)) return <div className="request-metrics-detail">
+    <section className="detail-timing"><h3>同步请求耗时</h3><dl className="usage-breakdown"><div><dt>网关收到请求</dt><dd>{dateTime(r.started)}</dd></div><div><dt>总耗时</dt><dd>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</dd></div></dl></section>
+    <section className="detail-usage"><h3>用量</h3><p className="metric-explanation">搜索和抓取按次计费，没有 Token 用量；DeepSeek 只对成功且有结果的请求收费。</p></section>
     <section className="detail-outcome"><h3>请求结果</h3><dl className="usage-breakdown"><div><dt>最终结果</dt><dd>{recordStatus(r)}</dd></div><div><dt>客户端 HTTP / 上游 HTTP</dt><dd>{r.status || '—'} / {r.upstream_status || '—'}</dd></div></dl>{r.error_type && <p className="metric-explanation">{errorName(r.error_type)}</p>}</section>
   </div>;
   const modern = !!r.metrics_version, offset = modern ? r.forward_offset_ms || 0 : 0;

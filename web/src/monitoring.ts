@@ -1,3 +1,4 @@
+import { isWebTool } from './web-tools.mjs';
 import type { WorkBuddyGrouping } from './request-tasks';
 export type RequestAdaptation = {
   rule: string; field: string; before: string; after: string; removed_fields?: string[];
@@ -71,7 +72,7 @@ export const diagnosticSourceName = (source?: string) => ({ gateway: '网关', u
 export const diagnosticActionName = (action?: string) => ({ admin_login: '登录管理页面解锁', check_project_credential: '检查项目凭证', check_model_access: '检查模型授权', fix_request: '检查请求格式', inspect_upstream: '检查上游连接与响应', retry_later: '稍后重试', retry_or_check_client: '重试或检查客户端', check_client: '检查客户端是否主动取消', retry: '重试请求', inspect_gateway: '检查网关状态' }[action || ''] || action || '检查网关状态');
 export const recordStatus = (r: RequestRecord) => ({ complete: '完成', canceled: '已取消', truncated: '未完整结束', timeout: '已超时', rejected: '已拒绝', interrupted: '异常中断', running: '进行中' }[r.state] || '失败');
 export function firstTiming(r: RequestRecord, content = false) {
-  if (r.protocol === 'dashscope-asr') return '不适用';
+  if (r.protocol === 'dashscope-asr' || isWebTool(r.protocol)) return '不适用';
   if (r.metrics_version && r.stream === false) return '非流式';
   if (!content && !r.timing_version) return '未记录';
   const v = content ? r.first_text_ms : r.first_token_ms;

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import { connectionProtocols, protocolName } from './connection-protocols';
+import { isWebTool } from './web-tools.mjs';
 
 type CatalogModel = { id: string; display_name: string; created_at?: number };
 type Catalog = { models: CatalogModel[]; protocol: string; truncated: boolean };
@@ -10,7 +11,7 @@ export function ModelCatalogField({ connection, value, onChange, onSelect }: {
   connection?: Connection; value: string; onChange: (value: string) => void;
   onSelect: (id: string, name: string) => void;
 }) {
-  const protocols = connectionProtocols(connection).filter(p => p !== 'dashscope-asr');
+  const protocols = connectionProtocols(connection).filter(p => p !== 'dashscope-asr' && !isWebTool(p));
   const [protocol, setProtocol] = useState<string>(protocols[0] || '');
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [search, setSearch] = useState('');

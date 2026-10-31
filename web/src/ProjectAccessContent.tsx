@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, KeyRound, RefreshCw, ShieldCheck } from 'lucide-react';
 import { asrExample } from './asr.mjs';
 import { protocolName } from './connection-protocols';
+import { isWebTool, webToolExample, webToolPath } from './web-tools.mjs';
 
-type Protocol = 'chat' | 'messages' | 'dashscope-asr';
+type Protocol = 'chat' | 'messages' | 'dashscope-asr' | 'deepseek-search' | 'deepseek-fetch';
 type Model = { id: string; alias: string; name?: string; protocols: string[]; enabled: boolean };
 
 type Props = {
@@ -15,7 +16,7 @@ type Props = {
   rotateToken: () => Promise<void>;
 };
 
-const protocolOrder: Protocol[] = ['chat', 'messages', 'dashscope-asr'];
+const protocolOrder: Protocol[] = ['chat', 'messages', 'dashscope-asr', 'deepseek-search', 'deepseek-fetch'];
 
 export function ProjectAccessContent({ project, baseURL, models, resolveToken, saveToken, rotateToken }: Props) {
   const protocolOptions = protocolOrder.filter(protocol => models.some(model => model.enabled && model.protocols.includes(protocol)));
@@ -39,6 +40,7 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   const selectedModel = availableModels.find(model => model.alias === alias) || availableModels[0];
   const selectedAlias = selectedModel?.alias || '';
   const isAsr = protocol === 'dashscope-asr';
+  const isWeb = isWebTool(protocol);
 
   useEffect(() => {
     if (!visibleProtocols.includes(protocol)) setProtocol(visibleProtocols[0]);
@@ -52,6 +54,7 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   }
   function endpointFor(target: Protocol) {
     if (target === 'dashscope-asr') return `${gatewayBaseURL}/asr/transcriptions`;
+    if (isWebTool(target)) return `${gatewayBaseURL}${webToolPath(target)}`;
     return `${origin}/v1/${target === 'messages' ? 'messages' : 'chat/completions'}`;
   }
 
@@ -102,6 +105,10 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
           const endpoint = endpointFor(protocol);
           return `# ${protocolName(protocol)} · ${model.alias}\nASR_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${model.alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${asrExample(model.alias)}`;
         }
+        if (isWebTool(protocol)) {
+          const endpoint = endpointFor(protocol);
+          return `# ${protocolName(protocol)} · ${model.alias}\nURL=${endpoint}\nAPI_KEY=${token}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${webToolExample(protocol)}`;
+        }
         const title = `${protocolName(protocol)} · ${model.alias}`;
         return `# ${title}\nBASE_URL=${baseURLFor(protocol)}\nAPI_KEY=${token}\nMODEL=${model.alias}`;
       });
@@ -133,13 +140,13 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
     <section className="access-field">
       <div className="access-field-heading"><h3>Base URL <span>SDK 基础地址</span></h3></div>
       <div className="access-copy-row"><code>{baseURLFor(protocol)}</code><button disabled={busy} onClick={() => copyValue(baseURLFor(protocol), 'Base URL 已复制')}><Copy size={15}/>复制 Base URL</button></div>
-      <p className="access-hint">{isAsr ? '用于构造百炼 ASR 请求；直接请求请复制下面的完整端点。' : protocol === 'messages' ? 'Anthropic SDK 使用网关根地址，SDK 会自动补充 /v1/messages。' : 'OpenAI 兼容客户端使用包含 /v1 的基础地址，SDK 会自动补充 /chat/completions。'}</p>
+      <p className="access-hint">{isAsr ? '用于构造百炼 ASR 请求；直接请求请复制下面的完整端点。' : isWeb ? '搜索和抓取没有 SDK，直接请求下面的完整端点。' : protocol === 'messages' ? 'Anthropic SDK 使用网关根地址，SDK 会自动补充 /v1/messages。' : 'OpenAI 兼容客户端使用包含 /v1 的基础地址，SDK 会自动补充 /chat/completions。'}</p>
     </section>
 
     <section className="access-field">
       <div className="access-field-heading"><h3>请求端点 <span>Endpoint</span></h3></div>
       <div className="access-copy-row"><code>{endpointFor(protocol)}</code><button disabled={busy} onClick={() => copyValue(endpointFor(protocol), '端点已复制')}><Copy size={15}/>复制端点</button></div>
-      <p className="access-hint">{isAsr ? '将百炼原生 JSON 发送到此完整地址，使用项目 Token 进行 Bearer 鉴权。' : '直接发送 HTTP 请求时使用此完整地址。'}</p>
+      <p className="access-hint">{isAsr ? '将百炼原生 JSON 发送到此完整地址，使用项目 Token 进行 Bearer 鉴权。' : isWeb ? '请求体与 DeepSeek 原生接口相同，使用项目 Token 进行 Bearer 鉴权。' : '直接发送 HTTP 请求时使用此完整地址。'}</p>
     </section>
 
     <section className="access-field">
@@ -171,6 +178,8 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
       {availableModels.length > 1 && <button type="button" className="link access-copy-models" disabled={busy} onClick={() => copyValue(availableModels.map(model => model.alias).join('\n'), '模型列表已复制')}><Copy size={14}/>复制全部模型名</button>}
       {isAsr && <p className="access-hint">音频请求的模型别名也从这里选择；下方会显示对应的原生 JSON 示例。</p>}
     </section>
+
+    {isWeb && <section className="access-field"><h3>请求示例</h3><pre>{webToolExample(protocol)}</pre><p className="access-hint">不用写 model：网关会在此项目的授权里找到启用了该协议的模型。授权了多个时，再加 model 指定。</p></section>}
 
     {isAsr && <section className="access-field"><h3>音频请求示例</h3><pre>{asrExample(selectedAlias)}</pre><p className="access-hint">替换音频 Base64，format 与文件实际格式保持一致。热词可选；接口接收 JSON。</p></section>}
 
