@@ -27,6 +27,9 @@ func (rec *Record) readUsage(data []byte) {
 		rec.readASRUsage(data)
 		return
 	}
+	if isWebTool(rec.Protocol) {
+		return
+	}
 	type usage struct {
 		Input      *int64 `json:"input_tokens"`
 		Output     *int64 `json:"output_tokens"`

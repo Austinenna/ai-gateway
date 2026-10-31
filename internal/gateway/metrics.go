@@ -176,6 +176,9 @@ func isTimeout(err error) bool {
 
 func finalizeUsage(rec *Record) {
 	rec.UsageStatus = "unknown"
+	if isWebTool(rec.Protocol) {
+		return
+	}
 	if rec.Protocol == "dashscope-asr" {
 		if rec.AudioSeconds != nil {
 			rec.UsageStatus = "partial"
@@ -266,10 +269,10 @@ func (a *metricAggregate) add(rec Record) {
 		a.AudioSeconds += *rec.AudioSeconds
 		a.AudioSamples++
 	}
-	if rec.Forwarded && rec.Protocol != "dashscope-asr" {
+	if rec.Forwarded && rec.Protocol != "dashscope-asr" && !isWebTool(rec.Protocol) {
 		a.UsageEligible++
 	}
-	if rec.UsageStatus == "complete" && rec.Protocol != "dashscope-asr" {
+	if rec.UsageStatus == "complete" && rec.Protocol != "dashscope-asr" && !isWebTool(rec.Protocol) {
 		a.UsageComplete++
 	}
 	if rec.InputTotal != nil {

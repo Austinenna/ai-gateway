@@ -88,6 +88,7 @@ npm run test:local-unlock
 - [GitHub 推送后自动部署](docs/deployment/github-actions-cd.md)：生产环境 Secrets、部署检查与自动回滚。
 - [手动部署到生产](docs/deployment/manual-production-deploy.md)：本机 Linux amd64 构建、SSH 上传、备份、回滚与验收流程。
 - [百炼 ASR 接入](docs/asr.md)：音频转写配置、请求示例、记录与验证边界。
+- [DeepSeek 搜索与抓取接入](docs/deepseek-search.md)：借用模型条目转发 Search／Fetch、配置、调用与记录。
 - [配置与项目权限设计](docs/configuration-and-permissions.md)、[当前界面说明](docs/design-directions.md)。
 - [项目理解报告](docs/project-understanding-report.md)：2026-09-15 的说明快照，生成方式见 [报告说明](docs/report-assets/README.md)。
 - [原始技术选型](docs/archive/technology-options.md)、[三版独立界面方向](docs/archive/ui-directions.md)：历史比较，已被现行方案替代。

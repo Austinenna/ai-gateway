@@ -6,7 +6,7 @@ import (
 	"slices"
 )
 
-var supportedProtocols = []string{"chat", "messages", "dashscope-asr"}
+var supportedProtocols = []string{"chat", "messages", "dashscope-asr", "deepseek-search", "deepseek-fetch"}
 
 func requestProtocol(path string) string {
 	switch path {
@@ -14,6 +14,10 @@ func requestProtocol(path string) string {
 		return "messages"
 	case "/v1/asr/transcriptions":
 		return "dashscope-asr"
+	case "/v1/tools/search":
+		return "deepseek-search"
+	case "/v1/tools/fetch":
+		return "deepseek-fetch"
 	default:
 		return "chat"
 	}

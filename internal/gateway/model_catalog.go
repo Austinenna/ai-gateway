@@ -61,6 +61,10 @@ func (g *Gateway) discoverModels(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "当前不支持获取百炼 ASR 模型列表，请手动填写模型 ID")
 		return
 	}
+	if isWebTool(in.Protocol) {
+		problem(w, 400, "搜索和抓取不是模型，没有模型列表，请手动填写")
+		return
+	}
 	if c.Provider == "demo" {
 		writeJSON(w, 200, modelCatalog{Models: []catalogModel{{ID: "demo-v1", DisplayName: "本地演示模型"}}, Protocol: in.Protocol})
 		return

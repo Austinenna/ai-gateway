@@ -141,12 +141,16 @@ MODEL=coding
 | `POST /v1/chat/completions` | Chat Completions 普通／流式调用 | 连接的 `chat` 基础端点追加 `/chat/completions` |
 | `POST /v1/messages` | Messages 普通／流式调用 | 连接的 `messages` 基础端点追加 `/messages` |
 | `POST /v1/asr/transcriptions` | 百炼原生 JSON 同步转写 | 连接的 `dashscope-asr` 基础端点追加 `/services/aigc/multimodal-generation/generation` |
+| `POST /v1/tools/search` | DeepSeek 联网搜索，请求体与 DeepSeek 原生相同，可不带 `model` | 连接的 `deepseek-search` 基础端点追加 `/tools/search`，转发前删除 `model` |
+| `POST /v1/tools/fetch` | DeepSeek 网页抓取，转为 Markdown | 连接的 `deepseek-fetch` 基础端点追加 `/tools/fetch`，转发前删除 `model` |
 
 Messages 转发配置 `x-api-key`、Bearer 鉴权及 `anthropic-version`，并允许传递客户端的 `anthropic-beta`。没有提供自动 Chat↔Messages 转换、Responses、Realtime、Token Counting 或任意代理路径。
 
 Anthropic SDK 的 Base URL 应填写网关根地址，由 SDK 添加 `/v1/messages`；管理页“接入信息”的“复制端点”显示并复制完整的 `/v1/messages` 请求地址，完整配置中的 `BASE_URL` 仍按 SDK 语义生成。Chat Completions 同理，复制端点为 `/v1/chat/completions`，SDK 的 `BASE_URL` 保留 `/v1`。
 
 ASR 复用上述鉴权、模型别名、启停、加密凭据与记录流程，但请求上限为 32 MiB，接受 `input.messages` 中的音频 Data URI 和热词，以及原生 `parameters`。只支持同步，拒绝 `stream:true`；不注入 LLM 默认参数。转发保留音频原文、厂商响应及错误；记录副本在截断前移除音频正文。ASR 的模型目录需手填，管理员测试接受音频输入，项目自助申请返回对应 ASR 端点。详见 [ASR 接入约定](asr.md)。
+
+搜索和抓取是 DeepSeek 账号下与模型平级的服务，借用模型条目承载别名、项目授权和连接；请求不带 `model` 时按协议在项目授权中查找唯一模型。只启用这两个协议的模型不出现在 `/v1/models`，新建模型默认不勾选它们。详见 [DeepSeek 搜索与抓取接入](deepseek-search.md)。
 
 公开目录固定返回全网关的目录，携带项目凭证也不会按项目筛选；响应格式为 `{"object":"list","data":[{"id":"调用别名","object":"model","name":"显示名称","protocols":["chat","messages"]}]}`，按别名排序，空目录返回 `data: []`。协议取模型启用协议与连接已配置端点的交集，模型或连接停用、交集为空时不展示；无需项目授权、主密钥解锁或上游探测。这个目录表示配置的能力，不承诺上游实时可用，也不授予调用权限。无需认证不等于开放网络监听，其他设备仍需能够访问网关地址。
 

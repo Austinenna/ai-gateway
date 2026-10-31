@@ -261,6 +261,9 @@ func (g *Gateway) applicationEndpoints(protocol string) (string, string) {
 	if protocol == "messages" {
 		return g.origin, g.origin + "/v1/messages"
 	}
+	if isWebTool(protocol) {
+		return g.origin + "/v1", g.origin + "/v1" + webToolPath(protocol)
+	}
 	return g.origin + "/v1", g.origin + "/v1/chat/completions"
 }
 

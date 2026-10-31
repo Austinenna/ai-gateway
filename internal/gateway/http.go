@@ -213,6 +213,8 @@ func (g *Gateway) Handler(assets fs.FS) http.Handler {
 	mux.HandleFunc("POST /v1/chat/completions", g.observeCall(g.proxy))
 	mux.HandleFunc("POST /v1/messages", g.observeCall(g.proxy))
 	mux.HandleFunc("POST /v1/asr/transcriptions", g.observeCall(g.proxy))
+	mux.HandleFunc("POST /v1/tools/search", g.observeCall(g.proxy))
+	mux.HandleFunc("POST /v1/tools/fetch", g.observeCall(g.proxy))
 	mux.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {
 		problem(w, 404, "网关当前支持 Chat Completions、Messages、百炼 ASR 和模型列表")
 	})

@@ -33,7 +33,7 @@ func validateModelDefaults(defaults map[string]json.RawMessage) error {
 }
 
 func applyModelDefaults(body, defaults map[string]json.RawMessage, provider, protocol string) {
-	if protocol == "dashscope-asr" {
+	if protocol == "dashscope-asr" || isWebTool(protocol) {
 		return
 	}
 	for key, value := range defaults {

@@ -217,7 +217,8 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if m.Protocols == nil {
-		m.Protocols = endpointProtocols(endpoints)
+		// Search / fetch are separate services; a model only gets them when chosen explicitly.
+		m.Protocols = slices.DeleteFunc(endpointProtocols(endpoints), isWebTool)
 		if m.ID != "" {
 			var oldConnection, oldProtocols string
 			if g.db.QueryRow("SELECT connection_id,protocols_json FROM models WHERE id=?", m.ID).Scan(&oldConnection, &oldProtocols) == nil && oldConnection == m.ConnectionID {

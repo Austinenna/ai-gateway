@@ -76,7 +76,8 @@ func (g *Gateway) modelList(w http.ResponseWriter, r *http.Request) {
 		problem(w, 401, "项目凭证无效或项目已停用")
 		return
 	}
-	rows, e := g.db.Query(`SELECT m.alias,m.context_window FROM models m JOIN project_models pm ON pm.model_id=m.id JOIN connections c ON c.id=m.connection_id WHERE pm.project_id=? AND m.enabled=1 AND c.enabled=1 AND EXISTS(SELECT 1 FROM json_each(m.protocols_json) mp JOIN json_each(c.endpoints_json) ce ON ce.key=mp.value) ORDER BY m.alias`, p.ID)
+	// Entries serving only search / fetch are not models a client can chat with.
+	rows, e := g.db.Query(`SELECT m.alias,m.context_window FROM models m JOIN project_models pm ON pm.model_id=m.id JOIN connections c ON c.id=m.connection_id WHERE pm.project_id=? AND m.enabled=1 AND c.enabled=1 AND EXISTS(SELECT 1 FROM json_each(m.protocols_json) mp JOIN json_each(c.endpoints_json) ce ON ce.key=mp.value WHERE mp.value NOT IN ('deepseek-search','deepseek-fetch')) ORDER BY m.alias`, p.ID)
 	if e != nil {
 		problem(w, 500, "查询失败")
 		return
@@ -139,6 +140,8 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	limit := int64(maxLLMRequestBytes)
 	if protocol == "dashscope-asr" {
 		limit = maxASRRequestBytes
+	} else if isWebTool(protocol) {
+		limit = maxWebToolRequestBytes
 	}
 	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 	if e != nil {
@@ -151,7 +154,11 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var alias string
-	if json.Unmarshal(body["model"], &alias) != nil {
+	if _, exists := body["model"]; !exists && isWebTool(protocol) {
+		if alias, ok = g.webToolAlias(w, p.ID, protocol); !ok {
+			return
+		}
+	} else if json.Unmarshal(body["model"], &alias) != nil {
 		problem(w, 400, "缺少模型别名")
 		return
 	}
@@ -222,6 +229,10 @@ func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, body)
 		return
 	}
+	if isWebTool(c.Protocol) {
+		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, webToolTestBody(c.Protocol, in.Message))
+		return
+	}
 	if in.Message == "" {
 		in.Message = "请简短回复：连接成功。"
 	}
@@ -277,6 +288,11 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 			problem(w, 400, err.Error())
 			return
 		}
+	} else if isWebTool(c.Protocol) {
+		if err := validateWebToolRequest(body); err != nil {
+			problem(w, 400, err.Error())
+			return
+		}
 	}
 	key := g.key()
 	defer wipe(key)
@@ -317,7 +333,11 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	}()
 	applyModelDefaults(body, m.Defaults, c.Provider, c.Protocol)
 	rec.Adaptations = adaptProviderRequest(body, c.Provider, m.UpstreamModel, c.Protocol)
-	body["model"], _ = json.Marshal(m.UpstreamModel)
+	if isWebTool(c.Protocol) {
+		delete(body, "model") // DeepSeek Search / Fetch take no model field
+	} else {
+		body["model"], _ = json.Marshal(m.UpstreamModel)
+	}
 	var stream bool
 	if v, ok := body["stream"]; ok && json.Unmarshal(v, &stream) != nil {
 		rec.Status = 400
@@ -342,6 +362,8 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 		path = "/messages"
 	} else if c.Protocol == "dashscope-asr" {
 		path = "/services/aigc/multimodal-generation/generation"
+	} else if isWebTool(c.Protocol) {
+		path = webToolPath(c.Protocol)
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
