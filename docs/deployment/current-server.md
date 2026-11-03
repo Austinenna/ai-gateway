@@ -61,6 +61,27 @@ https://<SERVER_IPV4>/v1
 
 新增客户端或直连公网出口变化时，只在云端防火墙／安全组中维护相应来源，无需再修改 Nginx。Nginx 继续负责 HTTPS 和反向代理；后续部署应保留这一访问边界，不重新引入管理来源白名单。
 
+## 出站代理
+
+网关访问厂商的出站请求经本机 mihomo（规则模式）的 mixed-port `127.0.0.1:7890`，由 mihomo 规则决定直连或代理；OpenRouter 等境外厂商直连不可达。mihomo 以 `ubuntu` 用户级 systemd 服务 `mihomo.service` 运行，已开启 linger，开机自动启动；未启用 TUN。
+
+systemd 服务不会读取 shell 配置或 `/etc/environment` 中的代理变量，所以代理通过 drop-in `/etc/systemd/system/ai-gateway.service.d/proxy.conf` 传给网关：
+
+```ini
+[Service]
+Environment="HTTPS_PROXY=http://127.0.0.1:7890"
+Environment="HTTP_PROXY=http://127.0.0.1:7890"
+Environment="NO_PROXY=localhost,127.0.0.1,::1"
+```
+
+部署脚本只替换二进制，不覆盖该文件。修改后需 `sudo systemctl daemon-reload` 并重启 `ai-gateway.service`。mihomo 停止时，所有厂商请求都会失败。核对网关进程实际拿到的代理变量：
+
+```bash
+sudo cat /proc/$(systemctl show -p MainPID --value ai-gateway)/environ | tr '\0' '\n' | grep -i proxy
+```
+
+2026-11-03 新增该 drop-in：重启后服务 active、健康检查通过，进程环境包含上述变量；服务器经 7890 访问 OpenRouter 返回 200，直连超时。
+
 ## 当前网络边界
 
 - `8317`：不开放公网，只允许服务器本机访问

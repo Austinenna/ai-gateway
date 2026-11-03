@@ -18,6 +18,7 @@ ProtectSystem=full
 ProtectHome=true
 ReadWritePaths=/var/lib/ai-gateway
 LimitNOFILE=8192
+# Outbound proxy is set in ai-gateway.service.d/proxy.conf; see docs/deployment/current-server.md.
 
 [Install]
 WantedBy=multi-user.target
