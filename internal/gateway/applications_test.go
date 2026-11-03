@@ -216,7 +216,7 @@ func TestApplicationMigrationAndRestart(t *testing.T) {
 	h.want(h.request("GET", "/v1/models", nil, out.Token, false), 200)
 	var version int
 	_ = g.db.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 8 {
+	if version != 9 {
 		t.Fatal("migration version")
 	}
 }

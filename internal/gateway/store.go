@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -31,6 +32,8 @@ type Connection struct {
 	Enabled   bool              `json:"enabled"`
 	HasToken  bool              `json:"has_token"`
 	Token     string            `json:"token,omitempty"`
+	// UseProxy is a pointer so an older admin client that omits it keeps the saved value.
+	UseProxy *bool `json:"use_proxy,omitempty"`
 }
 type Model struct {
 	ID            string                     `json:"id"`
@@ -112,6 +115,7 @@ type Gateway struct {
 	writerDone        chan struct{}
 	dropped           atomic.Int64
 	client            HTTPDoer
+	outboundProxy     atomic.Pointer[url.URL]
 }
 
 func randomBytes(n int) []byte {
@@ -188,7 +192,7 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	if e = db.QueryRow("PRAGMA user_version").Scan(&v); e != nil {
 		return fail(e)
 	}
-	if v > 8 {
+	if v > 9 {
 		return fail(errors.New("database was created by a newer gateway"))
 	}
 	_, e = db.Exec(`
@@ -237,7 +241,15 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 			return fail(e)
 		}
 	}
+	if v < 9 {
+		if e = migrateConnectionProxy(db); e != nil {
+			return fail(e)
+		}
+	}
 	g := &Gateway{db: db, dataDir: dataDir, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient()}
+	if e = g.loadOutboundProxy(); e != nil {
+		return fail(e)
+	}
 	if e = g.initMetrics(); e != nil {
 		return fail(e)
 	}
@@ -341,7 +353,7 @@ func (g *Gateway) setup(password string) error {
 	return tx.Commit()
 }
 func (g *Gateway) connections() ([]Connection, error) {
-	rows, e := g.db.Query("SELECT id,name,provider,endpoints_json,enabled FROM connections ORDER BY rowid")
+	rows, e := g.db.Query("SELECT id,name,provider,endpoints_json,enabled,use_proxy FROM connections ORDER BY rowid")
 	if e != nil {
 		return nil, e
 	}
@@ -350,13 +362,15 @@ func (g *Gateway) connections() ([]Connection, error) {
 	for rows.Next() {
 		var c Connection
 		var endpoints string
-		if e = rows.Scan(&c.ID, &c.Name, &c.Provider, &endpoints, &c.Enabled); e != nil {
+		var useProxy bool
+		if e = rows.Scan(&c.ID, &c.Name, &c.Provider, &endpoints, &c.Enabled, &useProxy); e != nil {
 			return nil, e
 		}
 		if e = json.Unmarshal([]byte(endpoints), &c.Endpoints); e != nil {
 			return nil, e
 		}
 		c.HasToken = c.Provider != "demo"
+		c.UseProxy = &useProxy
 		out = append(out, c)
 	}
 	return out, rows.Err()

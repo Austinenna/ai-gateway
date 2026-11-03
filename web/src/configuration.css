@@ -303,3 +303,12 @@
 .application-banner{width:100%;justify-content:flex-start;white-space:normal;text-align:left;background:light-dark(#fff8e5,#302b20);border-color:light-dark(#ebd8a0,#655330);margin-bottom:20px;padding:14px 18px}
 .application-banner span{flex:1}.application-banner svg{flex:none}
 .projects-table .project-row-actions .primary{background:var(--accent);color:white;border-color:var(--accent)}
+.outbound-proxy{display:flex;align-items:center;justify-content:space-between;gap:16px 24px;flex-wrap:wrap;padding:16px 20px;margin-bottom:16px;border-radius:12px}
+.outbound-proxy h2{display:flex;align-items:center;gap:7px;font-size:14px;margin-bottom:4px}
+.outbound-proxy-text{flex:1 1 280px;min-width:0}
+.outbound-proxy-form{display:flex;gap:9px;flex:1 1 300px;max-width:420px}
+.outbound-proxy-form input{font-family:"SFMono-Regular",Consolas,monospace;font-size:13px}
+.connection-state-tags{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.connection-proxy{color:var(--accent);background:light-dark(#eef2fd,#1d2a44)}
+.proxy-check{margin-bottom:4px}
+.modal p.proxy-hint{margin:0 0 16px 25px;font-size:12px;line-height:1.6}

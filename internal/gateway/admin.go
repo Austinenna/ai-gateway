@@ -66,7 +66,7 @@ func (g *Gateway) state(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "读取申请失败")
 		return
 	}
-	writeJSON(w, 200, map[string]any{"applications": applications, "connections": cs, "models": ms, "projects": ps, "request_count": count, "dropped_records": g.dropped.Load(), "base_url": g.origin + "/v1"})
+	writeJSON(w, 200, map[string]any{"applications": applications, "connections": cs, "models": ms, "projects": ps, "request_count": count, "dropped_records": g.dropped.Load(), "base_url": g.origin + "/v1", "outbound_proxy": g.outboundProxyURL()})
 }
 func (g *Gateway) saveConnection(w http.ResponseWriter, r *http.Request) {
 	var c Connection
@@ -102,8 +102,9 @@ func (g *Gateway) saveConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	var encrypted []byte
 	var oldEndpoints, oldProvider string
+	var useProxy bool
 	if !creating {
-		if e := g.db.QueryRow("SELECT credential,endpoints_json,provider FROM connections WHERE id=?", c.ID).Scan(&encrypted, &oldEndpoints, &oldProvider); e != nil {
+		if e := g.db.QueryRow("SELECT credential,endpoints_json,provider,use_proxy FROM connections WHERE id=?", c.ID).Scan(&encrypted, &oldEndpoints, &oldProvider, &useProxy); e != nil {
 			problem(w, 404, "连接不存在")
 			return
 		}
@@ -130,13 +131,17 @@ func (g *Gateway) saveConnection(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "请填写厂商 Token")
 		return
 	}
+	if c.UseProxy != nil {
+		useProxy = *c.UseProxy && c.Provider != "demo"
+	}
+	c.UseProxy = &useProxy
 	var result sql.Result
 	var e error
 	endpoints, _ := json.Marshal(c.Endpoints)
 	if creating {
-		result, e = g.db.Exec(`INSERT INTO connections(id,name,provider,protocol,base_url,credential,enabled,endpoints_json) VALUES(?,?,?,'','',?,?,?)`, c.ID, c.Name, c.Provider, encrypted, c.Enabled, string(endpoints))
+		result, e = g.db.Exec(`INSERT INTO connections(id,name,provider,protocol,base_url,credential,enabled,endpoints_json,use_proxy) VALUES(?,?,?,'','',?,?,?,?)`, c.ID, c.Name, c.Provider, encrypted, c.Enabled, string(endpoints), useProxy)
 	} else {
-		result, e = g.db.Exec(`UPDATE connections SET name=?,provider=?,protocol='',base_url='',credential=?,enabled=?,endpoints_json=? WHERE id=?`, c.Name, c.Provider, encrypted, c.Enabled, string(endpoints), c.ID)
+		result, e = g.db.Exec(`UPDATE connections SET name=?,provider=?,protocol='',base_url='',credential=?,enabled=?,endpoints_json=?,use_proxy=? WHERE id=?`, c.Name, c.Provider, encrypted, c.Enabled, string(endpoints), useProxy, c.ID)
 	}
 	if e != nil {
 		problem(w, 500, "连接保存失败")

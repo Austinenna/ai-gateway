@@ -40,8 +40,9 @@ func (g *Gateway) discoverModels(w http.ResponseWriter, r *http.Request) {
 	var c Connection
 	var endpoints string
 	var encrypted []byte
+	var useProxy bool
 	c.ID = r.PathValue("id")
-	if g.db.QueryRow("SELECT provider,endpoints_json,enabled,credential FROM connections WHERE id=?", c.ID).Scan(&c.Provider, &endpoints, &c.Enabled, &encrypted) != nil {
+	if g.db.QueryRow("SELECT provider,endpoints_json,enabled,use_proxy,credential FROM connections WHERE id=?", c.ID).Scan(&c.Provider, &endpoints, &c.Enabled, &useProxy, &encrypted) != nil {
 		problem(w, 404, "连接不存在")
 		return
 	}
@@ -83,6 +84,7 @@ func (g *Gateway) discoverModels(w http.ResponseWriter, r *http.Request) {
 	defer wipe(token)
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+	ctx = g.withUpstreamProxy(ctx, useProxy)
 	catalog, err := g.fetchModelCatalog(ctx, c.Endpoints[in.Protocol], in.Protocol, string(token))
 	if err != nil {
 		problem(w, 502, err.Error())

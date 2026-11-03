@@ -1,7 +1,7 @@
 import { Eye, KeyRound, Pencil, Trash2 } from 'lucide-react';
 import { connectionProtocols, protocolName } from './connection-protocols';
 
-type ConnectionInfo = { id: string; name: string; provider: string; endpoints: Record<string, string>; enabled: boolean; has_token?: boolean };
+type ConnectionInfo = { id: string; name: string; provider: string; endpoints: Record<string, string>; enabled: boolean; has_token?: boolean; use_proxy?: boolean };
 const providerName = (provider: string) => ({ zhipu: '智谱', minimax: 'MiniMax', deepseek: 'DeepSeek', dashscope: '阿里云百炼', custom: '自定义', demo: '本地演示' }[provider] || provider);
 
 export function ConnectionList<T extends ConnectionInfo>({ connections, onEdit, onReveal, onDelete }: {
@@ -21,7 +21,7 @@ export function ConnectionList<T extends ConnectionInfo>({ connections, onEdit, 
           <span><KeyRound size={14}/>{c.provider === 'demo' ? '无需 Token' : c.has_token ? '已配置' : '未配置'}</span>
           {c.provider !== 'demo' && <button className="link" onClick={() => onReveal(c)}><Eye size={14}/>解锁查看</button>}
         </div></td>
-        <td className="connection-state"><span className={'model-state ' + (c.enabled ? 'is-enabled' : '')}>{c.enabled ? '已启用' : '已停用'}</span></td>
+        <td className="connection-state"><div className="connection-state-tags"><span className={'model-state ' + (c.enabled ? 'is-enabled' : '')}>{c.enabled ? '已启用' : '已停用'}</span>{c.use_proxy && <span className="model-state connection-proxy" title="经出站代理访问">走代理</span>}</div></td>
         <td className="connection-operations"><div className="connection-actions">
           <button onClick={() => onEdit(c)}><Pencil size={15}/>编辑</button>
           <button className="danger" onClick={() => onDelete(c)}><Trash2 size={15}/>删除</button>
