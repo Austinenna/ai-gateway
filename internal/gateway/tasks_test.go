@@ -330,3 +330,24 @@ func TestTaskQueryPresentationKeepsOriginalRecords(t *testing.T) {
 		t.Fatal("query summary was lost with missing body")
 	}
 }
+
+// X-Gateway-Task-ID calls have no WorkBuddy agent type; the detail must still show their query.
+func TestHeaderTaskDetailShowsQuery(t *testing.T) {
+	h := newHarness(t)
+	input, _ := json.Marshal(map[string]any{"messages": []any{
+		map[string]any{"role": "system", "content": "提取记忆"},
+		map[string]any{"role": "user", "content": "【本轮】\n用户：你好"},
+	}})
+	rec := Record{ID: "header-task", ProjectID: "p", Started: 1, State: "complete", Input: string(input)}
+	headers := http.Header{}
+	headers.Set("X-Gateway-Category", "memory")
+	headers.Set("X-Gateway-Task-ID", "task-1")
+	if err := captureUsageTags(&rec, headers); err != nil {
+		t.Fatal(err)
+	}
+	rec.Question, rec.QuestionVersion = questionExcerpt(rec.Input), 1
+	task, question, err := h.g.presentTask([]Record{rec}, true)
+	if err != nil || question != "【本轮】\n用户：你好" || task.Title != question || task.QuestionRecordID != rec.ID || task.Category != "memory" {
+		t.Fatalf("header task lost its query: %+v %q %v", task, question, err)
+	}
+}

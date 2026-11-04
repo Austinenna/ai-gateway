@@ -282,6 +282,7 @@ type RequestTask struct {
 	QuestionRecordID string             `json:"question_record_id,omitempty"`
 	ReplyRecordID    string             `json:"reply_record_id,omitempty"`
 	Grouping         *WorkBuddyGrouping `json:"grouping,omitempty"`
+	Category         string             `json:"category,omitempty"`
 	Models           []string           `json:"models"`
 	Providers        []string           `json:"providers"`
 	Cost             *CostTotals        `json:"cost,omitempty"`
@@ -419,6 +420,9 @@ func summarizeTask(records []Record) RequestTask {
 				task.OutputTokens += r.OutputTokens
 			}
 		}
+		if task.Category == "" {
+			task.Category = r.Category
+		}
 		if r.Alias != "" && !models[r.Alias] {
 			task.Models = append(task.Models, r.Alias)
 			models[r.Alias] = true
@@ -465,7 +469,8 @@ func summarizeTask(records []Record) RequestTask {
 func (g *Gateway) presentTask(records []Record, fullQuestion bool) (RequestTask, string, error) {
 	task := summarizeTask(records)
 	for _, rec := range records {
-		if task.Grouped && (rec.Grouping == nil || rec.Grouping.AgentType != "main") {
+		// Same rule as summarizeTask: X-Gateway-Task-ID calls carry no agent type.
+		if task.Grouped && rec.Grouping != nil && rec.Grouping.AgentType != "main" {
 			continue
 		}
 		question := rec.Question

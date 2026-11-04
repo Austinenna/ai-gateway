@@ -9,7 +9,7 @@ export type RequestTask = {
   id: string; project_id: string; project_name: string; grouped: boolean; title: string; state: string;
   started: number; updated: number; duration_ms: number; calls: number; active: number; failed: number;
   missing_records: number; input_tokens: number; output_tokens: number; input_samples: number; output_samples: number;
-  question_record_id?: string; reply_record_id?: string; grouping?: WorkBuddyGrouping;
+  question_record_id?: string; reply_record_id?: string; grouping?: WorkBuddyGrouping; category?: string;
   models: string[]; providers: string[]; cost?: CostTotals;
 };
 export type TaskDetail = { task: RequestTask; question: string; calls: RequestRecord[]; total: number; offset: number; has_more: boolean };
