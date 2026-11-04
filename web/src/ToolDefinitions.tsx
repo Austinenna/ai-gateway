@@ -13,10 +13,17 @@ function toolName(tool: unknown, index: number): string {
 
 export function ToolDefinitions({ content }: { content: unknown }) {
   const tools = Array.isArray(content) ? content : [content];
-  return <div className="tool-definitions">
-    {tools.map((tool, index) => <details className="tool-definition" key={index}>
-      <summary><ChevronRight size={14} aria-hidden="true"/><code>{toolName(tool, index)}</code></summary>
-      <pre>{readable(tool)}</pre>
-    </details>)}
-  </div>;
+  return (
+    <div className="tool-definitions">
+      {tools.map((tool, index) => (
+        <details className="tool-definition" key={index}>
+          <summary>
+            <ChevronRight size={14} aria-hidden="true" />
+            <code>{toolName(tool, index)}</code>
+          </summary>
+          <pre>{readable(tool)}</pre>
+        </details>
+      ))}
+    </div>
+  );
 }

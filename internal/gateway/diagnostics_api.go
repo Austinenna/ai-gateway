@@ -234,7 +234,9 @@ func (g *Gateway) diagnostics(w http.ResponseWriter, r *http.Request) {
 		key := diagnosticGroupKey(rec)
 		group := groups[key]
 		if group == nil {
-			group = &diagnosticGroupView{Code: d.Code, Message: d.Message, Phase: d.Phase, Source: d.Source, Status: rec.Status, ErrorType: rec.ErrorType, UpstreamStatus: rec.UpstreamStatus, FirstStarted: rec.Started, LastStarted: rec.Started, Retryable: d.Retryable, UpstreamContacted: d.UpstreamContacted, RecommendedAction: d.RecommendedAction, ExampleID: rec.ID}
+			group = &diagnosticGroupView{Code: d.Code, Message: d.Message, Phase: d.Phase, Source: d.Source, Status: rec.Status, ErrorType: rec.ErrorType, UpstreamStatus: rec.UpstreamStatus, FirstStarted: rec.Started, LastStarted: rec.Started, Retryable: d.Retryable, UpstreamContacted: d.UpstreamContacted, RecommendedAction: d.RecommendedAction, ExampleID: rec.ID,
+				// Calls rejected before routing have no model or provider; keep arrays non-null.
+				Models: []string{}, Providers: []string{}, Protocols: []string{}, Projects: []string{}}
 			groups[key] = group
 		}
 		group.Count++

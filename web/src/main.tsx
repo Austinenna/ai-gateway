@@ -1,6 +1,33 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, AlertTriangle, ArrowRight, Check, ChevronRight, Copy, Eye, FlaskConical, KeyRound, Layers3, LayoutDashboard, LockKeyhole, MessagesSquare, Wallet, Network, Plug, Plus, RefreshCw, Search, Send, ShieldCheck, Terminal, Trash2, Waypoints, X } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  ChevronRight,
+  Copy,
+  Database,
+  Eye,
+  FlaskConical,
+  KeyRound,
+  Layers3,
+  LayoutDashboard,
+  LockKeyhole,
+  MessagesSquare,
+  Wallet,
+  Network,
+  Plug,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  ShieldCheck,
+  Terminal,
+  Trash2,
+  Waypoints,
+  X,
+} from 'lucide-react';
 import { responseText, readable, messageList } from './protocol.mjs';
 import { projectCredentialInput, createCredentialMemory } from './credentials.mjs';
 import { ProjectAccessContent } from './ProjectAccessContent';
@@ -36,6 +63,7 @@ import './diagnostics.css';
 import './inspector.css';
 import './workspace.css';
 import './cost.css';
+import './theme.css';
 import { MonitorOverview } from './MonitorOverview';
 import { CostPage } from './CostPage';
 import { ModelPriceFields } from './ModelPriceFields';
@@ -44,203 +72,2380 @@ import { DiagnosticsPage } from './DiagnosticsPage';
 import { ChatPage } from './ChatPage';
 import { RequestHeader, RequestTiming } from './RequestMetrics';
 import { type RequestRecord, recordStatus } from './monitoring';
+import { StatusBar } from './StatusBar';
+import { SystemPage } from './SystemPage';
+import { Attempts } from './Attempts';
+import { HealthBlocks } from './ConnectionHealthView';
+import { healthLabel, type ConnectionHealth, type Runtime } from './health';
 
-type Conn={id:string;name:string;provider:string;endpoints:Record<string,string>;enabled:boolean;has_token?:boolean;token?:string;use_proxy?:boolean};
-type Model={id:string;name:string;alias:string;connection_id:string;protocols:string[];upstream_model:string;context_window?:number;defaults:ModelDefaults;enabled:boolean;prices?:ModelPrice[]};
-type Project={id:string;name:string;enabled:boolean;token_prefix:string;has_saved_token?:boolean;model_ids:string[];monthly_budget?:number|null};
-type State={applications?:ProjectApplication[];connections:Conn[];models:Model[];projects:Project[];request_count:number;dropped_records:number;base_url:string;outbound_proxy?:string};
-type Status={passwordless_enabled?:boolean;passwordless_ready?:boolean;configured:boolean;authenticated:boolean;locked:boolean;base_url:string};
-type DeleteTarget={kind:'connections'|'models'|'projects';id:string;name:string};
-const deleteLabels={connections:'连接',models:'模型',projects:'项目'};
-type Page='overview'|'chat'|'tasks'|'requests'|'diagnostics'|'costs'|'connections'|'models'|'projects';
-const initial:State={connections:[],models:[],projects:[],request_count:0,dropped_records:0,base_url:''};
-const labels:Record<Page,string>={overview:'概览',chat:'对话调试',tasks:'任务记录',requests:'请求记录',diagnostics:'异常与诊断',costs:'成本统计',connections:'厂商连接',models:'模型配置',projects:'项目权限'};
-const icons={overview:LayoutDashboard,chat:MessagesSquare,tasks:Layers3,requests:Activity,diagnostics:AlertTriangle,costs:Wallet,connections:Plug,models:Network,projects:ShieldCheck};
-const initialPage=(()=>{const value=new URLSearchParams(location.search).get('view') as Page|null;return value&&value in labels?value:'overview'})();
-const time=(v:number)=>new Date(v).toLocaleTimeString('zh-CN',{hour12:false});
-async function api(path:string,method='GET',body?:unknown) {
- const res=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json','X-Gateway-Admin':'1'},credentials:'same-origin',...(body!==undefined?{body:JSON.stringify(body)}:{})});
- const value=await res.json();if(!res.ok)throw new Error(value.error?.message||value.message||'请求失败');return value;
+type Conn = {
+  id: string;
+  name: string;
+  provider: string;
+  endpoints: Record<string, string>;
+  enabled: boolean;
+  has_token?: boolean;
+  token?: string;
+  use_proxy?: boolean;
+};
+type Model = {
+  id: string;
+  name: string;
+  alias: string;
+  connection_id: string;
+  protocols: string[];
+  upstream_model: string;
+  context_window?: number;
+  defaults: ModelDefaults;
+  enabled: boolean;
+  prices?: ModelPrice[];
+  fallback_model_id?: string;
+};
+type Project = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  token_prefix: string;
+  has_saved_token?: boolean;
+  model_ids: string[];
+  monthly_budget?: number | null;
+  rate_rpm?: number | null;
+  rate_burst?: number | null;
+  max_concurrent?: number | null;
+};
+type State = {
+  applications?: ProjectApplication[];
+  connections: Conn[];
+  models: Model[];
+  projects: Project[];
+  request_count: number;
+  dropped_records: number;
+  base_url: string;
+  outbound_proxy?: string;
+};
+type Status = {
+  passwordless_enabled?: boolean;
+  passwordless_ready?: boolean;
+  configured: boolean;
+  authenticated: boolean;
+  locked: boolean;
+  base_url: string;
+};
+type DeleteTarget = { kind: 'connections' | 'models' | 'projects'; id: string; name: string };
+const deleteLabels = { connections: '连接', models: '模型', projects: '项目' };
+type Page = 'overview' | 'chat' | 'tasks' | 'requests' | 'diagnostics' | 'costs' | 'connections' | 'models' | 'projects' | 'system';
+const initial: State = { connections: [], models: [], projects: [], request_count: 0, dropped_records: 0, base_url: '' };
+const labels: Record<Page, string> = {
+  overview: '概览',
+  chat: '对话调试',
+  tasks: '任务记录',
+  requests: '请求记录',
+  diagnostics: '异常与诊断',
+  costs: '成本统计',
+  connections: '厂商连接',
+  models: '模型配置',
+  projects: '项目权限',
+  system: '数据与系统',
+};
+// The rail groups pages by what the operator is doing.
+const navGroups: [string, Page[]][] = [
+  ['观测', ['overview', 'requests', 'tasks', 'diagnostics', 'costs']],
+  ['配置', ['connections', 'models', 'projects']],
+  ['工具', ['chat']],
+  ['系统', ['system']],
+];
+const navNumber = Object.fromEntries(navGroups.flatMap(([, pages]) => pages).map((p, i) => [p, String(i + 1).padStart(2, '0')])) as Record<
+  Page,
+  string
+>;
+const icons = {
+  overview: LayoutDashboard,
+  chat: MessagesSquare,
+  tasks: Layers3,
+  requests: Activity,
+  diagnostics: AlertTriangle,
+  costs: Wallet,
+  connections: Plug,
+  models: Network,
+  projects: ShieldCheck,
+  system: Database,
+};
+const initialPage = (() => {
+  const value = new URLSearchParams(location.search).get('view') as Page | null;
+  return value && value in labels ? value : 'overview';
+})();
+const time = (v: number) => new Date(v).toLocaleTimeString('zh-CN', { hour12: false });
+async function api(path: string, method = 'GET', body?: unknown) {
+  const res = await fetch('/api' + path, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'X-Gateway-Admin': '1' },
+    credentials: 'same-origin',
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  const value = await res.json();
+  if (!res.ok) throw new Error(value.error?.message || value.message || '请求失败');
+  return value;
 }
-function Empty({title,text,action}:{title:string;text:string;action?:React.ReactNode}){return <div className="empty"><Waypoints size={28}/><h3>{title}</h3><p>{text}</p>{action}</div>}
-function Badge({on,children}:{on:boolean;children:React.ReactNode}){return <span className={'badge '+(on?'good':'muted-badge')}><span className="dot"/>{children}</span>}
-function Field({label,hint,children}:{label:string;hint?:string;children:React.ReactNode}){return <label className="field"><span>{label}</span>{children}{hint&&<small>{hint}</small>}</label>}
-function Modal({title,onClose,children,className=''}:{title:string;onClose:()=>void;children:React.ReactNode;className?:string}){const ref=useRef<HTMLDialogElement>(null);useEffect(()=>{ref.current?.showModal();ref.current?.querySelector<HTMLElement>('[data-initial-focus]')?.focus();return()=>ref.current?.close()},[]);return <dialog ref={ref} onCancel={e=>{e.preventDefault();onClose()}} className={'modal '+className}><div className="modal-head"><h2>{title}</h2><button className="icon-btn" onClick={onClose} aria-label="关闭"><X size={19}/></button></div>{children}</dialog>}
-function App(){
- const sidebar=useSidebarState();
- const[tasks,setTasks]=useState<RequestTask[]>([]);
- const[status,setStatus]=useState<Status|null>(null),[state,setState]=useState(initial),[page,setPage]=useState<Page>(initialPage),[records,setRecords]=useState<RequestRecord[]>([]),[selected,setSelected]=useState<RequestRecord|null>(null),[tab,setTab]=useState('messages');
- const taskView=page==='tasks', recordsPage=taskView||page==='requests';
- const[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[password,setPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');
- const[search,setSearch]=useState(''),[filter,setFilter]=useState('all'),[projectFilter,setProjectFilter]=useState('all'),[modelFilter,setModelFilter]=useState('all'),[providerFilter,setProviderFilter]=useState('all');
- const[conn,setConn]=useState<Conn|null>(null),[model,setModel]=useState<Model|null>(null),[project,setProject]=useState<Project|null>(null),[config,setConfig]=useState<Project|null>(null);
- const[freshKey,setFreshKey]=useState<{token:string;project:Project}|null>(null),[reveal,setReveal]=useState<Conn|null>(null),[revealed,setRevealed]=useState(''),[revealPassword,setRevealPassword]=useState('');
- const[testAudio,setTestAudio]=useState<AsrAudio|null>(null),[callAudio,setCallAudio]=useState<AsrAudio|null>(null),[testHotwords,setTestHotwords]=useState(''),[callHotwords,setCallHotwords]=useState('');
- const[testVoice,setTestVoice]=useState(DEFAULT_TTS_VOICE),[callVoice,setCallVoice]=useState(DEFAULT_TTS_VOICE),[testSpeech,setTestSpeech]=useState(''),[callSpeech,setCallSpeech]=useState('');
- const[testModel,setTestModel]=useState<Model|null>(null),[testResult,setTestResult]=useState(''),[testProtocol,setTestProtocol]=useState('chat'),[callProtocol,setCallProtocol]=useState('chat');
- const[tester,setTester]=useState(false),[callToken,setCallToken]=useState(''),[callAlias,setCallAlias]=useState(''),[prompt,setPrompt]=useState('你好，请简短介绍自己。'),[callOutput,setCallOutput]=useState(''),[calling,setCalling]=useState(false);const abort=useRef<AbortController|null>(null);
- const credentialMemory=useRef(createCredentialMemory());
- const workspace=useRef<HTMLDivElement>(null);
- const[credentialError,setCredentialError]=useState(''),[callProjectId,setCallProjectId]=useState('');
- const[credentialGuide,setCredentialGuide]=useState(false),[guideProjectId,setGuideProjectId]=useState('');
- const[deleteTarget,setDeleteTarget]=useState<DeleteTarget|null>(null),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');
- const refreshStatus=()=>api('/status').then(setStatus);
- async function load(){const[s,rs,ts]=await Promise.all([api('/admin/state'),api('/admin/requests'),api('/admin/request-tasks')]);setState(s);setRecords(rs);setTasks(Array.isArray(ts.tasks)?ts.tasks:[])}
- useEffect(()=>{refreshStatus().catch(e=>setError(e.message))},[]);
- useEffect(()=>{if(!status?.authenticated)return;load().catch(e=>setError(e.message));const timer=setInterval(()=>{if(document.visibilityState==='visible')load().catch(()=>refreshStatus().catch(()=>{}))},5000);return()=>clearInterval(timer)},[status?.authenticated]);
- useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(''),4500);return()=>clearTimeout(t)},[notice]);
- useEffect(()=>{if(!revealed)return;const t=setTimeout(()=>{setRevealed('');setReveal(null)},20000);return()=>clearTimeout(t)},[revealed]);
- useEffect(()=>()=>abort.current?.abort(),[]);
- useEffect(()=>{if(!selected?.id||(!selected.record_missing&&selected.state!=='running'))return;let disposed=false;const timer=setInterval(()=>{if(document.visibilityState==='visible')api('/admin/requests/'+selected.id).then(value=>{if(!disposed)setSelected(value)}).catch(()=>{})},5000);return()=>{disposed=true;clearInterval(timer)}},[selected?.id,selected?.state,selected?.record_missing]);
- useEffect(()=>{if(status&&!status.authenticated){credentialMemory.current.clear();abort.current?.abort();setCallToken('');setCallProjectId('');setCredentialError('');setFreshKey(null);setConfig(null);setCredentialGuide(false);setDeleteTarget(null)}},[status?.authenticated]);
- useEffect(()=>{if(freshKey)credentialMemory.current.remember(freshKey.project.id,freshKey.token)},[freshKey]);
- useEffect(()=>{workspace.current?.scrollTo({top:0,behavior:'instant'})},[page,status?.authenticated]);
- useEffect(()=>{workspace.current?.querySelector('.request-detail')?.scrollTo({top:0,behavior:'instant'})},[selected?.id,tab,page]);
- useEffect(()=>{workspace.current?.querySelector('.request-items')?.scrollTo({top:0,behavior:'instant'})},[search,filter,projectFilter,modelFilter,providerFilter]);
- async function run(action:()=>Promise<void>){setError('');setBusy(true);try{await action()}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
- async function copy(value:string){try{await navigator.clipboard.writeText(value);setNotice('已复制')}catch{setError('复制失败，请手动选择文本复制')}}
- async function authenticate(e:React.FormEvent){e.preventDefault();if(!status?.configured&&password!==confirmPassword){setError('两次输入的密码不一致');return};await run(async()=>{await api(status?.configured?'/login':'/setup','POST',{password});setPassword('');setConfirmPassword('');await refreshStatus()})}
- function navigate(p:Page){setPage(p);setError('')}
- function newConn(){setError('');setConn({id:'',name:'',provider:'zhipu',endpoints:{chat:templateEndpoint('zhipu','chat')},enabled:true,token:''})}
- function changeProvider(provider:string){setConn(current=>{
-  if(!current)return current;
-  const entries=Object.entries(current.endpoints).filter(([protocol])=>provider==='custom'||!!templateEndpoint(provider,protocol));
-  const endpoints=provider==='dashscope'?{'dashscope-asr':templateEndpoint(provider,'dashscope-asr')}:provider!=='custom'&&!entries.length?{chat:templateEndpoint(provider,'chat')}:Object.fromEntries(entries.map(([protocol,url])=>[protocol,provider==='custom'?(url.trim().replace(/\/+$/,'')===templateEndpoint(current.provider,protocol)?'':url):templateEndpoint(provider,protocol)]));
-  return {...current,provider,endpoints};
- })}
- function newModel(){const c=state.connections[0];setError('');setModel({id:'',name:'',alias:'',connection_id:c?.id||'',protocols:defaultModelProtocols(c),upstream_model:'',defaults:{},enabled:true})}
- function protocolsFor(m?:Model){return modelProtocols(m,state.connections.find(c=>c.id===m?.connection_id))}
- function openModelTest(m:Model){setTestModel(m);setTestProtocol(protocolsFor(m)[0]||'');setTestResult('');setTestAudio(null);setTestHotwords('')}
- function newProject(){setError('');setProject({id:'',name:'',enabled:true,token_prefix:'',model_ids:[]})}
- function askDelete(kind:DeleteTarget['kind'],item:{id:string;name:string}){
-  const saved=state[kind].find(x=>x.id===item.id);
-  setDeleteTarget({kind,id:item.id,name:saved?.name||item.name});setDeleteError('');setError('');
- }
- async function confirmDelete(){
-  if(!deleteTarget||deleting)return;
-  const target=deleteTarget;setDeleting(true);setDeleteError('');
-  try{
-   await api('/admin/'+target.kind+'/'+target.id+(target.kind==='connections'?'?cascade=true':''),'DELETE',target.kind==='connections'?{model_ids:state.models.filter(m=>m.connection_id===target.id).map(m=>m.id)}:undefined);
-   if(target.kind==='projects'){
-    const token=credentialMemory.current.get(target.id);credentialMemory.current.forget(target.id);
-    if(callProjectId===target.id||(token&&callToken.trim()===token)){setCallToken('');setCallProjectId('');setCredentialError('项目已删除，请选择其他项目。')}
-    if(project?.id===target.id)setProject(null);if(config?.id===target.id)setConfig(null);if(freshKey?.project.id===target.id)setFreshKey(null);
-   }else if(target.kind==='models'){
-    if(state.models.find(m=>m.id===target.id)?.alias===callAlias)setCallAlias('');
-    if(model?.id===target.id)setModel(null);if(testModel?.id===target.id){setTestModel(null);setTestResult('');setTestAudio(null);setTestHotwords('')}
-   }else{
-    const removed=state.models.filter(m=>m.connection_id===target.id);if(removed.some(m=>m.alias===callAlias))setCallAlias('');if(removed.some(m=>m.id===model?.id))setModel(null);if(removed.some(m=>m.id===testModel?.id)){setTestModel(null);setTestResult('');setTestAudio(null);setTestHotwords('')}
-    if(conn?.id===target.id)setConn(null);if(reveal?.id===target.id){setReveal(null);setRevealed('')}
-   }
-   setDeleteTarget(null);setNotice(deleteLabels[target.kind]+'「'+target.name+'」已删除');
-   await load().catch(()=>setError('已删除，但列表刷新失败，请刷新页面。'));
-  }catch(e){setDeleteError((e as Error).message)}finally{setDeleting(false)}
- }
- async function deleteLinkedModel(id:string){
-  if(deleting)return false;setDeleting(true);setDeleteError('');
-  try{
-   await api('/admin/models/'+id,'DELETE');
-   if(state.models.find(m=>m.id===id)?.alias===callAlias)setCallAlias('');
-   setState(prev=>({...prev,models:prev.models.filter(m=>m.id!==id),projects:prev.projects.map(p=>({...p,model_ids:p.model_ids.filter(mid=>mid!==id)}))}));
-   await load().catch(()=>setDeleteError('模型已删除，但列表刷新失败。请刷新列表后继续。'));return true;
-  }catch(e){setDeleteError((e as Error).message);return false}finally{setDeleting(false)}
- }
- async function refreshDeleteModels(){if(deleting)return;setDeleting(true);setDeleteError('');try{await load()}catch(e){setDeleteError((e as Error).message)}finally{setDeleting(false)}}
- function fillProjectCredential(p:Project,token:string){
-  credentialMemory.current.remember(p.id,token);setCallToken(token);setCallProjectId(p.id);setCredentialError('');setError('');setCallOutput('');
-  const allowed=state.models.filter(m=>p.model_ids.includes(m.id)&&m.enabled&&state.connections.some(c=>c.id===m.connection_id&&c.enabled));
-  setCallAlias(allowed.find(m=>m.alias===callAlias)?.alias||allowed[0]?.alias||'');setTester(true);setPage(taskView?'tasks':'requests');setCredentialGuide(false);
- }
- function showCredentialGuide(p?:Project){
-  const target=p||state.projects.find(x=>x.id===callProjectId)||state.projects.find(x=>x.enabled&&x.model_ids.some(mid=>state.models.some(m=>m.id===mid&&m.alias===callAlias)))||state.projects.find(x=>x.enabled)||state.projects[0];
-  setGuideProjectId(target?.id||'');setCredentialGuide(true);setError('');
- }
- function openTester(p?:Project){
-  if(p){const token=credentialMemory.current.get(p.id);if(p.enabled&&token)fillProjectCredential(p,token);else showCredentialGuide(p);return}
-  setTester(true);setError('');
-  if(!callToken){const known=state.projects.find(x=>x.enabled&&credentialMemory.current.get(x.id));if(known)fillProjectCredential(known,credentialMemory.current.get(known.id))}
- }
- function closeTester(){abort.current?.abort();setTester(false);setCallToken('');setCallProjectId('');setCallOutput('');setCredentialError('');setCallAudio(null);setCallHotwords('');setCallSpeech('')}
- async function demo(){await run(async()=>{const result=await api('/admin/demo','POST',{});credentialMemory.current.remember(result.project_id,result.token);setCallToken(result.token);setCallProjectId(result.project_id);setCallAlias(result.alias);setCredentialError('');setTester(true);setPage('requests');await load();setNotice('演示凭证已自动填入，可以直接发送请求。')})}
- async function selectRecord(id:string){await run(async()=>{setSelected(await api('/admin/requests/'+id));setTab('messages')})}
- async function call(e:React.FormEvent){e.preventDefault();setCallOutput('');setCallSpeech('');setError('');const checked=projectCredentialInput(callToken);setCredentialError(checked.error);if(checked.error)return;setCallToken(checked.token);setCalling(true);abort.current=new AbortController();try{
-  const m=state.models.find(x=>x.alias===callAlias),available=protocolsFor(m);const protocol=available.includes(callProtocol)?callProtocol:available[0];if(!protocol)throw new Error('此模型没有可用协议，请检查连接端点与模型配置');const isAsr=protocol==='dashscope-asr',isTts=protocol==='dashscope-tts',isWeb=isWebTool(protocol);const body=isAsr?asrRequest(callAlias,callAudio,callHotwords):isTts?ttsRequest(callAlias,prompt,callVoice):isWeb?{model:callAlias,...webToolRequest(protocol,prompt)}:{model:callAlias,messages:[{role:'user',content:prompt}],max_tokens:256,stream:true};const res=await fetch(isAsr?'/v1/asr/transcriptions':isTts?'/v1/tts/speech':isWeb?'/v1'+webToolPath(protocol):protocol==='messages'?'/v1/messages':'/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+checked.token},body:JSON.stringify(body),signal:abort.current.signal});
-  if(!res.ok){const data=await res.json();if(res.status===401){credentialMemory.current.forgetToken(checked.token);setCredentialError('这份项目凭证已失效、填写有误，或项目已停用。点击「选择项目并填入」检查项目状态；找不到完整凭证时可重置。');return}throw new Error(data.error?.message||data.message||'调用失败')};if(!res.body)throw new Error('响应为空');const reader=res.body.getReader(),decoder=new TextDecoder();let raw='';while(true){const part=await reader.read();if(part.done)break;raw+=decoder.decode(part.value,{stream:true});setCallOutput(responseText(raw))}raw+=decoder.decode();if(isTts){let out=null;try{out=JSON.parse(raw)}catch{}setCallSpeech(ttsAudioSource(out));setCallOutput(ttsSummary(out)||'合成已结束，未返回音频，详情见请求记录。');setNotice('调用已结束，请求记录正在保存');setTimeout(()=>load().catch(()=>{}),250);return}setCallOutput((isWeb?webToolText(raw):responseText(raw))||(isAsr?'转写已结束，未识别到文字。':'请求已结束，完整事件请查看请求记录。'));setNotice('调用已结束，请求记录正在保存');setTimeout(()=>load().catch(()=>{}),250)
- }catch(e){if((e as Error).name==='AbortError')setNotice('已取消调用');else setError((e as Error).message)}finally{setCalling(false);abort.current=null}}
- const visible=records.filter(r=>(projectFilter==='all'||r.project_id===projectFilter)&&(modelFilter==='all'||recordModelValue(r)===modelFilter)&&(providerFilter==='all'||recordProviderValue(r)===providerFilter)&&(filter==='all'||(filter==='success'?r.state==='complete':r.state!=='complete'))&&`${r.project_name} ${r.alias} ${r.id}`.toLowerCase().includes(search.toLowerCase()));
+function Empty({ title, text, action }: { title: string; text: string; action?: React.ReactNode }) {
+  return (
+    <div className="empty">
+      <Waypoints size={28} />
+      <h3>{title}</h3>
+      <p>{text}</p>
+      {action}
+    </div>
+  );
+}
+function Badge({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return (
+    <span className={'badge ' + (on ? 'good' : 'muted-badge')}>
+      <span className="dot" />
+      {children}
+    </span>
+  );
+}
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+      {hint && <small>{hint}</small>}
+    </label>
+  );
+}
+function Modal({
+  title,
+  onClose,
+  children,
+  className = '',
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    ref.current?.showModal();
+    ref.current?.querySelector<HTMLElement>('[data-initial-focus]')?.focus();
+    return () => ref.current?.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      className={'modal ' + className}
+    >
+      <div className="modal-head">
+        <h2>{title}</h2>
+        <button className="icon-btn" onClick={onClose} aria-label="关闭">
+          <X size={19} />
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
+function App() {
+  const sidebar = useSidebarState();
+  const [tasks, setTasks] = useState<RequestTask[]>([]);
+  const [status, setStatus] = useState<Status | null>(null),
+    [state, setState] = useState(initial),
+    [page, setPage] = useState<Page>(initialPage),
+    [records, setRecords] = useState<RequestRecord[]>([]),
+    [selected, setSelected] = useState<RequestRecord | null>(null),
+    [tab, setTab] = useState('messages');
+  const taskView = page === 'tasks',
+    recordsPage = taskView || page === 'requests';
+  const [runtime, setRuntime] = useState<Runtime | null>(null),
+    [health, setHealth] = useState<Record<string, ConnectionHealth>>({}),
+    [probing, setProbing] = useState('');
+  const [reqTotal, setReqTotal] = useState<number | null>(null),
+    [reqNext, setReqNext] = useState(''),
+    [reqLoading, setReqLoading] = useState(false),
+    [bodySearch, setBodySearch] = useState(false),
+    [bodySearchState, setBodySearchState] = useState('');
+  const reqSeq = useRef(0);
+  const [error, setError] = useState(''),
+    [notice, setNotice] = useState(''),
+    [busy, setBusy] = useState(false),
+    [password, setPassword] = useState(''),
+    [confirmPassword, setConfirmPassword] = useState('');
+  const [search, setSearch] = useState(''),
+    [filter, setFilter] = useState('all'),
+    [projectFilter, setProjectFilter] = useState('all'),
+    [modelFilter, setModelFilter] = useState('all'),
+    [providerFilter, setProviderFilter] = useState('all');
+  const [conn, setConn] = useState<Conn | null>(null),
+    [model, setModel] = useState<Model | null>(null),
+    [project, setProject] = useState<Project | null>(null),
+    [config, setConfig] = useState<Project | null>(null);
+  const [freshKey, setFreshKey] = useState<{ token: string; project: Project } | null>(null),
+    [reveal, setReveal] = useState<Conn | null>(null),
+    [revealed, setRevealed] = useState(''),
+    [revealPassword, setRevealPassword] = useState('');
+  const [testAudio, setTestAudio] = useState<AsrAudio | null>(null),
+    [callAudio, setCallAudio] = useState<AsrAudio | null>(null),
+    [testHotwords, setTestHotwords] = useState(''),
+    [callHotwords, setCallHotwords] = useState('');
+  const [testVoice, setTestVoice] = useState(DEFAULT_TTS_VOICE),
+    [callVoice, setCallVoice] = useState(DEFAULT_TTS_VOICE),
+    [testSpeech, setTestSpeech] = useState(''),
+    [callSpeech, setCallSpeech] = useState('');
+  const [testModel, setTestModel] = useState<Model | null>(null),
+    [testResult, setTestResult] = useState(''),
+    [testProtocol, setTestProtocol] = useState('chat'),
+    [callProtocol, setCallProtocol] = useState('chat');
+  const [tester, setTester] = useState(false),
+    [callToken, setCallToken] = useState(''),
+    [callAlias, setCallAlias] = useState(''),
+    [prompt, setPrompt] = useState('你好，请简短介绍自己。'),
+    [callOutput, setCallOutput] = useState(''),
+    [calling, setCalling] = useState(false);
+  const abort = useRef<AbortController | null>(null);
+  const credentialMemory = useRef(createCredentialMemory());
+  const workspace = useRef<HTMLDivElement>(null);
+  const [credentialError, setCredentialError] = useState(''),
+    [callProjectId, setCallProjectId] = useState('');
+  const [credentialGuide, setCredentialGuide] = useState(false),
+    [guideProjectId, setGuideProjectId] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null),
+    [deleting, setDeleting] = useState(false),
+    [deleteError, setDeleteError] = useState('');
+  const refreshStatus = () => api('/status').then(setStatus);
+  async function load() {
+    const [s, ts] = await Promise.all([api('/admin/state'), api('/admin/request-tasks')]);
+    setState(s);
+    setTasks(Array.isArray(ts.tasks) ? ts.tasks : []);
+    if (pageRef.current === 'requests') refreshRequests().catch(() => {});
+  }
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  // The request list is paged and filtered on the server.
+  function requestQuery(cursor = '') {
+    const q = new URLSearchParams({ limit: '50' });
+    if (projectFilter !== 'all') q.set('project_id', projectFilter || 'none');
+    if (modelFilter !== 'all') q.set('model', modelFilter);
+    if (providerFilter !== 'all') q.set('provider', providerFilter);
+    if (filter !== 'all') q.set('state', filter);
+    if (search.trim()) {
+      q.set('q', search.trim());
+      if (bodySearch) q.set('body', '1');
+    }
+    if (cursor) q.set('cursor', cursor);
+    return '/admin/requests?' + q.toString();
+  }
+  type RequestPage = { items: RequestRecord[]; next_cursor?: string; total?: number; body_search?: string };
+  async function refreshRequests() {
+    const seq = ++reqSeq.current;
+    const reply = await api(requestQuery());
+    if (seq !== reqSeq.current) return;
+    const page: RequestPage = Array.isArray(reply) ? { items: reply } : { ...reply, items: reply?.items || [] };
+    setRecords((prev) => {
+      // Keep older pages the user already loaded below the refreshed first page.
+      if (prev.length <= page.items.length || !page.items.length) {
+        setReqNext(page.next_cursor || '');
+        return page.items;
+      }
+      const fresh = new Set(page.items.map((r) => r.id));
+      const oldest = page.items[page.items.length - 1].started;
+      return [...page.items, ...prev.filter((r) => !fresh.has(r.id) && r.started <= oldest)];
+    });
+    setReqTotal(page.total ?? null);
+    setBodySearchState(page.body_search || '');
+  }
+  async function loadMoreRequests() {
+    if (!reqNext || reqLoading) return;
+    setReqLoading(true);
+    try {
+      const reply = await api(requestQuery(reqNext));
+      const page: RequestPage = { ...reply, items: reply?.items || [] };
+      setRecords((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...page.items.filter((r) => !seen.has(r.id))];
+      });
+      setReqNext(page.next_cursor || '');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setReqLoading(false);
+    }
+  }
+  async function loadHealth() {
+    const h = await api('/admin/health');
+    setHealth(Object.fromEntries(((h?.connections || []) as ConnectionHealth[]).map((c) => [c.id, c])));
+  }
+  useEffect(() => {
+    refreshStatus().catch((e) => setError(e.message));
+  }, []);
+  useEffect(() => {
+    if (!status?.authenticated) return;
+    load().catch((e) => setError(e.message));
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') load().catch(() => refreshStatus().catch(() => {}));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [status?.authenticated]);
+  useEffect(() => {
+    if (!status?.authenticated || page !== 'requests') return;
+    setRecords([]);
+    setReqNext('');
+    setReqTotal(null);
+    const t = setTimeout(() => {
+      setReqLoading(true);
+      refreshRequests()
+        .catch((e) => setError(e.message))
+        .finally(() => setReqLoading(false));
+    }, 250);
+    const poll = setInterval(() => {
+      if (document.visibilityState === 'visible') refreshRequests().catch(() => {});
+    }, 5000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(poll);
+    };
+  }, [status?.authenticated, page, search, filter, projectFilter, modelFilter, providerFilter, bodySearch]);
+  useEffect(() => {
+    if (!status?.authenticated || (page !== 'connections' && page !== 'overview')) return;
+    loadHealth().catch(() => {});
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') loadHealth().catch(() => {});
+    }, 10000);
+    return () => clearInterval(t);
+  }, [status?.authenticated, page]);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(''), 4500);
+    return () => clearTimeout(t);
+  }, [notice]);
+  useEffect(() => {
+    if (!revealed) return;
+    const t = setTimeout(() => {
+      setRevealed('');
+      setReveal(null);
+    }, 20000);
+    return () => clearTimeout(t);
+  }, [revealed]);
+  useEffect(() => () => abort.current?.abort(), []);
+  useEffect(() => {
+    if (!selected?.id || (!selected.record_missing && selected.state !== 'running')) return;
+    let disposed = false;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible')
+        api('/admin/requests/' + selected.id)
+          .then((value) => {
+            if (!disposed) setSelected(value);
+          })
+          .catch(() => {});
+    }, 5000);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+    };
+  }, [selected?.id, selected?.state, selected?.record_missing]);
+  useEffect(() => {
+    if (status && !status.authenticated) {
+      credentialMemory.current.clear();
+      abort.current?.abort();
+      setCallToken('');
+      setCallProjectId('');
+      setCredentialError('');
+      setFreshKey(null);
+      setConfig(null);
+      setCredentialGuide(false);
+      setDeleteTarget(null);
+    }
+  }, [status?.authenticated]);
+  useEffect(() => {
+    if (freshKey) credentialMemory.current.remember(freshKey.project.id, freshKey.token);
+  }, [freshKey]);
+  useEffect(() => {
+    workspace.current?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [page, status?.authenticated]);
+  useEffect(() => {
+    workspace.current?.querySelector('.request-detail')?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [selected?.id, tab, page]);
+  useEffect(() => {
+    workspace.current?.querySelector('.request-items')?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [search, filter, projectFilter, modelFilter, providerFilter]);
+  async function run(action: () => Promise<void>) {
+    setError('');
+    setBusy(true);
+    try {
+      await action();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function copy(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setNotice('已复制');
+    } catch {
+      setError('复制失败，请手动选择文本复制');
+    }
+  }
+  async function authenticate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!status?.configured && password !== confirmPassword) {
+      setError('两次输入的密码不一致');
+      return;
+    }
+    await run(async () => {
+      await api(status?.configured ? '/login' : '/setup', 'POST', { password });
+      setPassword('');
+      setConfirmPassword('');
+      await refreshStatus();
+    });
+  }
+  function navigate(p: Page) {
+    setPage(p);
+    setError('');
+  }
+  function newConn() {
+    setError('');
+    setConn({ id: '', name: '', provider: 'zhipu', endpoints: { chat: templateEndpoint('zhipu', 'chat') }, enabled: true, token: '' });
+  }
+  function changeProvider(provider: string) {
+    setConn((current) => {
+      if (!current) return current;
+      const entries = Object.entries(current.endpoints).filter(
+        ([protocol]) => provider === 'custom' || !!templateEndpoint(provider, protocol),
+      );
+      const endpoints =
+        provider === 'dashscope'
+          ? { 'dashscope-asr': templateEndpoint(provider, 'dashscope-asr') }
+          : provider !== 'custom' && !entries.length
+            ? { chat: templateEndpoint(provider, 'chat') }
+            : Object.fromEntries(
+                entries.map(([protocol, url]) => [
+                  protocol,
+                  provider === 'custom'
+                    ? url.trim().replace(/\/+$/, '') === templateEndpoint(current.provider, protocol)
+                      ? ''
+                      : url
+                    : templateEndpoint(provider, protocol),
+                ]),
+              );
+      return { ...current, provider, endpoints };
+    });
+  }
+  function newModel() {
+    const c = state.connections[0];
+    setError('');
+    setModel({
+      id: '',
+      name: '',
+      alias: '',
+      connection_id: c?.id || '',
+      protocols: defaultModelProtocols(c),
+      upstream_model: '',
+      defaults: {},
+      enabled: true,
+    });
+  }
+  function protocolsFor(m?: Model) {
+    return modelProtocols(
+      m,
+      state.connections.find((c) => c.id === m?.connection_id),
+    );
+  }
+  function openModelTest(m: Model) {
+    setTestModel(m);
+    setTestProtocol(protocolsFor(m)[0] || '');
+    setTestResult('');
+    setTestAudio(null);
+    setTestHotwords('');
+  }
+  function newProject() {
+    setError('');
+    setProject({ id: '', name: '', enabled: true, token_prefix: '', model_ids: [] });
+  }
+  function askDelete(kind: DeleteTarget['kind'], item: { id: string; name: string }) {
+    const saved = state[kind].find((x) => x.id === item.id);
+    setDeleteTarget({ kind, id: item.id, name: saved?.name || item.name });
+    setDeleteError('');
+    setError('');
+  }
+  async function confirmDelete() {
+    if (!deleteTarget || deleting) return;
+    const target = deleteTarget;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await api(
+        '/admin/' + target.kind + '/' + target.id + (target.kind === 'connections' ? '?cascade=true' : ''),
+        'DELETE',
+        target.kind === 'connections'
+          ? { model_ids: state.models.filter((m) => m.connection_id === target.id).map((m) => m.id) }
+          : undefined,
+      );
+      if (target.kind === 'projects') {
+        const token = credentialMemory.current.get(target.id);
+        credentialMemory.current.forget(target.id);
+        if (callProjectId === target.id || (token && callToken.trim() === token)) {
+          setCallToken('');
+          setCallProjectId('');
+          setCredentialError('项目已删除，请选择其他项目。');
+        }
+        if (project?.id === target.id) setProject(null);
+        if (config?.id === target.id) setConfig(null);
+        if (freshKey?.project.id === target.id) setFreshKey(null);
+      } else if (target.kind === 'models') {
+        if (state.models.find((m) => m.id === target.id)?.alias === callAlias) setCallAlias('');
+        if (model?.id === target.id) setModel(null);
+        if (testModel?.id === target.id) {
+          setTestModel(null);
+          setTestResult('');
+          setTestAudio(null);
+          setTestHotwords('');
+        }
+      } else {
+        const removed = state.models.filter((m) => m.connection_id === target.id);
+        if (removed.some((m) => m.alias === callAlias)) setCallAlias('');
+        if (removed.some((m) => m.id === model?.id)) setModel(null);
+        if (removed.some((m) => m.id === testModel?.id)) {
+          setTestModel(null);
+          setTestResult('');
+          setTestAudio(null);
+          setTestHotwords('');
+        }
+        if (conn?.id === target.id) setConn(null);
+        if (reveal?.id === target.id) {
+          setReveal(null);
+          setRevealed('');
+        }
+      }
+      setDeleteTarget(null);
+      setNotice(deleteLabels[target.kind] + '「' + target.name + '」已删除');
+      await load().catch(() => setError('已删除，但列表刷新失败，请刷新页面。'));
+    } catch (e) {
+      setDeleteError((e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+  async function deleteLinkedModel(id: string) {
+    if (deleting) return false;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await api('/admin/models/' + id, 'DELETE');
+      if (state.models.find((m) => m.id === id)?.alias === callAlias) setCallAlias('');
+      setState((prev) => ({
+        ...prev,
+        models: prev.models.filter((m) => m.id !== id),
+        projects: prev.projects.map((p) => ({ ...p, model_ids: p.model_ids.filter((mid) => mid !== id) })),
+      }));
+      await load().catch(() => setDeleteError('模型已删除，但列表刷新失败。请刷新列表后继续。'));
+      return true;
+    } catch (e) {
+      setDeleteError((e as Error).message);
+      return false;
+    } finally {
+      setDeleting(false);
+    }
+  }
+  async function refreshDeleteModels() {
+    if (deleting) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await load();
+    } catch (e) {
+      setDeleteError((e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+  function fillProjectCredential(p: Project, token: string) {
+    credentialMemory.current.remember(p.id, token);
+    setCallToken(token);
+    setCallProjectId(p.id);
+    setCredentialError('');
+    setError('');
+    setCallOutput('');
+    const allowed = state.models.filter(
+      (m) => p.model_ids.includes(m.id) && m.enabled && state.connections.some((c) => c.id === m.connection_id && c.enabled),
+    );
+    setCallAlias(allowed.find((m) => m.alias === callAlias)?.alias || allowed[0]?.alias || '');
+    setTester(true);
+    setPage(taskView ? 'tasks' : 'requests');
+    setCredentialGuide(false);
+  }
+  function showCredentialGuide(p?: Project) {
+    const target =
+      p ||
+      state.projects.find((x) => x.id === callProjectId) ||
+      state.projects.find((x) => x.enabled && x.model_ids.some((mid) => state.models.some((m) => m.id === mid && m.alias === callAlias))) ||
+      state.projects.find((x) => x.enabled) ||
+      state.projects[0];
+    setGuideProjectId(target?.id || '');
+    setCredentialGuide(true);
+    setError('');
+  }
+  function openTester(p?: Project) {
+    if (p) {
+      const token = credentialMemory.current.get(p.id);
+      if (p.enabled && token) fillProjectCredential(p, token);
+      else showCredentialGuide(p);
+      return;
+    }
+    setTester(true);
+    setError('');
+    if (!callToken) {
+      const known = state.projects.find((x) => x.enabled && credentialMemory.current.get(x.id));
+      if (known) fillProjectCredential(known, credentialMemory.current.get(known.id));
+    }
+  }
+  function closeTester() {
+    abort.current?.abort();
+    setTester(false);
+    setCallToken('');
+    setCallProjectId('');
+    setCallOutput('');
+    setCredentialError('');
+    setCallAudio(null);
+    setCallHotwords('');
+    setCallSpeech('');
+  }
+  async function demo() {
+    await run(async () => {
+      const result = await api('/admin/demo', 'POST', {});
+      credentialMemory.current.remember(result.project_id, result.token);
+      setCallToken(result.token);
+      setCallProjectId(result.project_id);
+      setCallAlias(result.alias);
+      setCredentialError('');
+      setTester(true);
+      setPage('requests');
+      await load();
+      setNotice('演示凭证已自动填入，可以直接发送请求。');
+    });
+  }
+  async function selectRecord(id: string) {
+    await run(async () => {
+      setSelected(await api('/admin/requests/' + id));
+      setTab('messages');
+    });
+  }
+  async function call(e: React.FormEvent) {
+    e.preventDefault();
+    setCallOutput('');
+    setCallSpeech('');
+    setError('');
+    const checked = projectCredentialInput(callToken);
+    setCredentialError(checked.error);
+    if (checked.error) return;
+    setCallToken(checked.token);
+    setCalling(true);
+    abort.current = new AbortController();
+    try {
+      const m = state.models.find((x) => x.alias === callAlias),
+        available = protocolsFor(m);
+      const protocol = available.includes(callProtocol) ? callProtocol : available[0];
+      if (!protocol) throw new Error('此模型没有可用协议，请检查连接端点与模型配置');
+      const isAsr = protocol === 'dashscope-asr',
+        isTts = protocol === 'dashscope-tts',
+        isWeb = isWebTool(protocol);
+      const body = isAsr
+        ? asrRequest(callAlias, callAudio, callHotwords)
+        : isTts
+          ? ttsRequest(callAlias, prompt, callVoice)
+          : isWeb
+            ? { model: callAlias, ...webToolRequest(protocol, prompt) }
+            : { model: callAlias, messages: [{ role: 'user', content: prompt }], max_tokens: 256, stream: true };
+      const res = await fetch(
+        isAsr
+          ? '/v1/asr/transcriptions'
+          : isTts
+            ? '/v1/tts/speech'
+            : isWeb
+              ? '/v1' + webToolPath(protocol)
+              : protocol === 'messages'
+                ? '/v1/messages'
+                : '/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + checked.token },
+          body: JSON.stringify(body),
+          signal: abort.current.signal,
+        },
+      );
+      if (!res.ok) {
+        const data = await res.json();
+        if (res.status === 401) {
+          credentialMemory.current.forgetToken(checked.token);
+          setCredentialError('这份项目凭证已失效、填写有误，或项目已停用。点击「选择项目并填入」检查项目状态；找不到完整凭证时可重置。');
+          return;
+        }
+        throw new Error(data.error?.message || data.message || '调用失败');
+      }
+      if (!res.body) throw new Error('响应为空');
+      const reader = res.body.getReader(),
+        decoder = new TextDecoder();
+      let raw = '';
+      while (true) {
+        const part = await reader.read();
+        if (part.done) break;
+        raw += decoder.decode(part.value, { stream: true });
+        setCallOutput(responseText(raw));
+      }
+      raw += decoder.decode();
+      if (isTts) {
+        let out = null;
+        try {
+          out = JSON.parse(raw);
+        } catch {}
+        setCallSpeech(ttsAudioSource(out));
+        setCallOutput(ttsSummary(out) || '合成已结束，未返回音频，详情见请求记录。');
+        setNotice('调用已结束，请求记录正在保存');
+        setTimeout(() => load().catch(() => {}), 250);
+        return;
+      }
+      setCallOutput(
+        (isWeb ? webToolText(raw) : responseText(raw)) || (isAsr ? '转写已结束，未识别到文字。' : '请求已结束，完整事件请查看请求记录。'),
+      );
+      setNotice('调用已结束，请求记录正在保存');
+      setTimeout(() => load().catch(() => {}), 250);
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') setNotice('已取消调用');
+      else setError((e as Error).message);
+    } finally {
+      setCalling(false);
+      abort.current = null;
+    }
+  }
+  const visible = records;
 
- const filterOptions=requestFilterOptions(records,state.models,state.connections);
- const hasFilters=!!search||filter!=='all'||projectFilter!=='all'||modelFilter!=='all'||providerFilter!=='all';
- function clearRequestFilters(){setSearch('');setFilter('all');setProjectFilter('all');setModelFilter('all');setProviderFilter('all')}
- const guideProject=state.projects.find(p=>p.id===guideProjectId),guideToken=guideProject?credentialMemory.current.get(guideProject.id):undefined;
- const deleteModels=deleteTarget?.kind==='connections'?state.models.filter(m=>m.connection_id===deleteTarget.id):[];
- const deleteProjects=deleteTarget?.kind==='models'?state.projects.filter(p=>p.model_ids.includes(deleteTarget.id)):[];
- const historyProjects=[...new Map(records.filter(r=>r.project_id!=='admin-test'&&r.project_id!=='admin-chat'&&!state.projects.some(p=>p.id===r.project_id)).map(r=>[r.project_id,r.project_name])).entries()];
- const pendingApplications=(state.applications||[]).filter(a=>a.status==='pending');
- const connectionsByID=new Map(state.connections.map(c=>[c.id,c]));
- const callProtocols=protocolsFor(state.models.find(m=>m.alias===callAlias));
- const selectedCallProtocol=callProtocols.includes(callProtocol)?callProtocol:callProtocols[0]||'';
- const testProtocols=protocolsFor(testModel||undefined);
- const selectedTestProtocol=testProtocols.includes(testProtocol)?testProtocol:testProtocols[0]||'';
- const errorView=error&&<div className="error" role="alert">{error}<button type="button" onClick={()=>setError('')} aria-label="关闭错误"><X size={15}/></button></div>;
- if(!status)return <div className="boot"><Waypoints/>正在打开AI Gateway…{errorView}</div>;
- if(!status.authenticated)return <div className="login-page"><div className="login-brand"><span className="brand-icon"><Waypoints size={20}/></span>AI Gateway <span className="version">v0.1</span></div><div className="login-grid"><section className="login-context"><span className="eyebrow">YOUR MODELS. ONE PLACE.</span><h1>模型连接，<br/>由你掌管。</h1><p>统一管理厂商密钥，让每个项目<br/>只访问你授权的模型。</p><div className="login-feature"><Plug size={18}/><span>智谱 · MiniMax · 自定义连接</span></div><div className="login-feature"><ShieldCheck size={18}/><span>独立项目凭证与模型授权</span></div><div className="login-feature"><Activity size={18}/><span>查看消息、原始数据与耗时</span></div></section><form className="login-card" onSubmit={authenticate}><span className="lock-mark"><LockKeyhole size={22}/></span><h2>{status.configured?(status.locked?'解锁你的网关':'登录管理页面'):'设置管理密码'}</h2><p>{status.configured?(status.passwordless_enabled?(status.passwordless_ready?(status.locked?'网关已锁定，密码留空即可解锁并恢复调用。':'网关已就绪，模型调用不依赖管理页面登录。密码留空即可进入。'):'首次切换需输入一次原管理密码，之后启动自动就绪，无需手动解锁。'):(status.locked?'解锁后，项目可以继续通过网关调用模型。':'网关已就绪，登录管理页面不会影响模型调用。')):'此密码用于登录管理页和解锁厂商密钥。请妥善保管，Demo 暂不提供密码找回。'}</p><Field label="管理密码"><input autoFocus type="password" autoComplete={status.configured?'current-password':'new-password'} minLength={status.configured?undefined:12} required={!status.configured||!status.passwordless_enabled||!status.passwordless_ready} value={password} onChange={e=>setPassword(e.target.value)} placeholder={status.configured?(status.passwordless_ready?'留空，直接点下方按钮':'输入管理密码'):'至少 12 个字符'}/></Field>{!status.configured&&<Field label="再次输入密码"><input type="password" autoComplete="new-password" minLength={12} required value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)}/></Field>}{errorView}<button className="primary full" disabled={busy}>{busy?'正在进入…':status.configured?(status.locked?'解锁并进入':'进入管理页面'):'创建并进入'}<ArrowRight size={17}/></button><small className="login-foot">{status.configured&&status.passwordless_enabled?'本地临时设置 · 原管理密码仍然有效':'首次进入后，可载入本地演示，无需厂商 Token。'}</small></form></div><footer className="login-bottom"><span><span className="dot"/> 本地运行</span><span>{status.passwordless_enabled?'本地自动就绪 · 退出管理不影响调用':'凭据加密保存 · 重启后需重新解锁'}</span></footer></div>;
- return <div className="app"><Sidebar collapsed={sidebar.collapsed}><div className="nav-caption">工作空间</div><nav id="workspace-navigation" aria-label="工作空间">{(Object.keys(labels) as Page[]).map(p=>{const Icon=icons[p];return <button key={p} className={page===p?'active':''} aria-current={page===p?'page':undefined} title={labels[p]+(p==='projects'&&pendingApplications.length>0?`（${pendingApplications.length} 个待批准）`:p==='requests'&&state.request_count>0?`（${state.request_count} 条）`:'')} aria-label={labels[p]+(p==='projects'&&pendingApplications.length>0?`，${pendingApplications.length} 个待批准`:p==='requests'&&state.request_count>0?`，${state.request_count} 条`:'')} onClick={()=>navigate(p)}><Icon size={18}/><span className="sidebar-label">{labels[p]}</span>{p==='projects'&&pendingApplications.length>0&&<span className="nav-count nav-count-pending" aria-label="待批准项目数">{pendingApplications.length}</span>}{p==='requests'&&state.request_count>0&&<span className="nav-count">{state.request_count}</span>}</button>})}</nav><div className="sidebar-bottom"><div className="gateway-status" title={`网关已就绪 · ${new URL(state.base_url||location.origin).host}`} aria-label={`网关已就绪 · ${new URL(state.base_url||location.origin).host}`}><Badge on><span className="sidebar-label">网关已就绪</span></Badge><code className="gateway-address" aria-label="网关地址">{new URL(state.base_url||location.origin).host}</code></div><button className="quiet" aria-label="退出管理" title="退出管理" onClick={()=>run(async()=>{await api('/admin/logout','POST',{});abort.current?.abort();setCallToken('');setFreshKey(null);setRevealed('');setReveal(null);setConn(null);setModel(null);setProject(null);setSelected(null);setState(initial);setRecords([]);setTasks([]);await refreshStatus()})}><LockKeyhole size={15}/><span className="sidebar-label">退出管理</span></button></div></Sidebar><div className={'workspace'+(recordsPage&&!tester?' requests-workspace':page==='chat'?' chat-workspace':'')} ref={workspace} tabIndex={0} role="region" aria-label="工作区"><header className={'page-head'+(recordsPage?' request-page-head':'')}><div className="page-head-inner"><div className="page-heading"><SidebarToggle collapsed={sidebar.collapsed} onToggle={sidebar.toggle}/><h1>{page==='overview'?'运行总览':labels[page]}</h1></div>{page==='connections'?<button className="primary" onClick={newConn}><Plus size={17}/>新增连接</button>:page==='models'?<button className="primary" onClick={newModel} disabled={!state.connections.length}><Plus size={17}/>新增模型</button>:page==='projects'?<button className="primary" onClick={newProject}><Plus size={17}/>新建项目</button>:recordsPage?<button onClick={()=>tester?closeTester():openTester()}><Terminal size={16}/>试调用</button>:<button onClick={()=>navigate('requests')}>查看请求<ArrowRight size={16}/></button>}</div></header><main className={'main '+(recordsPage?'requests-main':page==='chat'?'chat-main':page==='models'?'models-main':page==='projects'?'projects-main':page==='diagnostics'?'diagnostics-main':'')}>{errorView}
- {state.dropped_records>0&&<div className="error">有 {state.dropped_records} 条记录未能写入，请检查磁盘空间。</div>}
- {page!=='projects'&&pendingApplications.length>0&&<button className="application-banner" onClick={()=>navigate('projects')}><ShieldCheck size={18}/><span>{pendingApplications.length} 个项目等待批准接入</span><ArrowRight size={16}/></button>}
- <ChatPage active={page==='chat'} models={state.models} connections={state.connections} api={api} refresh={load} onOpenRecord={id=>{navigate('requests');selectRecord(id)}} onConfigure={()=>navigate('models')}/>
- {page==='overview'&&<MonitorOverview projects={state.projects} connections={state.connections} models={state.models} onSelect={id=>{navigate('requests');selectRecord(id)}} onNewConnection={newConn} onDemo={demo}/>}
- {page==='diagnostics'&&<DiagnosticsPage onSelect={id=>{navigate('requests');selectRecord(id)}}/>}
- {page==='costs'&&<CostPage projects={state.projects} onSelect={id=>{navigate('requests');selectRecord(id)}} onEditProject={id=>{const p=state.projects.find(x=>x.id===id);if(p)setProject({...p,model_ids:[...p.model_ids]})}}/>}
- {page==='connections'&&<OutboundProxyPanel value={state.outbound_proxy||''} proxiedCount={state.connections.filter(c=>c.use_proxy).length} busy={busy} onSave={url=>run(async()=>{await api('/admin/outbound-proxy','PUT',{url});await load();setNotice(url?'出站代理已保存':'出站代理已清除')})}/>}
- {page==='connections'&&(!state.connections.length?<Empty title="添加厂商连接" text="将端点和 Token 配置一次，多个模型可以共用这个连接。" action={<button onClick={newConn}><Plus size={16}/>新增连接</button>}/>:<ConnectionList connections={state.connections} onEdit={c=>setConn({...c,token:''})} onReveal={c=>{setReveal(c);setRevealed('');setRevealPassword('')}} onDelete={c=>askDelete('connections',c)}/>)}
- {page==='models'&&(!state.models.length?<Empty title="配置一个模型" text={state.connections.length?'选择已有连接，填写程序调用别名与厂商模型 ID。':'先添加厂商连接，然后再创建模型。'} action={<button onClick={state.connections.length?newModel:()=>navigate('connections')}>{state.connections.length?'新增模型':'去添加连接'}<ArrowRight size={15}/></button>}/>:<ModelList models={state.models} connections={state.connections} onEdit={m=>setModel({...m,protocols:protocolsFor(m),defaults:{...m.defaults}})} onTest={openModelTest} onDelete={m=>askDelete('models',m)} onCopyAlias={copy}/>)}
- {page==='projects'&&(!state.projects.length?<Empty title="让项目接入网关" text="新建项目、勾选模型权限，再把独立凭证填到你的程序里。" action={<button onClick={newProject}><Plus size={16}/>新建项目</button>}/>:<ProjectList applications={state.applications} deciding={busy} onDecision={(application,decision)=>run(async()=>{await api('/admin/applications/'+application.id+'/decision','POST',{decision});await load();setNotice(decision==='approve'?'已批准，客户端原 Token 立即生效':'已拒绝，客户端 Token 保持不可用')})} projects={state.projects} models={state.models} onEdit={p=>setProject({...p,model_ids:[...p.model_ids]})} onAccess={setConfig} onTest={openTester} onDelete={p=>askDelete('projects',p)}/>)}
- {recordsPage&&<>{tester&&<section className="panel tester"><div className="panel-head"><h2><Terminal size={17}/>以项目身份试调用</h2><button className="icon-btn" onClick={closeTester} aria-label="关闭试调用"><X size={18}/></button></div><form onSubmit={call}><div className="form-grid"><div className="credential-field"><Field label="网关项目凭证" hint="填写完整的 gw_ 开头凭证；管理密码和厂商 Token 用在各自的配置页面。"><input type="password" autoComplete="off" spellCheck={false} aria-invalid={!!credentialError} aria-describedby={credentialError?'project-credential-error':undefined} value={callToken} onChange={e=>{setCallToken(e.target.value);setCallProjectId('');setCredentialError('')}} placeholder="粘贴完整项目凭证（gw_ 开头）"/></Field>{credentialError&&<p id="project-credential-error" className="credential-error" role="alert">{credentialError}</p>}<button type="button" className="link" disabled={calling} onClick={()=>showCredentialGuide()}><KeyRound size={14}/>选择项目并填入</button></div><Field label="模型别名"><select value={callAlias} onChange={e=>setCallAlias(e.target.value)} required><option value="">选择模型</option>{state.models.map(m=><option key={m.id} value={m.alias}>{m.alias} · {m.name}</option>)}</select></Field></div><Field label="调用协议"><select value={selectedCallProtocol} onChange={e=>setCallProtocol(e.target.value)} disabled={calling||!callProtocols.length}>{!callProtocols.length&&<option value="">无可用协议</option>}{callProtocols.map(p=><option key={p} value={p}>{protocolName(p)}</option>)}</select></Field>{selectedCallProtocol==='dashscope-asr'?<AsrAudioFields audio={callAudio} onAudio={setCallAudio} hotwords={callHotwords} onHotwords={setCallHotwords} disabled={calling}/>:<>{selectedCallProtocol==='dashscope-tts'&&<Field label="音色 ID" hint="百炼控制台的音色 ID，例如 anmingyuan_v3.1。"><input required value={callVoice} onChange={e=>setCallVoice(e.target.value)}/></Field>}<Field label={selectedCallProtocol==='dashscope-tts'?'要合成的文字':'消息'}><textarea required rows={2} value={prompt} onChange={e=>setPrompt(e.target.value)}/></Field></>}<div className="actions"><button className="primary" disabled={calling||(selectedCallProtocol==='dashscope-asr'&&!callAudio)}><Send size={15}/>{calling?(selectedCallProtocol==='dashscope-asr'?'正在转写…':'正在接收…'):'发送请求'}</button>{calling&&<button type="button" onClick={()=>abort.current?.abort()}>停止</button>}</div>{callOutput&&<div className="call-output" aria-live="polite">{callOutput}</div>}{callSpeech&&<audio controls src={callSpeech} aria-label="合成的语音"/>}</form></section>}{taskView?<TaskWorkspace tasks={tasks} api={api} refresh={()=>run(load)} renderRecord={(record,callTab,setCallTab,callCopy)=><RecordDetail selected={record} tab={callTab} setTab={setCallTab} copy={callCopy}/>}/>:<div className="inspector"><section className="request-rail"><div className="rail-head"><div><h2>请求</h2><span className="muted small">{hasFilters?`${visible.length} / ${records.length} 条`:`最近 ${records.length} 条`}</span><button className="icon-btn" aria-label="刷新请求" onClick={()=>run(load)}><RefreshCw size={15}/></button></div><label className="search"><Search size={15}/><input aria-label="搜索请求" placeholder="搜索项目、模型、ID" value={search} onChange={e=>setSearch(e.target.value)}/></label><div className="request-filters"><div className="request-project-filter"><FilterSelect label="按项目筛选" value={projectFilter} onChange={setProjectFilter} options={[{value:"all",label:"所有项目"},{value:"admin-test",label:"管理员测试"},{value:"admin-chat",label:"对话调试"},...state.projects.map(p=>({value:p.id,label:p.name})),...historyProjects.map(([id,name])=>({value:id,label:id?name+"（已删除）":"未识别项目"}))]}/></div><FilterSelect label="按模型筛选" value={modelFilter} onChange={setModelFilter} options={filterOptions.models}/><FilterSelect label="按厂商筛选" value={providerFilter} onChange={setProviderFilter} options={filterOptions.providers}/></div><div className="filter-tabs">{[['all','全部'],['success','完成'],['failed','未完成']].map(([v,t])=><button key={v} className={filter===v?'selected':''} aria-pressed={filter===v} onClick={()=>setFilter(v)}>{t}</button>)}{hasFilters&&<button className="request-reset" onClick={clearRequestFilters} aria-label="清除请求筛选">清除</button>}</div></div><div className="request-items" role="region" aria-label="请求列表" tabIndex={0}>{visible.length?visible.map(r=><button key={r.id} className={'request-item '+(selected?.id===r.id?'selected':'')} onClick={()=>selectRecord(r.id)}><span><b>{r.project_name}</b><small>{time(r.started)}</small></span><span><code>{r.alias}</code><small className={r.state==='complete'?'good-text':'warning-text'}>{r.status}</small></span><small>{recordStatus(r)} · {r.stream===true?'流式':r.stream===false?'非流式':'方式未记录'}</small></button>):<p className="rail-empty">没有匹配的请求</p>}</div></section><section className="request-detail" aria-label="请求详情" tabIndex={0}>{selected?<RecordDetail selected={selected} tab={tab} setTab={setTab} copy={copy}/>:<Empty title="选择一条请求" text="查看消息结构、原始数据和首字耗时。"/>}</section></div>}</>}
- </main><footer className="app-footer"><span><span className="dot"/> 本地服务 · Go + SQLite</span><span>厂商凭据不随项目调用接口返回</span></footer></div>
- {notice&&<div className="toast" role="status"><Check size={17}/>{notice}</div>}
- {credentialGuide&&<Modal title="选择项目并填入凭证" onClose={()=>setCredentialGuide(false)}><div className="modal-body">
-  {state.projects.length?<><Field label="选择项目"><select value={guideProjectId} onChange={e=>setGuideProjectId(e.target.value)}>{state.projects.map(p=><option key={p.id} value={p.id}>{p.name}{p.enabled?'':' · 已停用'}</option>)}</select></Field>
-   {guideProject&&!guideProject.enabled?<><p className="impact">此项目已停用，无法发起调用。请先在项目权限中启用。</p><button onClick={()=>{setCredentialGuide(false);setProject({...guideProject,model_ids:[...guideProject.model_ids]});navigate('projects')}}>查看项目权限<ArrowRight size={15}/></button></>:guideProject&&guideProject.has_saved_token?<><p>此项目的 Token 已加密保管，可以直接取出填入，正在使用的凭证保持有效。</p>{errorView}<div className="modal-actions"><button className="primary" disabled={busy} onClick={()=>run(async()=>{const out=await api('/admin/projects/'+guideProject.id+'/credential','POST',{});fillProjectCredential(guideProject,out.token)})}>填入这个项目的凭证<ArrowRight size={15}/></button></div></>:guideProject&&guideToken?<><p>当前页面暂存了这份凭证，可以直接填入。</p><div className="modal-actions"><button className="primary" onClick={()=>fillProjectCredential(guideProject,guideToken)}>填入这个项目的凭证<ArrowRight size={15}/></button></div></>:guideProject&&<><p>此旧版项目尚未保存 Token 原文。已有完整 Token 可以到「接入信息」保存，之后可随时复制或填入。</p><p className="impact">重新生成后，旧凭证立即失效。已经接入的程序也需要更新凭证。</p>{errorView}<div className="modal-actions"><button onClick={()=>{setCredentialGuide(false);setConfig(guideProject)}}>保存已有 Token</button><button className="primary" disabled={busy} onClick={()=>run(async()=>{const out=await api('/admin/projects/'+guideProject.id+'/rotate','POST',{});fillProjectCredential(guideProject,out.token);setFreshKey({token:out.token,project:guideProject});await load();setNotice('已重置并填入项目凭证，旧凭证已失效')})}><RefreshCw size={15}/>重置凭证并填入</button></div></>}
-  </>:<><p>先创建项目并授权模型，再生成独立项目凭证。</p><button className="primary" onClick={()=>{setCredentialGuide(false);navigate('projects');newProject()}}>新建项目<Plus size={15}/></button></>}
- </div></Modal>}
- {conn&&<Modal title={conn.id?'编辑连接':'新增厂商连接'} onClose={()=>setConn(null)}><form onSubmit={e=>{e.preventDefault();run(async()=>{await api('/admin/connections'+(conn.id?'/'+conn.id:''),conn.id?'PUT':'POST',conn);setConn(null);await load();setNotice('连接已保存')})}}><p className="form-intro">选择厂商模板或自定义连接，至少配置一种协议的端点与 Token，多个模型可以共用这个连接。</p><Field label="连接名称"><input autoFocus required maxLength={80} value={conn.name} onChange={e=>setConn({...conn,name:e.target.value})} placeholder="例如：智谱主连接、我的模型服务"/></Field><Field label="厂商"><select value={conn.provider} disabled={conn.provider==='demo'} onChange={e=>changeProvider(e.target.value)}><option value="zhipu">智谱</option><option value="minimax">MiniMax</option><option value="deepseek">DeepSeek</option><option value="dashscope">阿里云百炼</option><option value="custom">自定义连接</option>{conn.provider==='demo'&&<option value="demo">本地演示</option>}</select></Field><ConnectionProtocolFields key={conn.id||'new'} provider={conn.provider} endpoints={conn.endpoints} onChange={endpoints=>setConn({...conn,endpoints})}/>{conn.provider!=='demo'&&<Field label={conn.id?'更换厂商 Token':'厂商 Token'} hint={conn.id?'留空保留原 Token；填写新值即更换。':'保存后加密保管，项目使用独立网关凭证。'}><input type="password" autoComplete="off" required={!conn.id} value={conn.token||''} onChange={e=>setConn({...conn,token:e.target.value})} placeholder={conn.id?'已配置，留空保留':'粘贴厂商 Token'}/></Field>}{conn.provider!=='demo'&&<><label className="check proxy-check"><input type="checkbox" checked={!!conn.use_proxy} onChange={e=>setConn({...conn,use_proxy:e.target.checked})}/>走出站代理</label><p className="muted small proxy-hint">{state.outbound_proxy?<>开启后经 <code>{state.outbound_proxy}</code> 访问此厂商；关闭则直连。</>:'尚未设置出站代理地址，目前按服务器环境变量决定；在「厂商连接」页顶部设置后此开关生效。'}</p></>}<label className="check"><input type="checkbox" checked={conn.enabled} onChange={e=>setConn({...conn,enabled:e.target.checked})}/>启用这个连接</label>{conn.id&&<p className="impact">此连接关联 {state.models.filter(m=>m.connection_id===conn.id).length} 个模型，关联项目：{state.projects.filter(p=>p.model_ids.some(mid=>state.models.some(m=>m.id===mid&&m.connection_id===conn.id))).map(p=>p.name).join('、')||'无'}。端点、协议或凭据变更将用于后续请求；新增协议需在模型中启用，移除协议会停止对应调用。</p>}{errorView}<div className="modal-actions">{conn.id&&<button type="button" className="danger delete-action" onClick={()=>askDelete('connections',conn)}><Trash2 size={14}/>删除连接</button>}<button type="button" onClick={()=>setConn(null)}>取消</button><button className="primary" disabled={busy||!Object.keys(conn.endpoints).length}>保存连接</button></div></form></Modal>}
- {model&&<Modal title={model.id?'编辑模型':'新增模型'} onClose={()=>setModel(null)}><form onSubmit={e=>{e.preventDefault();run(async()=>{await api('/admin/models'+(model.id?'/'+model.id:''),model.id?'PUT':'POST',model);setModel(null);await load();setNotice('模型已保存')})}}><p className="form-intro">为程序提供稳定的调用别名，随时调整背后的模型。</p><div className="form-grid"><Field label="显示名称" hint="只影响管理页面。"><input autoFocus required value={model.name} onChange={e=>setModel({...model,name:e.target.value})} placeholder="我的代码模型"/></Field><Field label="调用别名" hint="程序请求的 model 字段。"><input required value={model.alias} onChange={e=>setModel({...model,alias:e.target.value})} placeholder="coding"/></Field></div><Field label="所属连接"><select required value={model.connection_id} onChange={e=>setModel({...model,connection_id:e.target.value,context_window:0,protocols:defaultModelProtocols(connectionsByID.get(e.target.value))})}><option value="">请选择连接</option>{state.connections.map(c=><option key={c.id} value={c.id}>{c.name} · {connectionProtocols(c).map(protocolName).join(" / ")}</option>)}</select></Field><h3>启用的调用协议</h3><p className="muted small">仅勾选上游模型实际支持的协议；ASR 模型使用百炼 ASR，语音合成模型使用百炼 TTS。DeepSeek 搜索和抓取是独立服务，建议单独建一个模型只勾选它们。</p><div className="protocol-options">{connectionProtocols(connectionsByID.get(model.connection_id)).map(p=><label className="check" key={p}><input type="checkbox" checked={model.protocols.includes(p)} onChange={e=>setModel({...model,protocols:e.target.checked?[...model.protocols,p]:model.protocols.filter(x=>x!==p)})}/>{protocolName(p)}</label>)}</div>{!model.protocols.length&&<p className="error">请至少选择一种调用协议。</p>}{model.protocols.length>0&&model.protocols.every(isWebTool)?<Field label="上游模型 ID（不会发送）" hint="搜索和抓取没有模型，此值只作说明，可填 deepseek-web-tools。"><input required value={model.upstream_model} onChange={e=>setModel({...model,upstream_model:e.target.value})} placeholder="deepseek-web-tools"/></Field>:model.protocols.length===1&&model.protocols[0]==='dashscope-asr'?<Field label="厂商模型 ID" hint="填写百炼已开通的 ASR 模型 ID。"><input required value={model.upstream_model} onChange={e=>setModel({...model,upstream_model:e.target.value})} placeholder="qwen-audio-3.0-asr-flash"/></Field>:model.protocols.length===1&&model.protocols[0]==='dashscope-tts'?<Field label="厂商模型 ID" hint="填写百炼已开通的语音合成模型 ID。"><input required value={model.upstream_model} onChange={e=>setModel({...model,upstream_model:e.target.value})} placeholder="qwen-audio-3.1-tts-flash"/></Field>:<><ModelCatalogField key={model.connection_id+JSON.stringify(connectionsByID.get(model.connection_id)?.endpoints)} connection={connectionsByID.get(model.connection_id)} value={model.upstream_model} onChange={value=>setModel(current=>current?{...current,upstream_model:value,context_window:0}:null)} onSelect={(id,name)=>setModel(current=>current?{...current,upstream_model:id,name,alias:id,context_window:0}:null)}/><ModelContextWindow value={model.context_window} onChange={context_window=>setModel({...model,context_window})}/><div className="form-grid"><Field label="默认 temperature（可选）"><input type="number" min="0" max="2" step="0.1" value={model.defaults.temperature??''} onChange={e=>{const d={...model.defaults};if(e.target.value==='')delete d.temperature;else d.temperature=Number(e.target.value);setModel({...model,defaults:d})}}/></Field><Field label="默认 max_tokens（可选）"><input type="number" min="1" max="131072" step="1" value={model.defaults.max_tokens??''} onChange={e=>{const d={...model.defaults};if(e.target.value==='')delete d.max_tokens;else d.max_tokens=Number(e.target.value);setModel({...model,defaults:d})}}/></Field></div><ModelThinkingDefaults provider={connectionsByID.get(model.connection_id)?.provider} protocols={model.protocols} defaults={model.defaults} onChange={defaults=>setModel({...model,defaults})}/></>}<ModelPriceFields protocols={model.protocols} prices={model.prices||[]} onChange={prices=>setModel({...model,prices})}/><label className="check"><input type="checkbox" checked={model.enabled} onChange={e=>setModel({...model,enabled:e.target.checked})}/>启用这个模型</label>{model.id&&<p className="impact">已授权给 {state.projects.filter(p=>p.model_ids.includes(model.id)).map(p=>p.name).join('、')||'尚无项目'}。修改别名后需同步程序配置；修改显示名称不影响调用。</p>}{errorView}<div className="modal-actions">{model.id&&<button type="button" className="danger delete-action" onClick={()=>askDelete('models',model)}><Trash2 size={14}/>删除模型</button>}<button type="button" onClick={()=>setModel(null)}>取消</button><button className="primary" disabled={busy||!model.protocols.length}>保存模型</button></div></form></Modal>}
- {project&&<Modal title={project.id?'编辑项目权限':'新建项目'} onClose={()=>setProject(null)}><form onSubmit={e=>{e.preventDefault();run(async()=>{const result=await api('/admin/projects'+(project.id?'/'+project.id:''),project.id?'PUT':'POST',project);setProject(null);await load();if(result.token)setFreshKey({token:result.token,project:result.project});else setNotice('项目权限已保存，后续请求立即采用新权限')})}}><p className="form-intro">管理项目的模型权限，保存后可在「接入信息」复制端点与凭证。</p><Field label="项目名称"><input autoFocus required maxLength={80} value={project.name} onChange={e=>setProject({...project,name:e.target.value})} placeholder="例如：代码助手"/></Field><label className="check"><input type="checkbox" checked={project.enabled} onChange={e=>setProject({...project,enabled:e.target.checked})}/>允许此项目调用</label><Field label="月预算（元，可选）" hint="按配置单价估算本月费用，达到预算后网关拒绝此项目的新请求，下月 1 日自动恢复。留空表示不限。"><input type="number" min="0.01" step="any" inputMode="decimal" value={project.monthly_budget??''} onChange={e=>setProject({...project,monthly_budget:e.target.value===''?null:Number(e.target.value)})} placeholder="不限"/></Field><h3>允许使用的模型</h3><div className="grants">{state.models.length?state.models.map(m=><label key={m.id} className="grant"><input type="checkbox" checked={project.model_ids.includes(m.id)} onChange={e=>setProject({...project,model_ids:e.target.checked?[...project.model_ids,m.id]:project.model_ids.filter(x=>x!==m.id)})}/><span><b>{m.name}</b><code>{m.alias}</code></span><small>{m.enabled?'已启用':'已停用'}</small></label>):<p className="muted">请先在模型配置中添加模型。</p>}</div><p className="impact">未勾选的模型无法调用。项目凭证不能读取厂商 Token 或访问管理接口。</p>{errorView}<div className="modal-actions">{project.id&&<button type="button" className="danger delete-action" onClick={()=>askDelete('projects',project)}><Trash2 size={14}/>删除项目</button>}<button type="button" onClick={()=>setProject(null)}>取消</button><button className="primary" disabled={busy}>{project.id?'保存权限':'创建并生成凭证'}</button></div></form></Modal>}
- {freshKey&&<Modal title="项目凭证已生成" onClose={()=>setFreshKey(null)}><div className="modal-body"><p>凭证已加密保存。以后可在「项目权限 → 接入信息」中复制完整 Token，当前页面也可直接填入试调用。</p><pre className="secret">{freshKey.token}</pre><button onClick={()=>copy(freshKey.token)}><Copy size={15}/>复制凭证</button><div className="modal-actions"><button onClick={()=>{fillProjectCredential(freshKey.project,freshKey.token);setFreshKey(null)}}>用它试调用<ArrowRight size={16}/></button><button className="primary" onClick={()=>setFreshKey(null)}>已保存</button></div></div></Modal>}
- {config&&<Modal className="project-access-modal" title={config.name+' · 接入信息'} onClose={()=>setConfig(null)}><ProjectAccessContent key={config.id} project={state.projects.find(p=>p.id===config.id)||config} baseURL={state.base_url} models={state.models.filter(m=>(state.projects.find(p=>p.id===config.id)||config).model_ids.includes(m.id)).map(m=>({...m,protocols:protocolsFor(m),enabled:m.enabled&&!!connectionsByID.get(m.connection_id)?.enabled}))} resolveToken={async()=>{const out=await api('/admin/projects/'+config.id+'/credential','POST',{});return out.token}} saveToken={async token=>{await api('/admin/projects/'+config.id+'/credential/save','POST',{token});await load()}} rotateToken={async()=>{const out=await api('/admin/projects/'+config.id+'/rotate','POST',{});credentialMemory.current.remember(config.id,out.token);if(callProjectId===config.id)setCallToken('');await load()}}/></Modal>}
- {reveal&&<Modal title={'解锁查看 · '+reveal.name} onClose={()=>{setReveal(null);setRevealed('');setRevealPassword('')}}><form onSubmit={e=>{e.preventDefault();run(async()=>{const out=await api('/admin/connections/'+reveal.id+'/reveal','POST',{password:revealPassword});setRevealPassword('');setRevealed(out.token)})}}>{revealed?<><p className="muted">20 秒后自动隐藏。请勿向 AI 提交此内容。</p><pre className="secret">{revealed}</pre><button type="button" onClick={()=>copy(revealed)}><Copy size={15}/>复制 Token</button></>:<><Field label="再次输入管理密码"><input autoFocus type="password" required={!status.passwordless_ready} placeholder={status.passwordless_ready?'本地免密模式，可留空':'输入管理密码'} autoComplete="current-password" value={revealPassword} onChange={e=>setRevealPassword(e.target.value)}/></Field>{errorView}<div className="modal-actions"><button className="primary" disabled={busy}><Eye size={16}/>解锁查看</button></div></>}</form></Modal>}
- {testModel&&<Modal title={'测试模型 · '+testModel.name} onClose={()=>{setTestModel(null);setTestResult('');setTestSpeech('')}}><div className="modal-body"><p>将通过 {connectionsByID.get(testModel.connection_id)?.name} 调用模型 <code>{testModel.upstream_model}</code>，{selectedTestProtocol==='dashscope-asr'?'转写所选音频。':selectedTestProtocol==='dashscope-tts'?'用所填音色合成一句测试语音。':isWebTool(selectedTestProtocol)?(selectedTestProtocol==='deepseek-fetch'?'抓取 DeepSeek 文档首页。':'搜索“DeepSeek”。'):'发送一句简短问候。'}</p><Field label="测试协议"><select value={selectedTestProtocol} disabled={busy||!testProtocols.length} onChange={e=>{setTestProtocol(e.target.value);setTestResult('');setTestSpeech('')}}>{!testProtocols.length&&<option value="">无可用协议</option>}{testProtocols.map(p=><option key={p} value={p}>{protocolName(p)}</option>)}</select></Field>{selectedTestProtocol==='dashscope-asr'&&<AsrAudioFields audio={testAudio} onAudio={setTestAudio} hotwords={testHotwords} onHotwords={setTestHotwords} disabled={busy}/>}{selectedTestProtocol==='dashscope-tts'&&<Field label="音色 ID" hint="需与模型匹配，例如 anmingyuan_v3.1。"><input value={testVoice} onChange={e=>setTestVoice(e.target.value)} disabled={busy}/></Field>}<p className="impact">{connectionsByID.get(testModel.connection_id)?.provider==='demo'?'本地模拟调用，不消耗额度。':'这是一次真实模型调用，会使用厂商 Token 并可能消耗额度。'}</p>{testResult&&<pre>{testResult}</pre>}{testSpeech&&<audio controls src={testSpeech} aria-label="测试合成的语音"/>}{errorView}<div className="modal-actions"><button onClick={()=>setTestModel(null)}>关闭</button><button className="primary" disabled={busy||!selectedTestProtocol||(selectedTestProtocol==='dashscope-asr'&&!testAudio)||(selectedTestProtocol==='dashscope-tts'&&!testVoice.trim())} onClick={()=>run(async()=>{const out=await api('/admin/models/'+testModel.id+'/test','POST',selectedTestProtocol==='dashscope-asr'?asrTestRequest(testAudio,testHotwords):selectedTestProtocol==='dashscope-tts'?{protocol:selectedTestProtocol,voice:testVoice.trim()}:isWebTool(selectedTestProtocol)?{protocol:selectedTestProtocol}:{protocol:selectedTestProtocol,message:'请简短回复：连接成功。'});setTestSpeech(ttsAudioSource(out));setTestResult(ttsSummary(out)||webToolText(JSON.stringify(out))||responseText(JSON.stringify(out))||JSON.stringify(out,null,2));await load()})}><Send size={15}/>{busy?'测试中…':'发起测试'}</button></div></div></Modal>}
- {deleteTarget?.kind==='connections'&&<Modal className="connection-delete-modal" title="删除厂商连接" onClose={()=>{if(!deleting)setDeleteTarget(null)}}><ConnectionDeleteContent key={deleteTarget.id} name={deleteTarget.name} endpoint={Object.entries(connectionsByID.get(deleteTarget.id)?.endpoints||{}).map(([p,url])=>protocolName(p)+': '+url).join(' · ')} models={deleteModels} projects={state.projects} busy={deleting} error={deleteError} onClose={()=>setDeleteTarget(null)} onDeleteAll={confirmDelete} onDeleteModel={deleteLinkedModel} onRefresh={refreshDeleteModels}/></Modal>}
- {deleteTarget&&deleteTarget.kind!=='connections'&&<Modal title={'删除'+deleteLabels[deleteTarget.kind]} onClose={()=>{if(!deleting)setDeleteTarget(null)}}><div className="modal-body delete-dialog">
-  <p>即将删除{deleteLabels[deleteTarget.kind]} <strong>「{deleteTarget.name}」</strong>。</p>
-  <p>{deleteTarget.kind==='projects'?'项目凭证立即失效，模型授权一并移除；已接入的程序将无法继续使用这个项目。':'模型及各项目对它的授权将被移除，后续无法再调用这个模型。'}</p>
-  {deleteProjects.length>0&&<p className="impact">受影响的项目：{deleteProjects.map(p=>p.name).join('、')}。</p>}
-  <p className="muted">历史请求记录会保留。此操作无法撤销；如仅需暂停使用，可取消后改为停用。</p>
-  {deleteError&&<div className="error" role="alert">{deleteError}</div>}
-  <div className="modal-actions"><button data-initial-focus="" disabled={deleting} onClick={()=>setDeleteTarget(null)}>取消</button><button className="danger-solid" disabled={deleting} onClick={confirmDelete}><Trash2 size={15}/>{deleting?'正在删除…':'确认删除'}</button></div>
- </div></Modal>}
-
- </div>
+  const filterOptions = requestFilterOptions(records, state.models, state.connections);
+  const hasFilters = !!search || filter !== 'all' || projectFilter !== 'all' || modelFilter !== 'all' || providerFilter !== 'all';
+  function clearRequestFilters() {
+    setSearch('');
+    setFilter('all');
+    setProjectFilter('all');
+    setModelFilter('all');
+    setProviderFilter('all');
+    setBodySearch(false);
+  }
+  const guideProject = state.projects.find((p) => p.id === guideProjectId),
+    guideToken = guideProject ? credentialMemory.current.get(guideProject.id) : undefined;
+  const deleteModels = deleteTarget?.kind === 'connections' ? state.models.filter((m) => m.connection_id === deleteTarget.id) : [];
+  const deleteProjects = deleteTarget?.kind === 'models' ? state.projects.filter((p) => p.model_ids.includes(deleteTarget.id)) : [];
+  const historyProjects = [
+    ...new Map(
+      records
+        .filter((r) => r.project_id !== 'admin-test' && r.project_id !== 'admin-chat' && !state.projects.some((p) => p.id === r.project_id))
+        .map((r) => [r.project_id, r.project_name]),
+    ).entries(),
+  ];
+  const pendingApplications = (state.applications || []).filter((a) => a.status === 'pending');
+  const connectionsByID = new Map(state.connections.map((c) => [c.id, c]));
+  const callProtocols = protocolsFor(state.models.find((m) => m.alias === callAlias));
+  const selectedCallProtocol = callProtocols.includes(callProtocol) ? callProtocol : callProtocols[0] || '';
+  const testProtocols = protocolsFor(testModel || undefined);
+  const selectedTestProtocol = testProtocols.includes(testProtocol) ? testProtocol : testProtocols[0] || '';
+  const errorView = error && (
+    <div className="error" role="alert">
+      {error}
+      <button type="button" onClick={() => setError('')} aria-label="关闭错误">
+        <X size={15} />
+      </button>
+    </div>
+  );
+  if (!status)
+    return (
+      <div className="boot">
+        <Waypoints />
+        正在打开AI Gateway…{errorView}
+      </div>
+    );
+  if (!status.authenticated)
+    return (
+      <div className="login-page">
+        <div className="login-brand">
+          <span className="brand-icon">
+            <Waypoints size={20} />
+          </span>
+          AI Gateway <span className="version">v0.1</span>
+        </div>
+        <div className="login-grid">
+          <section className="login-context">
+            <span className="eyebrow">YOUR MODELS. ONE PLACE.</span>
+            <h1>
+              模型连接，
+              <br />
+              由你掌管。
+            </h1>
+            <p>
+              统一管理厂商密钥，让每个项目
+              <br />
+              只访问你授权的模型。
+            </p>
+            <div className="login-feature">
+              <Plug size={18} />
+              <span>智谱 · MiniMax · 自定义连接</span>
+            </div>
+            <div className="login-feature">
+              <ShieldCheck size={18} />
+              <span>独立项目凭证与模型授权</span>
+            </div>
+            <div className="login-feature">
+              <Activity size={18} />
+              <span>查看消息、原始数据与耗时</span>
+            </div>
+          </section>
+          <form className="login-card" onSubmit={authenticate}>
+            <span className="lock-mark">
+              <LockKeyhole size={22} />
+            </span>
+            <h2>{status.configured ? (status.locked ? '解锁你的网关' : '登录管理页面') : '设置管理密码'}</h2>
+            <p>
+              {status.configured
+                ? status.passwordless_enabled
+                  ? status.passwordless_ready
+                    ? status.locked
+                      ? '网关已锁定，密码留空即可解锁并恢复调用。'
+                      : '网关已就绪，模型调用不依赖管理页面登录。密码留空即可进入。'
+                    : '首次切换需输入一次原管理密码，之后启动自动就绪，无需手动解锁。'
+                  : status.locked
+                    ? '解锁后，项目可以继续通过网关调用模型。'
+                    : '网关已就绪，登录管理页面不会影响模型调用。'
+                : '此密码用于登录管理页和解锁厂商密钥。请妥善保管，Demo 暂不提供密码找回。'}
+            </p>
+            <Field label="管理密码">
+              <input
+                autoFocus
+                type="password"
+                autoComplete={status.configured ? 'current-password' : 'new-password'}
+                minLength={status.configured ? undefined : 12}
+                required={!status.configured || !status.passwordless_enabled || !status.passwordless_ready}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={status.configured ? (status.passwordless_ready ? '留空，直接点下方按钮' : '输入管理密码') : '至少 12 个字符'}
+              />
+            </Field>
+            {!status.configured && (
+              <Field label="再次输入密码">
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={12}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </Field>
+            )}
+            {errorView}
+            <button className="primary full" disabled={busy}>
+              {busy ? '正在进入…' : status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入'}
+              <ArrowRight size={17} />
+            </button>
+            <small className="login-foot">
+              {status.configured && status.passwordless_enabled
+                ? '本地临时设置 · 原管理密码仍然有效'
+                : '首次进入后，可载入本地演示，无需厂商 Token。'}
+            </small>
+          </form>
+        </div>
+        <footer className="login-bottom">
+          <span>
+            <span className="dot" /> 本地运行
+          </span>
+          <span>{status.passwordless_enabled ? '本地自动就绪 · 退出管理不影响调用' : '凭据加密保存 · 重启后需重新解锁'}</span>
+        </footer>
+      </div>
+    );
+  return (
+    <div className="app">
+      <Sidebar collapsed={sidebar.collapsed}>
+        <nav id="workspace-navigation" aria-label="工作空间">
+          {navGroups.map(([group, pages]) => (
+            <div className="nav-group" key={group}>
+              <div className="nav-caption">{group}</div>
+              {pages.map((p) => {
+                const Icon = icons[p];
+                return (
+                  <button
+                    key={p}
+                    className={page === p ? 'active' : ''}
+                    aria-current={page === p ? 'page' : undefined}
+                    title={
+                      labels[p] +
+                      (p === 'projects' && pendingApplications.length > 0
+                        ? `（${pendingApplications.length} 个待批准）`
+                        : p === 'requests' && state.request_count > 0
+                          ? `（${state.request_count} 条）`
+                          : '')
+                    }
+                    aria-label={
+                      labels[p] +
+                      (p === 'projects' && pendingApplications.length > 0
+                        ? `，${pendingApplications.length} 个待批准`
+                        : p === 'requests' && state.request_count > 0
+                          ? `，${state.request_count} 条`
+                          : '')
+                    }
+                    onClick={() => navigate(p)}
+                  >
+                    <Icon size={16} />
+                    <em className="nav-no" aria-hidden="true">
+                      {navNumber[p]}
+                    </em>
+                    <span className="sidebar-label">{labels[p]}</span>
+                    {p === 'projects' && pendingApplications.length > 0 && (
+                      <span className="nav-count nav-count-pending" aria-label="待批准项目数">
+                        {pendingApplications.length}
+                      </span>
+                    )}
+                    {p === 'requests' && state.request_count > 0 && <span className="nav-count">{state.request_count}</span>}
+                    {p === 'connections' && runtime && Object.keys(runtime.breakers).length > 0 && (
+                      <span className="nav-count nav-count-pending">{Object.keys(runtime.breakers).length} 熔断</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div
+            className="gateway-status"
+            title={`网关已就绪 · ${new URL(state.base_url || location.origin).host}`}
+            aria-label={`网关已就绪 · ${new URL(state.base_url || location.origin).host}`}
+          >
+            <Badge on>
+              <span className="sidebar-label">网关已就绪</span>
+            </Badge>
+            <code className="gateway-address" aria-label="网关地址">
+              {new URL(state.base_url || location.origin).host}
+            </code>
+          </div>
+          <button
+            className="quiet"
+            aria-label="退出管理"
+            title="退出管理"
+            onClick={() =>
+              run(async () => {
+                await api('/admin/logout', 'POST', {});
+                abort.current?.abort();
+                setCallToken('');
+                setFreshKey(null);
+                setRevealed('');
+                setReveal(null);
+                setConn(null);
+                setModel(null);
+                setProject(null);
+                setSelected(null);
+                setState(initial);
+                setRecords([]);
+                setTasks([]);
+                await refreshStatus();
+              })
+            }
+          >
+            <LockKeyhole size={15} />
+            <span className="sidebar-label">退出管理</span>
+          </button>
+        </div>
+      </Sidebar>
+      <div
+        className={'workspace' + (recordsPage && !tester ? ' requests-workspace' : page === 'chat' ? ' chat-workspace' : '')}
+        ref={workspace}
+        tabIndex={0}
+        role="region"
+        aria-label="工作区"
+      >
+        <StatusBar api={api} host={new URL(state.base_url || location.origin).host} runtime={runtime} onRuntime={setRuntime} />
+        <header className={'page-head' + (recordsPage ? ' request-page-head' : '')}>
+          <div className="page-head-inner">
+            <div className="page-heading">
+              <SidebarToggle collapsed={sidebar.collapsed} onToggle={sidebar.toggle} />
+              <h1>
+                <em className="page-no" aria-hidden="true">
+                  {navNumber[page]}
+                </em>
+                {page === 'overview' ? '运行总览' : labels[page]}
+              </h1>
+            </div>
+            {page === 'connections' ? (
+              <button className="primary" onClick={newConn}>
+                <Plus size={17} />
+                新增连接
+              </button>
+            ) : page === 'models' ? (
+              <button className="primary" onClick={newModel} disabled={!state.connections.length}>
+                <Plus size={17} />
+                新增模型
+              </button>
+            ) : page === 'projects' ? (
+              <button className="primary" onClick={newProject}>
+                <Plus size={17} />
+                新建项目
+              </button>
+            ) : recordsPage ? (
+              <button onClick={() => (tester ? closeTester() : openTester())}>
+                <Terminal size={16} />
+                试调用
+              </button>
+            ) : (
+              <button onClick={() => navigate('requests')}>
+                查看请求
+                <ArrowRight size={16} />
+              </button>
+            )}
+          </div>
+        </header>
+        <main
+          className={
+            'main ' +
+            (recordsPage
+              ? 'requests-main'
+              : page === 'chat'
+                ? 'chat-main'
+                : page === 'models'
+                  ? 'models-main'
+                  : page === 'projects'
+                    ? 'projects-main'
+                    : page === 'diagnostics'
+                      ? 'diagnostics-main'
+                      : '')
+          }
+        >
+          {errorView}
+          {state.dropped_records > 0 && <div className="error">有 {state.dropped_records} 条记录未能写入，请检查磁盘空间。</div>}
+          {page !== 'projects' && pendingApplications.length > 0 && (
+            <button className="application-banner" onClick={() => navigate('projects')}>
+              <ShieldCheck size={18} />
+              <span>{pendingApplications.length} 个项目等待批准接入</span>
+              <ArrowRight size={16} />
+            </button>
+          )}
+          <ChatPage
+            active={page === 'chat'}
+            models={state.models}
+            connections={state.connections}
+            api={api}
+            refresh={load}
+            onOpenRecord={(id) => {
+              navigate('requests');
+              selectRecord(id);
+            }}
+            onConfigure={() => navigate('models')}
+          />
+          {page === 'overview' && state.connections.length > 0 && (
+            <section className="panel upstream-strip" aria-label="厂商连接健康">
+              <div className="panel-head">
+                <h2>厂商连接 · 近 24 小时</h2>
+                <button className="link" onClick={() => navigate('connections')}>
+                  查看连接
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+              <div className="upstream-rows">
+                {state.connections.map((c) =>
+                  health[c.id] ? (
+                    <div className={'upstream-row health-' + health[c.id].state} key={c.id}>
+                      <span className="ur-name">{c.name}</span>
+                      <span className="ur-state">
+                        {healthLabel[health[c.id].state]}
+                        {health[c.id].breaker_until && health[c.id].breaker_until! > Date.now()
+                          ? ` · 熔断 ${Math.ceil((health[c.id].breaker_until! - Date.now()) / 1000)}s`
+                          : ''}
+                      </span>
+                      <HealthBlocks health={health[c.id]} />
+                    </div>
+                  ) : null,
+                )}
+              </div>
+            </section>
+          )}
+          {page === 'system' && <SystemPage api={api} onNotice={setNotice} onError={setError} />}
+          {page === 'overview' && (
+            <MonitorOverview
+              projects={state.projects}
+              connections={state.connections}
+              models={state.models}
+              onSelect={(id) => {
+                navigate('requests');
+                selectRecord(id);
+              }}
+              onNewConnection={newConn}
+              onDemo={demo}
+            />
+          )}
+          {page === 'diagnostics' && (
+            <DiagnosticsPage
+              onSelect={(id) => {
+                navigate('requests');
+                selectRecord(id);
+              }}
+            />
+          )}
+          {page === 'costs' && (
+            <CostPage
+              projects={state.projects}
+              onSelect={(id) => {
+                navigate('requests');
+                selectRecord(id);
+              }}
+              onEditProject={(id) => {
+                const p = state.projects.find((x) => x.id === id);
+                if (p) setProject({ ...p, model_ids: [...p.model_ids] });
+              }}
+            />
+          )}
+          {page === 'connections' && (
+            <OutboundProxyPanel
+              value={state.outbound_proxy || ''}
+              proxiedCount={state.connections.filter((c) => c.use_proxy).length}
+              busy={busy}
+              onSave={(url) =>
+                run(async () => {
+                  await api('/admin/outbound-proxy', 'PUT', { url });
+                  await load();
+                  setNotice(url ? '出站代理已保存' : '出站代理已清除');
+                })
+              }
+            />
+          )}
+          {page === 'connections' &&
+            (!state.connections.length ? (
+              <Empty
+                title="添加厂商连接"
+                text="将端点和 Token 配置一次，多个模型可以共用这个连接。"
+                action={
+                  <button onClick={newConn}>
+                    <Plus size={16} />
+                    新增连接
+                  </button>
+                }
+              />
+            ) : (
+              <ConnectionList
+                connections={state.connections}
+                health={health}
+                probing={probing}
+                onProbe={(c) =>
+                  run(async () => {
+                    setProbing(c.id);
+                    try {
+                      const r = await api('/admin/connections/' + c.id + '/probe', 'POST', {});
+                      setNotice(r.ok ? '探测成功：' + r.message : '探测结果：' + (r.message || '失败'));
+                      await loadHealth();
+                    } finally {
+                      setProbing('');
+                    }
+                  })
+                }
+                onEdit={(c) => setConn({ ...c, token: '' })}
+                onReveal={(c) => {
+                  setReveal(c);
+                  setRevealed('');
+                  setRevealPassword('');
+                }}
+                onDelete={(c) => askDelete('connections', c)}
+              />
+            ))}
+          {page === 'models' &&
+            (!state.models.length ? (
+              <Empty
+                title="配置一个模型"
+                text={state.connections.length ? '选择已有连接，填写程序调用别名与厂商模型 ID。' : '先添加厂商连接，然后再创建模型。'}
+                action={
+                  <button onClick={state.connections.length ? newModel : () => navigate('connections')}>
+                    {state.connections.length ? '新增模型' : '去添加连接'}
+                    <ArrowRight size={15} />
+                  </button>
+                }
+              />
+            ) : (
+              <ModelList
+                models={state.models}
+                connections={state.connections}
+                onEdit={(m) => setModel({ ...m, protocols: protocolsFor(m), defaults: { ...m.defaults } })}
+                onTest={openModelTest}
+                onDelete={(m) => askDelete('models', m)}
+                onCopyAlias={copy}
+              />
+            ))}
+          {page === 'projects' &&
+            (!state.projects.length ? (
+              <Empty
+                title="让项目接入网关"
+                text="新建项目、勾选模型权限，再把独立凭证填到你的程序里。"
+                action={
+                  <button onClick={newProject}>
+                    <Plus size={16} />
+                    新建项目
+                  </button>
+                }
+              />
+            ) : (
+              <ProjectList
+                applications={state.applications}
+                deciding={busy}
+                onDecision={(application, decision) =>
+                  run(async () => {
+                    await api('/admin/applications/' + application.id + '/decision', 'POST', { decision });
+                    await load();
+                    setNotice(decision === 'approve' ? '已批准，客户端原 Token 立即生效' : '已拒绝，客户端 Token 保持不可用');
+                  })
+                }
+                projects={state.projects}
+                models={state.models}
+                onEdit={(p) => setProject({ ...p, model_ids: [...p.model_ids] })}
+                onAccess={setConfig}
+                onTest={openTester}
+                onDelete={(p) => askDelete('projects', p)}
+                usage={runtime?.limits || {}}
+              />
+            ))}
+          {recordsPage && (
+            <>
+              {tester && (
+                <section className="panel tester">
+                  <div className="panel-head">
+                    <h2>
+                      <Terminal size={17} />
+                      以项目身份试调用
+                    </h2>
+                    <button className="icon-btn" onClick={closeTester} aria-label="关闭试调用">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <form onSubmit={call}>
+                    <div className="form-grid">
+                      <div className="credential-field">
+                        <Field label="网关项目凭证" hint="填写完整的 gw_ 开头凭证；管理密码和厂商 Token 用在各自的配置页面。">
+                          <input
+                            type="password"
+                            autoComplete="off"
+                            spellCheck={false}
+                            aria-invalid={!!credentialError}
+                            aria-describedby={credentialError ? 'project-credential-error' : undefined}
+                            value={callToken}
+                            onChange={(e) => {
+                              setCallToken(e.target.value);
+                              setCallProjectId('');
+                              setCredentialError('');
+                            }}
+                            placeholder="粘贴完整项目凭证（gw_ 开头）"
+                          />
+                        </Field>
+                        {credentialError && (
+                          <p id="project-credential-error" className="credential-error" role="alert">
+                            {credentialError}
+                          </p>
+                        )}
+                        <button type="button" className="link" disabled={calling} onClick={() => showCredentialGuide()}>
+                          <KeyRound size={14} />
+                          选择项目并填入
+                        </button>
+                      </div>
+                      <Field label="模型别名">
+                        <select value={callAlias} onChange={(e) => setCallAlias(e.target.value)} required>
+                          <option value="">选择模型</option>
+                          {state.models.map((m) => (
+                            <option key={m.id} value={m.alias}>
+                              {m.alias} · {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    </div>
+                    <Field label="调用协议">
+                      <select
+                        value={selectedCallProtocol}
+                        onChange={(e) => setCallProtocol(e.target.value)}
+                        disabled={calling || !callProtocols.length}
+                      >
+                        {!callProtocols.length && <option value="">无可用协议</option>}
+                        {callProtocols.map((p) => (
+                          <option key={p} value={p}>
+                            {protocolName(p)}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    {selectedCallProtocol === 'dashscope-asr' ? (
+                      <AsrAudioFields
+                        audio={callAudio}
+                        onAudio={setCallAudio}
+                        hotwords={callHotwords}
+                        onHotwords={setCallHotwords}
+                        disabled={calling}
+                      />
+                    ) : (
+                      <>
+                        {selectedCallProtocol === 'dashscope-tts' && (
+                          <Field label="音色 ID" hint="百炼控制台的音色 ID，例如 anmingyuan_v3.1。">
+                            <input required value={callVoice} onChange={(e) => setCallVoice(e.target.value)} />
+                          </Field>
+                        )}
+                        <Field label={selectedCallProtocol === 'dashscope-tts' ? '要合成的文字' : '消息'}>
+                          <textarea required rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+                        </Field>
+                      </>
+                    )}
+                    <div className="actions">
+                      <button className="primary" disabled={calling || (selectedCallProtocol === 'dashscope-asr' && !callAudio)}>
+                        <Send size={15} />
+                        {calling ? (selectedCallProtocol === 'dashscope-asr' ? '正在转写…' : '正在接收…') : '发送请求'}
+                      </button>
+                      {calling && (
+                        <button type="button" onClick={() => abort.current?.abort()}>
+                          停止
+                        </button>
+                      )}
+                    </div>
+                    {callOutput && (
+                      <div className="call-output" aria-live="polite">
+                        {callOutput}
+                      </div>
+                    )}
+                    {callSpeech && <audio controls src={callSpeech} aria-label="合成的语音" />}
+                  </form>
+                </section>
+              )}
+              {taskView ? (
+                <TaskWorkspace
+                  tasks={tasks}
+                  api={api}
+                  refresh={() => run(load)}
+                  renderRecord={(record, callTab, setCallTab, callCopy) => (
+                    <RecordDetail selected={record} tab={callTab} setTab={setCallTab} copy={callCopy} />
+                  )}
+                />
+              ) : (
+                <div className="inspector">
+                  <section className="request-rail">
+                    <div className="rail-head">
+                      <div>
+                        <h2>请求</h2>
+                        <span className="muted small">
+                          {reqTotal === null
+                            ? `已载入 ${records.length} 条`
+                            : `${records.length} / ${reqTotal.toLocaleString()} 条${hasFilters ? '（已筛选）' : ''}`}
+                        </span>
+                        <button className="icon-btn" aria-label="刷新请求" onClick={() => run(refreshRequests)}>
+                          <RefreshCw size={15} />
+                        </button>
+                      </div>
+                      <label className="search">
+                        <Search size={15} />
+                        <input
+                          aria-label="搜索请求"
+                          placeholder="搜索项目、模型、ID、错误、提问"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
+                      </label>
+                      <label className="check body-search">
+                        <input type="checkbox" checked={bodySearch} onChange={(e) => setBodySearch(e.target.checked)} />
+                        同时搜索正文（较慢，最多 10 秒；只有保留期内的正文可搜）
+                      </label>
+                      {bodySearchState === 'timeout' && <small className="warning-text">正文搜索超时，下方只显示摘要匹配的结果。</small>}
+                      <div className="request-filters">
+                        <div className="request-project-filter">
+                          <FilterSelect
+                            label="按项目筛选"
+                            value={projectFilter}
+                            onChange={setProjectFilter}
+                            options={[
+                              { value: 'all', label: '所有项目' },
+                              { value: 'admin-test', label: '管理员测试' },
+                              { value: 'admin-chat', label: '对话调试' },
+                              ...state.projects.map((p) => ({ value: p.id, label: p.name })),
+                              ...historyProjects.map(([id, name]) => ({ value: id, label: id ? name + '（已删除）' : '未识别项目' })),
+                            ]}
+                          />
+                        </div>
+                        <FilterSelect label="按模型筛选" value={modelFilter} onChange={setModelFilter} options={filterOptions.models} />
+                        <FilterSelect
+                          label="按厂商筛选"
+                          value={providerFilter}
+                          onChange={setProviderFilter}
+                          options={filterOptions.providers}
+                        />
+                      </div>
+                      <div className="filter-tabs">
+                        {[
+                          ['all', '全部'],
+                          ['success', '完成'],
+                          ['unfinished', '未完成'],
+                          ['fallback', '回退'],
+                          ['limited', '限流'],
+                        ].map(([v, t]) => (
+                          <button
+                            key={v}
+                            className={filter === v ? 'selected' : ''}
+                            aria-pressed={filter === v}
+                            onClick={() => setFilter(v)}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                        {hasFilters && (
+                          <button className="request-reset" onClick={clearRequestFilters} aria-label="清除请求筛选">
+                            清除
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="request-items" role="region" aria-label="请求列表" tabIndex={0}>
+                      {visible.length ? (
+                        visible.map((r) => (
+                          <button
+                            key={r.id}
+                            className={'request-item ' + (selected?.id === r.id ? 'selected' : '')}
+                            onClick={() => selectRecord(r.id)}
+                          >
+                            <span>
+                              <b>{r.project_name}</b>
+                              <small>{time(r.started)}</small>
+                            </span>
+                            <span>
+                              <code>{r.alias}</code>
+                              <small className={r.state === 'complete' ? 'good-text' : 'warning-text'}>{r.status}</small>
+                            </span>
+                            <small>
+                              {recordStatus(r)} · {r.stream === true ? '流式' : r.stream === false ? '非流式' : '方式未记录'}
+                              {r.fallback_from && <span className="request-tag tag-fallback">回退自 {r.fallback_from}</span>}
+                              {(r.error_type === 'project_rate_limit' || r.error_type === 'project_concurrency') && (
+                                <span className="request-tag tag-limited">项目限流</span>
+                              )}
+                              {r.body_purged && <span className="request-tag tag-purged">正文已清理</span>}
+                            </small>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="rail-empty">{reqLoading ? '正在读取…' : '没有匹配的请求'}</p>
+                      )}
+                      {reqNext && (
+                        <button className="load-more" onClick={loadMoreRequests} disabled={reqLoading}>
+                          {reqLoading ? '正在读取…' : '加载更早的 50 条'}
+                        </button>
+                      )}
+                    </div>
+                  </section>
+                  <section className="request-detail" aria-label="请求详情" tabIndex={0}>
+                    {selected ? (
+                      <RecordDetail selected={selected} tab={tab} setTab={setTab} copy={copy} />
+                    ) : (
+                      <Empty title="选择一条请求" text="查看消息结构、原始数据和首字耗时。" />
+                    )}
+                  </section>
+                </div>
+              )}
+            </>
+          )}
+        </main>
+        <footer className="app-footer">
+          <span>
+            <span className="dot" /> 本地服务 · Go + SQLite
+          </span>
+          <span>厂商凭据不随项目调用接口返回</span>
+        </footer>
+      </div>
+      {notice && (
+        <div className="toast" role="status">
+          <Check size={17} />
+          {notice}
+        </div>
+      )}
+      {credentialGuide && (
+        <Modal title="选择项目并填入凭证" onClose={() => setCredentialGuide(false)}>
+          <div className="modal-body">
+            {state.projects.length ? (
+              <>
+                <Field label="选择项目">
+                  <select value={guideProjectId} onChange={(e) => setGuideProjectId(e.target.value)}>
+                    {state.projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                        {p.enabled ? '' : ' · 已停用'}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {guideProject && !guideProject.enabled ? (
+                  <>
+                    <p className="impact">此项目已停用，无法发起调用。请先在项目权限中启用。</p>
+                    <button
+                      onClick={() => {
+                        setCredentialGuide(false);
+                        setProject({ ...guideProject, model_ids: [...guideProject.model_ids] });
+                        navigate('projects');
+                      }}
+                    >
+                      查看项目权限
+                      <ArrowRight size={15} />
+                    </button>
+                  </>
+                ) : guideProject && guideProject.has_saved_token ? (
+                  <>
+                    <p>此项目的 Token 已加密保管，可以直接取出填入，正在使用的凭证保持有效。</p>
+                    {errorView}
+                    <div className="modal-actions">
+                      <button
+                        className="primary"
+                        disabled={busy}
+                        onClick={() =>
+                          run(async () => {
+                            const out = await api('/admin/projects/' + guideProject.id + '/credential', 'POST', {});
+                            fillProjectCredential(guideProject, out.token);
+                          })
+                        }
+                      >
+                        填入这个项目的凭证
+                        <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  </>
+                ) : guideProject && guideToken ? (
+                  <>
+                    <p>当前页面暂存了这份凭证，可以直接填入。</p>
+                    <div className="modal-actions">
+                      <button className="primary" onClick={() => fillProjectCredential(guideProject, guideToken)}>
+                        填入这个项目的凭证
+                        <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  guideProject && (
+                    <>
+                      <p>此旧版项目尚未保存 Token 原文。已有完整 Token 可以到「接入信息」保存，之后可随时复制或填入。</p>
+                      <p className="impact">重新生成后，旧凭证立即失效。已经接入的程序也需要更新凭证。</p>
+                      {errorView}
+                      <div className="modal-actions">
+                        <button
+                          onClick={() => {
+                            setCredentialGuide(false);
+                            setConfig(guideProject);
+                          }}
+                        >
+                          保存已有 Token
+                        </button>
+                        <button
+                          className="primary"
+                          disabled={busy}
+                          onClick={() =>
+                            run(async () => {
+                              const out = await api('/admin/projects/' + guideProject.id + '/rotate', 'POST', {});
+                              fillProjectCredential(guideProject, out.token);
+                              setFreshKey({ token: out.token, project: guideProject });
+                              await load();
+                              setNotice('已重置并填入项目凭证，旧凭证已失效');
+                            })
+                          }
+                        >
+                          <RefreshCw size={15} />
+                          重置凭证并填入
+                        </button>
+                      </div>
+                    </>
+                  )
+                )}
+              </>
+            ) : (
+              <>
+                <p>先创建项目并授权模型，再生成独立项目凭证。</p>
+                <button
+                  className="primary"
+                  onClick={() => {
+                    setCredentialGuide(false);
+                    navigate('projects');
+                    newProject();
+                  }}
+                >
+                  新建项目
+                  <Plus size={15} />
+                </button>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
+      {conn && (
+        <Modal title={conn.id ? '编辑连接' : '新增厂商连接'} onClose={() => setConn(null)}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              run(async () => {
+                await api('/admin/connections' + (conn.id ? '/' + conn.id : ''), conn.id ? 'PUT' : 'POST', conn);
+                setConn(null);
+                await load();
+                setNotice('连接已保存');
+              });
+            }}
+          >
+            <p className="form-intro">选择厂商模板或自定义连接，至少配置一种协议的端点与 Token，多个模型可以共用这个连接。</p>
+            <Field label="连接名称">
+              <input
+                autoFocus
+                required
+                maxLength={80}
+                value={conn.name}
+                onChange={(e) => setConn({ ...conn, name: e.target.value })}
+                placeholder="例如：智谱主连接、我的模型服务"
+              />
+            </Field>
+            <Field label="厂商">
+              <select value={conn.provider} disabled={conn.provider === 'demo'} onChange={(e) => changeProvider(e.target.value)}>
+                <option value="zhipu">智谱</option>
+                <option value="minimax">MiniMax</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="dashscope">阿里云百炼</option>
+                <option value="custom">自定义连接</option>
+                {conn.provider === 'demo' && <option value="demo">本地演示</option>}
+              </select>
+            </Field>
+            <ConnectionProtocolFields
+              key={conn.id || 'new'}
+              provider={conn.provider}
+              endpoints={conn.endpoints}
+              onChange={(endpoints) => setConn({ ...conn, endpoints })}
+            />
+            {conn.provider !== 'demo' && (
+              <Field
+                label={conn.id ? '更换厂商 Token' : '厂商 Token'}
+                hint={conn.id ? '留空保留原 Token；填写新值即更换。' : '保存后加密保管，项目使用独立网关凭证。'}
+              >
+                <input
+                  type="password"
+                  autoComplete="off"
+                  required={!conn.id}
+                  value={conn.token || ''}
+                  onChange={(e) => setConn({ ...conn, token: e.target.value })}
+                  placeholder={conn.id ? '已配置，留空保留' : '粘贴厂商 Token'}
+                />
+              </Field>
+            )}
+            {conn.provider !== 'demo' && (
+              <>
+                <label className="check proxy-check">
+                  <input type="checkbox" checked={!!conn.use_proxy} onChange={(e) => setConn({ ...conn, use_proxy: e.target.checked })} />
+                  走出站代理
+                </label>
+                <p className="muted small proxy-hint">
+                  {state.outbound_proxy ? (
+                    <>
+                      开启后经 <code>{state.outbound_proxy}</code> 访问此厂商；关闭则直连。
+                    </>
+                  ) : (
+                    '尚未设置出站代理地址，目前按服务器环境变量决定；在「厂商连接」页顶部设置后此开关生效。'
+                  )}
+                </p>
+              </>
+            )}
+            <label className="check">
+              <input type="checkbox" checked={conn.enabled} onChange={(e) => setConn({ ...conn, enabled: e.target.checked })} />
+              启用这个连接
+            </label>
+            {conn.id && (
+              <p className="impact">
+                此连接关联 {state.models.filter((m) => m.connection_id === conn.id).length} 个模型，关联项目：
+                {state.projects
+                  .filter((p) => p.model_ids.some((mid) => state.models.some((m) => m.id === mid && m.connection_id === conn.id)))
+                  .map((p) => p.name)
+                  .join('、') || '无'}
+                。端点、协议或凭据变更将用于后续请求；新增协议需在模型中启用，移除协议会停止对应调用。
+              </p>
+            )}
+            {errorView}
+            <div className="modal-actions">
+              {conn.id && (
+                <button type="button" className="danger delete-action" onClick={() => askDelete('connections', conn)}>
+                  <Trash2 size={14} />
+                  删除连接
+                </button>
+              )}
+              <button type="button" onClick={() => setConn(null)}>
+                取消
+              </button>
+              <button className="primary" disabled={busy || !Object.keys(conn.endpoints).length}>
+                保存连接
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {model && (
+        <Modal title={model.id ? '编辑模型' : '新增模型'} onClose={() => setModel(null)}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              run(async () => {
+                await api('/admin/models' + (model.id ? '/' + model.id : ''), model.id ? 'PUT' : 'POST', model);
+                setModel(null);
+                await load();
+                setNotice('模型已保存');
+              });
+            }}
+          >
+            <p className="form-intro">为程序提供稳定的调用别名，随时调整背后的模型。</p>
+            <div className="form-grid">
+              <Field label="显示名称" hint="只影响管理页面。">
+                <input
+                  autoFocus
+                  required
+                  value={model.name}
+                  onChange={(e) => setModel({ ...model, name: e.target.value })}
+                  placeholder="我的代码模型"
+                />
+              </Field>
+              <Field label="调用别名" hint="程序请求的 model 字段。">
+                <input required value={model.alias} onChange={(e) => setModel({ ...model, alias: e.target.value })} placeholder="coding" />
+              </Field>
+            </div>
+            <Field label="所属连接">
+              <select
+                required
+                value={model.connection_id}
+                onChange={(e) =>
+                  setModel({
+                    ...model,
+                    connection_id: e.target.value,
+                    context_window: 0,
+                    protocols: defaultModelProtocols(connectionsByID.get(e.target.value)),
+                  })
+                }
+              >
+                <option value="">请选择连接</option>
+                {state.connections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {connectionProtocols(c).map(protocolName).join(' / ')}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <h3>启用的调用协议</h3>
+            <p className="muted small">
+              仅勾选上游模型实际支持的协议；ASR 模型使用百炼 ASR，语音合成模型使用百炼 TTS。DeepSeek
+              搜索和抓取是独立服务，建议单独建一个模型只勾选它们。
+            </p>
+            <div className="protocol-options">
+              {connectionProtocols(connectionsByID.get(model.connection_id)).map((p) => (
+                <label className="check" key={p}>
+                  <input
+                    type="checkbox"
+                    checked={model.protocols.includes(p)}
+                    onChange={(e) =>
+                      setModel({ ...model, protocols: e.target.checked ? [...model.protocols, p] : model.protocols.filter((x) => x !== p) })
+                    }
+                  />
+                  {protocolName(p)}
+                </label>
+              ))}
+            </div>
+            {!model.protocols.length && <p className="error">请至少选择一种调用协议。</p>}
+            {model.protocols.length > 0 && model.protocols.every(isWebTool) ? (
+              <Field label="上游模型 ID（不会发送）" hint="搜索和抓取没有模型，此值只作说明，可填 deepseek-web-tools。">
+                <input
+                  required
+                  value={model.upstream_model}
+                  onChange={(e) => setModel({ ...model, upstream_model: e.target.value })}
+                  placeholder="deepseek-web-tools"
+                />
+              </Field>
+            ) : model.protocols.length === 1 && model.protocols[0] === 'dashscope-asr' ? (
+              <Field label="厂商模型 ID" hint="填写百炼已开通的 ASR 模型 ID。">
+                <input
+                  required
+                  value={model.upstream_model}
+                  onChange={(e) => setModel({ ...model, upstream_model: e.target.value })}
+                  placeholder="qwen-audio-3.0-asr-flash"
+                />
+              </Field>
+            ) : model.protocols.length === 1 && model.protocols[0] === 'dashscope-tts' ? (
+              <Field label="厂商模型 ID" hint="填写百炼已开通的语音合成模型 ID。">
+                <input
+                  required
+                  value={model.upstream_model}
+                  onChange={(e) => setModel({ ...model, upstream_model: e.target.value })}
+                  placeholder="qwen-audio-3.1-tts-flash"
+                />
+              </Field>
+            ) : (
+              <>
+                <ModelCatalogField
+                  key={model.connection_id + JSON.stringify(connectionsByID.get(model.connection_id)?.endpoints)}
+                  connection={connectionsByID.get(model.connection_id)}
+                  value={model.upstream_model}
+                  onChange={(value) => setModel((current) => (current ? { ...current, upstream_model: value, context_window: 0 } : null))}
+                  onSelect={(id, name) =>
+                    setModel((current) => (current ? { ...current, upstream_model: id, name, alias: id, context_window: 0 } : null))
+                  }
+                />
+                <ModelContextWindow value={model.context_window} onChange={(context_window) => setModel({ ...model, context_window })} />
+                <div className="form-grid">
+                  <Field label="默认 temperature（可选）">
+                    <input
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={model.defaults.temperature ?? ''}
+                      onChange={(e) => {
+                        const d = { ...model.defaults };
+                        if (e.target.value === '') delete d.temperature;
+                        else d.temperature = Number(e.target.value);
+                        setModel({ ...model, defaults: d });
+                      }}
+                    />
+                  </Field>
+                  <Field label="默认 max_tokens（可选）">
+                    <input
+                      type="number"
+                      min="1"
+                      max="131072"
+                      step="1"
+                      value={model.defaults.max_tokens ?? ''}
+                      onChange={(e) => {
+                        const d = { ...model.defaults };
+                        if (e.target.value === '') delete d.max_tokens;
+                        else d.max_tokens = Number(e.target.value);
+                        setModel({ ...model, defaults: d });
+                      }}
+                    />
+                  </Field>
+                </div>
+                <ModelThinkingDefaults
+                  provider={connectionsByID.get(model.connection_id)?.provider}
+                  protocols={model.protocols}
+                  defaults={model.defaults}
+                  onChange={(defaults) => setModel({ ...model, defaults })}
+                />
+              </>
+            )}
+            <Field
+              label="备用模型（可选）"
+              hint="主模型在还没向客户端输出任何内容前失败（连接失败、超时、429、401/403、5xx）时改用它，只切换一次；请求格式错误（400 等）和流式输出开始后的中断不会切换。项目也需要被授权使用备用模型。"
+            >
+              <select value={model.fallback_model_id || ''} onChange={(e) => setModel({ ...model, fallback_model_id: e.target.value })}>
+                <option value="">不使用备用模型</option>
+                {state.models
+                  .filter(
+                    (m) => m.id !== model.id && m.protocols.some((p) => model.protocols.includes(p)) && m.fallback_model_id !== model.id,
+                  )
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.alias} · {connectionsByID.get(m.connection_id)?.name || '连接不可用'}
+                      {m.enabled ? '' : '（已停用）'}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            {model.fallback_model_id &&
+              (() => {
+                const missing = state.projects.filter(
+                  (p) => p.model_ids.includes(model.id) && !p.model_ids.includes(model.fallback_model_id!),
+                );
+                return missing.length ? (
+                  <p className="warning-text small">
+                    {missing.map((p) => p.name).join('、')} 已授权本模型但未授权备用模型，它们的请求失败时不会改用备用。
+                  </p>
+                ) : null;
+              })()}
+            <ModelPriceFields
+              protocols={model.protocols}
+              prices={model.prices || []}
+              onChange={(prices) => setModel({ ...model, prices })}
+            />
+            <label className="check">
+              <input type="checkbox" checked={model.enabled} onChange={(e) => setModel({ ...model, enabled: e.target.checked })} />
+              启用这个模型
+            </label>
+            {model.id && (
+              <p className="impact">
+                已授权给{' '}
+                {state.projects
+                  .filter((p) => p.model_ids.includes(model.id))
+                  .map((p) => p.name)
+                  .join('、') || '尚无项目'}
+                。修改别名后需同步程序配置；修改显示名称不影响调用。
+              </p>
+            )}
+            {errorView}
+            <div className="modal-actions">
+              {model.id && (
+                <button type="button" className="danger delete-action" onClick={() => askDelete('models', model)}>
+                  <Trash2 size={14} />
+                  删除模型
+                </button>
+              )}
+              <button type="button" onClick={() => setModel(null)}>
+                取消
+              </button>
+              <button className="primary" disabled={busy || !model.protocols.length}>
+                保存模型
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {project && (
+        <Modal title={project.id ? '编辑项目权限' : '新建项目'} onClose={() => setProject(null)}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              run(async () => {
+                // Editing: an empty limit means unlimited (0). Creating: empty uses the defaults.
+                const body = project.id
+                  ? {
+                      ...project,
+                      rate_rpm: project.rate_rpm ?? 0,
+                      rate_burst: project.rate_burst ?? 0,
+                      max_concurrent: project.max_concurrent ?? 0,
+                    }
+                  : project;
+                const result = await api('/admin/projects' + (project.id ? '/' + project.id : ''), project.id ? 'PUT' : 'POST', body);
+                setProject(null);
+                await load();
+                if (result.token) setFreshKey({ token: result.token, project: result.project });
+                else setNotice('项目权限已保存，后续请求立即采用新权限');
+              });
+            }}
+          >
+            <p className="form-intro">管理项目的模型权限，保存后可在「接入信息」复制端点与凭证。</p>
+            <Field label="项目名称">
+              <input
+                autoFocus
+                required
+                maxLength={80}
+                value={project.name}
+                onChange={(e) => setProject({ ...project, name: e.target.value })}
+                placeholder="例如：代码助手"
+              />
+            </Field>
+            <label className="check">
+              <input type="checkbox" checked={project.enabled} onChange={(e) => setProject({ ...project, enabled: e.target.checked })} />
+              允许此项目调用
+            </label>
+            <Field
+              label="月预算（元，可选）"
+              hint="按配置单价估算本月费用，达到预算后网关拒绝此项目的新请求，下月 1 日自动恢复。留空表示不限。"
+            >
+              <input
+                type="number"
+                min="0.01"
+                step="any"
+                inputMode="decimal"
+                value={project.monthly_budget ?? ''}
+                onChange={(e) => setProject({ ...project, monthly_budget: e.target.value === '' ? null : Number(e.target.value) })}
+                placeholder="不限"
+              />
+            </Field>
+            <h3>限速</h3>
+            <p className="muted small">
+              超过上限的请求立即返回 429 并带 Retry-After，官方 SDK 会自动退避重试；不消耗厂商额度。留空或填 0 表示不限。
+            </p>
+            <div className="form-grid limit-grid">
+              <Field label="每分钟请求数" hint={project.id ? undefined : '留空则使用「数据与系统」里的新项目默认值。'}>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={project.rate_rpm ?? ''}
+                  onChange={(e) => setProject({ ...project, rate_rpm: e.target.value === '' ? null : Number(e.target.value) })}
+                  placeholder={project.id ? '不限' : '默认值'}
+                />
+              </Field>
+              <Field label="突发量" hint="短时间内允许连续发出的请求数，默认为每分钟请求数的 1/4。">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={project.rate_burst ?? ''}
+                  onChange={(e) => setProject({ ...project, rate_burst: e.target.value === '' ? null : Number(e.target.value) })}
+                  placeholder="自动"
+                />
+              </Field>
+              <Field label="同时进行的请求" hint="流式请求在结束前一直占用名额。">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={project.max_concurrent ?? ''}
+                  onChange={(e) => setProject({ ...project, max_concurrent: e.target.value === '' ? null : Number(e.target.value) })}
+                  placeholder={project.id ? '不限' : '默认值'}
+                />
+              </Field>
+            </div>
+            <h3>允许使用的模型</h3>
+            <div className="grants">
+              {state.models.length ? (
+                state.models.map((m) => (
+                  <label key={m.id} className="grant">
+                    <input
+                      type="checkbox"
+                      checked={project.model_ids.includes(m.id)}
+                      onChange={(e) =>
+                        setProject({
+                          ...project,
+                          model_ids: e.target.checked ? [...project.model_ids, m.id] : project.model_ids.filter((x) => x !== m.id),
+                        })
+                      }
+                    />
+                    <span>
+                      <b>{m.name}</b>
+                      <code>{m.alias}</code>
+                    </span>
+                    <small>{m.enabled ? '已启用' : '已停用'}</small>
+                  </label>
+                ))
+              ) : (
+                <p className="muted">请先在模型配置中添加模型。</p>
+              )}
+            </div>
+            <p className="impact">未勾选的模型无法调用。项目凭证不能读取厂商 Token 或访问管理接口。</p>
+            {errorView}
+            <div className="modal-actions">
+              {project.id && (
+                <button type="button" className="danger delete-action" onClick={() => askDelete('projects', project)}>
+                  <Trash2 size={14} />
+                  删除项目
+                </button>
+              )}
+              <button type="button" onClick={() => setProject(null)}>
+                取消
+              </button>
+              <button className="primary" disabled={busy}>
+                {project.id ? '保存权限' : '创建并生成凭证'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {freshKey && (
+        <Modal title="项目凭证已生成" onClose={() => setFreshKey(null)}>
+          <div className="modal-body">
+            <p>凭证已加密保存。以后可在「项目权限 → 接入信息」中复制完整 Token，当前页面也可直接填入试调用。</p>
+            <pre className="secret">{freshKey.token}</pre>
+            <button onClick={() => copy(freshKey.token)}>
+              <Copy size={15} />
+              复制凭证
+            </button>
+            <div className="modal-actions">
+              <button
+                onClick={() => {
+                  fillProjectCredential(freshKey.project, freshKey.token);
+                  setFreshKey(null);
+                }}
+              >
+                用它试调用
+                <ArrowRight size={16} />
+              </button>
+              <button className="primary" onClick={() => setFreshKey(null)}>
+                已保存
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {config && (
+        <Modal className="project-access-modal" title={config.name + ' · 接入信息'} onClose={() => setConfig(null)}>
+          <ProjectAccessContent
+            key={config.id}
+            project={state.projects.find((p) => p.id === config.id) || config}
+            baseURL={state.base_url}
+            models={state.models
+              .filter((m) => (state.projects.find((p) => p.id === config.id) || config).model_ids.includes(m.id))
+              .map((m) => ({ ...m, protocols: protocolsFor(m), enabled: m.enabled && !!connectionsByID.get(m.connection_id)?.enabled }))}
+            resolveToken={async () => {
+              const out = await api('/admin/projects/' + config.id + '/credential', 'POST', {});
+              return out.token;
+            }}
+            saveToken={async (token) => {
+              await api('/admin/projects/' + config.id + '/credential/save', 'POST', { token });
+              await load();
+            }}
+            rotateToken={async () => {
+              const out = await api('/admin/projects/' + config.id + '/rotate', 'POST', {});
+              credentialMemory.current.remember(config.id, out.token);
+              if (callProjectId === config.id) setCallToken('');
+              await load();
+            }}
+          />
+        </Modal>
+      )}
+      {reveal && (
+        <Modal
+          title={'解锁查看 · ' + reveal.name}
+          onClose={() => {
+            setReveal(null);
+            setRevealed('');
+            setRevealPassword('');
+          }}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              run(async () => {
+                const out = await api('/admin/connections/' + reveal.id + '/reveal', 'POST', { password: revealPassword });
+                setRevealPassword('');
+                setRevealed(out.token);
+              });
+            }}
+          >
+            {revealed ? (
+              <>
+                <p className="muted">20 秒后自动隐藏。请勿向 AI 提交此内容。</p>
+                <pre className="secret">{revealed}</pre>
+                <button type="button" onClick={() => copy(revealed)}>
+                  <Copy size={15} />
+                  复制 Token
+                </button>
+              </>
+            ) : (
+              <>
+                <Field label="再次输入管理密码">
+                  <input
+                    autoFocus
+                    type="password"
+                    required={!status.passwordless_ready}
+                    placeholder={status.passwordless_ready ? '本地免密模式，可留空' : '输入管理密码'}
+                    autoComplete="current-password"
+                    value={revealPassword}
+                    onChange={(e) => setRevealPassword(e.target.value)}
+                  />
+                </Field>
+                {errorView}
+                <div className="modal-actions">
+                  <button className="primary" disabled={busy}>
+                    <Eye size={16} />
+                    解锁查看
+                  </button>
+                </div>
+              </>
+            )}
+          </form>
+        </Modal>
+      )}
+      {testModel && (
+        <Modal
+          title={'测试模型 · ' + testModel.name}
+          onClose={() => {
+            setTestModel(null);
+            setTestResult('');
+            setTestSpeech('');
+          }}
+        >
+          <div className="modal-body">
+            <p>
+              将通过 {connectionsByID.get(testModel.connection_id)?.name} 调用模型 <code>{testModel.upstream_model}</code>，
+              {selectedTestProtocol === 'dashscope-asr'
+                ? '转写所选音频。'
+                : selectedTestProtocol === 'dashscope-tts'
+                  ? '用所填音色合成一句测试语音。'
+                  : isWebTool(selectedTestProtocol)
+                    ? selectedTestProtocol === 'deepseek-fetch'
+                      ? '抓取 DeepSeek 文档首页。'
+                      : '搜索“DeepSeek”。'
+                    : '发送一句简短问候。'}
+            </p>
+            <Field label="测试协议">
+              <select
+                value={selectedTestProtocol}
+                disabled={busy || !testProtocols.length}
+                onChange={(e) => {
+                  setTestProtocol(e.target.value);
+                  setTestResult('');
+                  setTestSpeech('');
+                }}
+              >
+                {!testProtocols.length && <option value="">无可用协议</option>}
+                {testProtocols.map((p) => (
+                  <option key={p} value={p}>
+                    {protocolName(p)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {selectedTestProtocol === 'dashscope-asr' && (
+              <AsrAudioFields
+                audio={testAudio}
+                onAudio={setTestAudio}
+                hotwords={testHotwords}
+                onHotwords={setTestHotwords}
+                disabled={busy}
+              />
+            )}
+            {selectedTestProtocol === 'dashscope-tts' && (
+              <Field label="音色 ID" hint="需与模型匹配，例如 anmingyuan_v3.1。">
+                <input value={testVoice} onChange={(e) => setTestVoice(e.target.value)} disabled={busy} />
+              </Field>
+            )}
+            <p className="impact">
+              {connectionsByID.get(testModel.connection_id)?.provider === 'demo'
+                ? '本地模拟调用，不消耗额度。'
+                : '这是一次真实模型调用，会使用厂商 Token 并可能消耗额度。'}
+            </p>
+            {testResult && <pre>{testResult}</pre>}
+            {testSpeech && <audio controls src={testSpeech} aria-label="测试合成的语音" />}
+            {errorView}
+            <div className="modal-actions">
+              <button onClick={() => setTestModel(null)}>关闭</button>
+              <button
+                className="primary"
+                disabled={
+                  busy ||
+                  !selectedTestProtocol ||
+                  (selectedTestProtocol === 'dashscope-asr' && !testAudio) ||
+                  (selectedTestProtocol === 'dashscope-tts' && !testVoice.trim())
+                }
+                onClick={() =>
+                  run(async () => {
+                    const out = await api(
+                      '/admin/models/' + testModel.id + '/test',
+                      'POST',
+                      selectedTestProtocol === 'dashscope-asr'
+                        ? asrTestRequest(testAudio, testHotwords)
+                        : selectedTestProtocol === 'dashscope-tts'
+                          ? { protocol: selectedTestProtocol, voice: testVoice.trim() }
+                          : isWebTool(selectedTestProtocol)
+                            ? { protocol: selectedTestProtocol }
+                            : { protocol: selectedTestProtocol, message: '请简短回复：连接成功。' },
+                    );
+                    setTestSpeech(ttsAudioSource(out));
+                    setTestResult(
+                      ttsSummary(out) ||
+                        webToolText(JSON.stringify(out)) ||
+                        responseText(JSON.stringify(out)) ||
+                        JSON.stringify(out, null, 2),
+                    );
+                    await load();
+                  })
+                }
+              >
+                <Send size={15} />
+                {busy ? '测试中…' : '发起测试'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {deleteTarget?.kind === 'connections' && (
+        <Modal
+          className="connection-delete-modal"
+          title="删除厂商连接"
+          onClose={() => {
+            if (!deleting) setDeleteTarget(null);
+          }}
+        >
+          <ConnectionDeleteContent
+            key={deleteTarget.id}
+            name={deleteTarget.name}
+            endpoint={Object.entries(connectionsByID.get(deleteTarget.id)?.endpoints || {})
+              .map(([p, url]) => protocolName(p) + ': ' + url)
+              .join(' · ')}
+            models={deleteModels}
+            projects={state.projects}
+            busy={deleting}
+            error={deleteError}
+            onClose={() => setDeleteTarget(null)}
+            onDeleteAll={confirmDelete}
+            onDeleteModel={deleteLinkedModel}
+            onRefresh={refreshDeleteModels}
+          />
+        </Modal>
+      )}
+      {deleteTarget && deleteTarget.kind !== 'connections' && (
+        <Modal
+          title={'删除' + deleteLabels[deleteTarget.kind]}
+          onClose={() => {
+            if (!deleting) setDeleteTarget(null);
+          }}
+        >
+          <div className="modal-body delete-dialog">
+            <p>
+              即将删除{deleteLabels[deleteTarget.kind]} <strong>「{deleteTarget.name}」</strong>。
+            </p>
+            <p>
+              {deleteTarget.kind === 'projects'
+                ? '项目凭证立即失效，模型授权一并移除；已接入的程序将无法继续使用这个项目。'
+                : '模型及各项目对它的授权将被移除，后续无法再调用这个模型。'}
+            </p>
+            {deleteProjects.length > 0 && <p className="impact">受影响的项目：{deleteProjects.map((p) => p.name).join('、')}。</p>}
+            <p className="muted">历史请求记录会保留。此操作无法撤销；如仅需暂停使用，可取消后改为停用。</p>
+            {deleteError && (
+              <div className="error" role="alert">
+                {deleteError}
+              </div>
+            )}
+            <div className="modal-actions">
+              <button data-initial-focus="" disabled={deleting} onClick={() => setDeleteTarget(null)}>
+                取消
+              </button>
+              <button className="danger-solid" disabled={deleting} onClick={confirmDelete}>
+                <Trash2 size={15} />
+                {deleting ? '正在删除…' : '确认删除'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
 }
-function pretty(s:string){try{return JSON.stringify(JSON.parse(s),null,2)}catch{return s}}
-function MessageBlock({label,assistant=false,children}:{label:string;assistant?:boolean;children:React.ReactNode}){
- const [expanded,setExpanded]=useState(true);
- const contentId=useId();
- return <article className={'message'+(assistant?' assistant':'')}>
-  <button type="button" className="message-label message-toggle" aria-expanded={expanded} aria-controls={contentId} onClick={()=>setExpanded(value=>!value)}>
-   <span className="message-role">{label}</span><ChevronRight size={14} className="message-chevron" aria-hidden="true"/><span className="message-toggle-hint" aria-hidden="true">{expanded?'收起':'展开'}</span>
-  </button>
-  <div id={contentId} className="message-content" hidden={!expanded}>{children}</div>
- </article>
+function pretty(s: string) {
+  try {
+    return JSON.stringify(JSON.parse(s), null, 2);
+  } catch {
+    return s;
+  }
 }
-function MessageContent({content}:{content:unknown}){
- const blocks=Array.isArray(content)?content:[content];
- return <TextPreview>{blocks.map((block,i)=>{
-  if(typeof block==='string')return <p key={i}>{block}</p>;
-  if(block&&typeof block==='object'&&'type' in block&&block.type==='text'&&'text' in block&&typeof block.text==='string')return <p key={i}>{block.text}</p>;
-  return <pre key={i}>{readable(block)}</pre>;
- })}</TextPreview>;
+function MessageBlock({ label, assistant = false, children }: { label: string; assistant?: boolean; children: React.ReactNode }) {
+  const [expanded, setExpanded] = useState(true);
+  const contentId = useId();
+  return (
+    <article className={'message' + (assistant ? ' assistant' : '')}>
+      <button
+        type="button"
+        className="message-label message-toggle"
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <span className="message-role">{label}</span>
+        <ChevronRight size={14} className="message-chevron" aria-hidden="true" />
+        <span className="message-toggle-hint" aria-hidden="true">
+          {expanded ? '收起' : '展开'}
+        </span>
+      </button>
+      <div id={contentId} className="message-content" hidden={!expanded}>
+        {children}
+      </div>
+    </article>
+  );
+}
+function MessageContent({ content }: { content: unknown }) {
+  const blocks = Array.isArray(content) ? content : [content];
+  return (
+    <TextPreview>
+      {blocks.map((block, i) => {
+        if (typeof block === 'string') return <p key={i}>{block}</p>;
+        if (
+          block &&
+          typeof block === 'object' &&
+          'type' in block &&
+          block.type === 'text' &&
+          'text' in block &&
+          typeof block.text === 'string'
+        )
+          return <p key={i}>{block.text}</p>;
+        return <pre key={i}>{readable(block)}</pre>;
+      })}
+    </TextPreview>
+  );
 }
 function recordLimitNote(r: RequestRecord) {
   if (!r.truncated) return null;
@@ -248,22 +2453,159 @@ function recordLimitNote(r: RequestRecord) {
   const scope = parts.length ? parts.join('和') + '记录' : '记录内容';
   return <div className="error">{scope}达到 1 MiB 上限，已截断；这是检查器保存副本的限制，不代表模型响应本身被截断。</div>;
 }
-function ttsRecordText(output:string){try{return ttsSummary(JSON.parse(output)).split('\n')[0]}catch{return ''}}
-function RecordDetail({selected,tab,setTab,copy}:{selected:RequestRecord;tab:string;setTab:(tab:string)=>void;copy:(value:string)=>void}){return <><RequestHeader record={selected}/><div className="detail-tabs">{[['messages','消息'],['response','响应详情'],['raw','原始数据'],['timing','性能与用量']].map(([v,t])=><button key={v} className={tab===v?'active':''} onClick={()=>setTab(v)}>{t}</button>)}</div><div className="detail-content"><RequestAdaptations changes={selected.adaptations}/>{selected.record_missing&&<div className="request-outcome-note">当前仅有监控摘要；请求可能仍在进行、正文日志尚未写入或未能保存。</div>}{recordLimitNote(selected)}{tab==='messages'?<Messages key={selected.id} record={selected} onResponseDetails={()=>{setTab('response')}}/>:tab==='response'?selected.protocol==='dashscope-asr'?<AsrResponseDetails key={selected.id} output={selected.output||''}/>:<ResponseDetails key={selected.id} output={selected.output||''}/>:tab==='raw'?<><div className="raw-data-heading"><h3>项目请求</h3><button type="button" className="raw-data-copy" aria-label="复制项目请求原始数据" disabled={!selected.input} onClick={()=>copy(selected.input||'')}><Copy size={14}/>复制</button></div><pre>{pretty(selected.input||'')}</pre><div className="raw-data-heading"><h3>上游响应 / SSE 事件</h3><button type="button" className="raw-data-copy" aria-label="复制上游响应原始数据" disabled={!selected.output} onClick={()=>copy(selected.output||'')}><Copy size={14}/>复制</button></div><pre>{pretty(selected.output||'')}</pre></>:<RequestTiming record={selected}/>}</div></>}
-
-function Messages({record,onResponseDetails}:{record:RequestRecord;onResponseDetails:()=>void}){
- const web=isWebTool(record.protocol),messages=web?[{role:record.protocol==='deepseek-fetch'?'url':'query',content:webToolInput(record.input||'')}]:messageList(record.input||'{}');
- return <div className="messages">
-  {messages.map((m,i)=><MessageBlock key={i} label={m.role==='tools'?`TOOLS · ${Array.isArray(m.content)?m.content.length:1} 个工具`:m.role.toUpperCase()}>
-   {m.role==='tools'?<ToolDefinitions content={m.content}/>:<MessageContent content={m.content}/>}
-   {Boolean(m.tool_calls)&&<details><summary>工具调用</summary><TextPreview><pre>{readable(m.tool_calls)}</pre></TextPreview></details>}
-  </MessageBlock>)}
-  <MessageBlock label={record.protocol==='dashscope-asr'?'ASR · 转写结果':record.protocol==='dashscope-tts'?'TTS · 合成结果':web?protocolName(record.protocol)+' · 返回结果':'ASSISTANT · 本次响应'} assistant>
-   <TextPreview><p>{(web?webToolText(record.output||''):record.protocol==='dashscope-tts'?ttsRecordText(record.output||''):responseText(record.output||''))||responsePlaceholder(responseDetails(record.output||''))}</p></TextPreview>
-   <button type="button" className="link response-details-link" onClick={onResponseDetails}>查看响应详情<ArrowRight size={14}/></button>
-   <details><summary>完整内容（包含工具、思考与其他返回字段）</summary><TextPreview><pre>{pretty(record.output||'')}</pre></TextPreview></details>
-  </MessageBlock>
- </div>
+function ttsRecordText(output: string) {
+  try {
+    return ttsSummary(JSON.parse(output)).split('\n')[0];
+  } catch {
+    return '';
+  }
+}
+function RecordDetail({
+  selected,
+  tab,
+  setTab,
+  copy,
+}: {
+  selected: RequestRecord;
+  tab: string;
+  setTab: (tab: string) => void;
+  copy: (value: string) => void;
+}) {
+  return (
+    <>
+      <RequestHeader record={selected} />
+      <Attempts record={selected} />
+      <div className="detail-tabs">
+        {[
+          ['messages', '消息'],
+          ['response', '响应详情'],
+          ['raw', '原始数据'],
+          ['timing', '性能与用量'],
+        ].map(([v, t]) => (
+          <button key={v} className={tab === v ? 'active' : ''} onClick={() => setTab(v)}>
+            {t}
+          </button>
+        ))}
+      </div>
+      <div className="detail-content">
+        <RequestAdaptations changes={selected.adaptations} />
+        {selected.record_missing &&
+          (selected.body_purged ? (
+            <div className="request-outcome-note">正文已按保留策略过期清理，下面只剩监控摘要和指标；保留天数可在「数据与系统」调整。</div>
+          ) : (
+            <div className="request-outcome-note">当前仅有监控摘要；请求可能仍在进行、正文日志尚未写入或未能保存。</div>
+          ))}
+        {recordLimitNote(selected)}
+        {tab === 'messages' ? (
+          <Messages
+            key={selected.id}
+            record={selected}
+            onResponseDetails={() => {
+              setTab('response');
+            }}
+          />
+        ) : tab === 'response' ? (
+          selected.protocol === 'dashscope-asr' ? (
+            <AsrResponseDetails key={selected.id} output={selected.output || ''} />
+          ) : (
+            <ResponseDetails key={selected.id} output={selected.output || ''} />
+          )
+        ) : tab === 'raw' ? (
+          <>
+            <div className="raw-data-heading">
+              <h3>项目请求</h3>
+              <button
+                type="button"
+                className="raw-data-copy"
+                aria-label="复制项目请求原始数据"
+                disabled={!selected.input}
+                onClick={() => copy(selected.input || '')}
+              >
+                <Copy size={14} />
+                复制
+              </button>
+            </div>
+            <pre>{pretty(selected.input || '')}</pre>
+            <div className="raw-data-heading">
+              <h3>上游响应 / SSE 事件</h3>
+              <button
+                type="button"
+                className="raw-data-copy"
+                aria-label="复制上游响应原始数据"
+                disabled={!selected.output}
+                onClick={() => copy(selected.output || '')}
+              >
+                <Copy size={14} />
+                复制
+              </button>
+            </div>
+            <pre>{pretty(selected.output || '')}</pre>
+          </>
+        ) : (
+          <RequestTiming record={selected} />
+        )}
+      </div>
+    </>
+  );
 }
 
-createRoot(document.getElementById('root')!).render(<App/>);
+function Messages({ record, onResponseDetails }: { record: RequestRecord; onResponseDetails: () => void }) {
+  const web = isWebTool(record.protocol),
+    messages = web
+      ? [{ role: record.protocol === 'deepseek-fetch' ? 'url' : 'query', content: webToolInput(record.input || '') }]
+      : messageList(record.input || '{}');
+  return (
+    <div className="messages">
+      {messages.map((m, i) => (
+        <MessageBlock
+          key={i}
+          label={m.role === 'tools' ? `TOOLS · ${Array.isArray(m.content) ? m.content.length : 1} 个工具` : m.role.toUpperCase()}
+        >
+          {m.role === 'tools' ? <ToolDefinitions content={m.content} /> : <MessageContent content={m.content} />}
+          {Boolean(m.tool_calls) && (
+            <details>
+              <summary>工具调用</summary>
+              <TextPreview>
+                <pre>{readable(m.tool_calls)}</pre>
+              </TextPreview>
+            </details>
+          )}
+        </MessageBlock>
+      ))}
+      <MessageBlock
+        label={
+          record.protocol === 'dashscope-asr'
+            ? 'ASR · 转写结果'
+            : record.protocol === 'dashscope-tts'
+              ? 'TTS · 合成结果'
+              : web
+                ? protocolName(record.protocol) + ' · 返回结果'
+                : 'ASSISTANT · 本次响应'
+        }
+        assistant
+      >
+        <TextPreview>
+          <p>
+            {(web
+              ? webToolText(record.output || '')
+              : record.protocol === 'dashscope-tts'
+                ? ttsRecordText(record.output || '')
+                : responseText(record.output || '')) || responsePlaceholder(responseDetails(record.output || ''))}
+          </p>
+        </TextPreview>
+        <button type="button" className="link response-details-link" onClick={onResponseDetails}>
+          查看响应详情
+          <ArrowRight size={14} />
+        </button>
+        <details>
+          <summary>完整内容（包含工具、思考与其他返回字段）</summary>
+          <TextPreview>
+            <pre>{pretty(record.output || '')}</pre>
+          </TextPreview>
+        </details>
+      </MessageBlock>
+    </div>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<App />);

@@ -2,7 +2,7 @@
 
 **Audience:** Product, UX, and UI designers
 **Document type:** Product and interaction requirements
-**Status:** Based on the current implementation
+**Status:** Written before cost statistics, budgets and the 2026-11 operations features (paging, retention, health, fallback, project limits). Where this brief and [operations.md](operations.md) or the code disagree, the code wins.
 
 ## How to use this brief
 
@@ -431,7 +431,7 @@ Avoid using “provider,” “model,” “project,” and “task” interchan
 The current frontend should not present the following as existing product features:
 
 - automatic model routing or provider fallback;
-- billing, cost accounting, quotas, or per-project rate limits;
+- billing or payment accounts (estimated costs, monthly budgets and per-project rate limits now exist);
 - multi-user administration, teams, organizations, or role management;
 - general-purpose secret vault references or vendor account management;
 - Responses API, Realtime API, arbitrary protocol conversion, or async ASR jobs;

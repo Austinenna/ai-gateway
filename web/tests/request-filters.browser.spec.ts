@@ -19,15 +19,28 @@ test.beforeEach(async ({ page }) => {
     { ...base, id: 'r6', project_id: 'p2', project_name: '文档整理', model_id: 'm3', alias: 'custom', provider: 'custom' },
     { ...base, id: 'r7', project_id: 'p2', project_name: '文档整理', provider: undefined },
   ];
+  // Filtering happens on the server; this mock applies the same query parameters.
+  const serverPage = (q: URLSearchParams) => {
+    const modelValue = (r: any) => (r.model_id ? `id:${r.model_id}` : r.alias ? `alias:${r.alias}` : 'unknown');
+    const items = records.filter((r: any) =>
+      (!q.get('project_id') || r.project_id === (q.get('project_id') === 'none' ? '' : q.get('project_id'))) &&
+      (!q.get('model') || modelValue(r) === q.get('model')) &&
+      (!q.get('provider') || (r.provider || 'unknown') === q.get('provider')) &&
+      (!q.get('state') || (q.get('state') === 'success' ? r.state === 'complete' : r.state !== 'complete')) &&
+      (!q.get('q') || JSON.stringify(r).includes(q.get('q')!)));
+    return { items, total: items.length };
+  };
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname;
     const json = path === '/api/status' ? { configured: true, authenticated: true, locked: false } :
       path === '/api/admin/state' ? { connections, models, projects, request_count: records.length, dropped_records: 0, base_url: '' } :
-      path === '/api/admin/requests' ? records : {};
+      path === '/api/admin/requests' ? serverPage(new URL(route.request().url()).searchParams) : {};
     return route.fulfill({ json });
   });
   await page.goto('/');
   await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+  // The list loads from the server after the page opens.
+  await expect(page.locator('.request-item')).toHaveCount(8);
 });
 
 test('请求筛选菜单支持键盘、取消和窄屏定位', async ({ page }, info) => {
@@ -78,7 +91,7 @@ test('模型、厂商与项目及状态搜索交叉筛选，保留历史和缺�
   await choose('厂商', 'MiniMax'); await count(3);
   await choose('项目', '研发助手'); await count(2);
   await choose('模型', /mini.*写作助手/); await count(1);
-  await expect(page.locator('.rail-head')).toContainText('1 / 8 条');
+  await expect(page.locator('.rail-head')).toContainText('1 / 1 条');
   await page.getByRole('button', { name: '完成', exact: true }).click(); await count(0);
   await expect(page.locator('.rail-empty')).toHaveText('没有匹配的请求');
   await page.getByRole('button', { name: '未完成', exact: true }).click(); await count(1);

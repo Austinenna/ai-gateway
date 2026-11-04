@@ -10,7 +10,8 @@ export function TextPreview({ children }: { children: ReactNode }) {
   const contentId = useId();
 
   useLayoutEffect(() => {
-    const body = bodyRef.current!, window = windowRef.current!;
+    const body = bodyRef.current!,
+      window = windowRef.current!;
     const measure = () => {
       if (!body.getClientRects().length) return;
       const limit = parseFloat(getComputedStyle(window).getPropertyValue('--preview-height'));
@@ -23,16 +24,23 @@ export function TextPreview({ children }: { children: ReactNode }) {
   }, []);
 
   function toggle() {
-    setExpanded(value => !value);
+    setExpanded((value) => !value);
     if (expanded) requestAnimationFrame(() => windowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' }));
   }
 
-  return <div className="text-preview">
-    <div ref={windowRef} id={contentId} className={'text-preview-window' + (expanded ? ' is-expanded' : long ? ' is-clipped' : '')}>
-      <div ref={bodyRef} className="text-preview-body">{children}</div>
+  return (
+    <div className="text-preview">
+      <div ref={windowRef} id={contentId} className={'text-preview-window' + (expanded ? ' is-expanded' : long ? ' is-clipped' : '')}>
+        <div ref={bodyRef} className="text-preview-body">
+          {children}
+        </div>
+      </div>
+      {long && (
+        <button type="button" className="text-preview-toggle" aria-expanded={expanded} aria-controls={contentId} onClick={toggle}>
+          {expanded ? '收起全文' : '展开全文'}
+          <ChevronDown size={13} aria-hidden="true" />
+        </button>
+      )}
     </div>
-    {long && <button type="button" className="text-preview-toggle" aria-expanded={expanded} aria-controls={contentId} onClick={toggle}>
-      {expanded ? '收起全文' : '展开全文'}<ChevronDown size={13} aria-hidden="true"/>
-    </button>}
-  </div>;
+  );
 }

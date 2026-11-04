@@ -84,7 +84,10 @@ func buildRequestFilter(q map[string][]string, now time.Time) (requestFilter, in
 		}
 	}
 	f.add("m.started>=? AND m.started<?", from, to)
-	if v := get("project_id"); v != "" && v != "all" {
+	if v := get("project_id"); v == "none" {
+		// Calls rejected before the project was identified.
+		f.add("COALESCE(m.m_project,'')=''")
+	} else if v != "" && v != "all" {
 		f.add("m.m_project=?", v)
 	}
 	if v := get("model"); v != "" && v != "all" {

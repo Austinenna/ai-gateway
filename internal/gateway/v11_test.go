@@ -136,6 +136,9 @@ func TestRequestListPagingFiltersAndSearch(t *testing.T) {
 	if p := page("?project_id=p2&limit=200"); *p.Total != 40 || p.Items[0].ProjectID != "p2" {
 		t.Fatalf("project filter total=%d", *p.Total)
 	}
+	if p := page("?project_id=none"); *p.Total != 0 {
+		t.Fatal("none must match only calls without a project")
+	}
 	if p := page("?state=failed&limit=200"); *p.Total != 12 {
 		t.Fatalf("failed filter total=%d", *p.Total)
 	}
