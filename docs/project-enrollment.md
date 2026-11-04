@@ -50,6 +50,8 @@
 
 以客户端实际字段含义为准，不重复追加 `/v1`。仅支持 Responses 的客户端不能直接使用本网关。远程机器或容器内的 `127.0.0.1` 指向它自身，需要明确可达的网关地址。
 
+接入后，自己写的程序建议在调用时带上 `X-Gateway-Category`（用途）和 `X-Gateway-Task-ID`（业务任务 ID），用于成本归集和任务记录，见 README「调用方标记」与 [用量、成本与项目预算](usage-costs.md)。项目可以用自己的 Token 调 `GET /v1/usage` 查用量和本月预算；预算用完时网关返回 402 `budget_exceeded`，客户端应提示用户，不要重试。
+
 ASR 客户端应直接向完整 `endpoint` 发送 [DashScope 原生 JSON](asr.md)，不使用 OpenAI 的 multipart 转写接口。独立 Skill 的脚本已接受 `--protocol dashscope-asr`；客户端配置字段要求完整 URL 时使用 `--url-kind endpoint`，将 `endpoint` 写入 `--base-field` 指定的字段。默认 `--url-kind base` 仍写入基础地址，兼容原有 Chat 与 Messages 用法。
 
 ## Skill 源码与验证
