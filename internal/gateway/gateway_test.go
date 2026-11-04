@@ -484,7 +484,7 @@ func TestMigrateV1RequestSummary(t *testing.T) {
 	}
 	var version int
 	_ = g.db.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 9 {
+	if version != 10 {
 		t.Fatal("migration version not updated")
 	}
 }

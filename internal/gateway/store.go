@@ -45,6 +45,7 @@ type Model struct {
 	ContextWindow int                        `json:"context_window"`
 	Defaults      map[string]json.RawMessage `json:"defaults"`
 	Enabled       bool                       `json:"enabled"`
+	Prices        []ModelPrice               `json:"prices"`
 }
 type Project struct {
 	ID            string   `json:"id"`
@@ -53,6 +54,7 @@ type Project struct {
 	TokenPrefix   string   `json:"token_prefix"`
 	HasSavedToken bool     `json:"has_saved_token"`
 	ModelIDs      []string `json:"model_ids"`
+	MonthlyBudget *float64 `json:"monthly_budget"`
 }
 type RequestDiagnostic struct {
 	Code              string `json:"code"`
@@ -88,6 +90,8 @@ type Record struct {
 	InputTruncated  bool               `json:"input_truncated,omitempty"`
 	OutputTruncated bool               `json:"output_truncated,omitempty"`
 	Diagnostic      *RequestDiagnostic `json:"diagnostic,omitempty"`
+	// Derived when read from the current price versions; never persisted.
+	Cost *RecordCost `json:"cost,omitempty"`
 
 	Adaptations []RequestAdaptation `json:"adaptations,omitempty"`
 }
@@ -116,6 +120,7 @@ type Gateway struct {
 	dropped           atomic.Int64
 	client            HTTPDoer
 	outboundProxy     atomic.Pointer[url.URL]
+	spend             map[string]monthSpend
 }
 
 func randomBytes(n int) []byte {
@@ -192,7 +197,7 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	if e = db.QueryRow("PRAGMA user_version").Scan(&v); e != nil {
 		return fail(e)
 	}
-	if v > 9 {
+	if v > 10 {
 		return fail(errors.New("database was created by a newer gateway"))
 	}
 	_, e = db.Exec(`
@@ -246,7 +251,12 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 			return fail(e)
 		}
 	}
-	g := &Gateway{db: db, dataDir: dataDir, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient()}
+	if v < 10 {
+		if e = migrateCosts(db); e != nil {
+			return fail(e)
+		}
+	}
+	g := &Gateway{db: db, dataDir: dataDir, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient(), spend: map[string]monthSpend{}}
 	if e = g.loadOutboundProxy(); e != nil {
 		return fail(e)
 	}
@@ -376,6 +386,10 @@ func (g *Gateway) connections() ([]Connection, error) {
 	return out, rows.Err()
 }
 func (g *Gateway) models() ([]Model, error) {
+	book, e := g.loadPrices()
+	if e != nil {
+		return nil, e
+	}
 	rows, e := g.db.Query("SELECT id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,context_window FROM models ORDER BY rowid")
 	if e != nil {
 		return nil, e
@@ -394,12 +408,16 @@ func (g *Gateway) models() ([]Model, error) {
 		if e = json.Unmarshal([]byte(d), &m.Defaults); e != nil {
 			return nil, e
 		}
+		m.Prices = book[m.ID]
+		if m.Prices == nil {
+			m.Prices = []ModelPrice{}
+		}
 		out = append(out, m)
 	}
 	return out, rows.Err()
 }
 func (g *Gateway) projects() ([]Project, error) {
-	rows, e := g.db.Query("SELECT id,name,enabled,token_prefix,EXISTS(SELECT 1 FROM project_credentials pc WHERE pc.project_id=projects.id) FROM projects ORDER BY rowid")
+	rows, e := g.db.Query("SELECT id,name,enabled,token_prefix,EXISTS(SELECT 1 FROM project_credentials pc WHERE pc.project_id=projects.id),monthly_budget FROM projects ORDER BY rowid")
 	if e != nil {
 		return nil, e
 	}
@@ -407,7 +425,7 @@ func (g *Gateway) projects() ([]Project, error) {
 	for rows.Next() {
 		var p Project
 		p.ModelIDs = []string{}
-		if e = rows.Scan(&p.ID, &p.Name, &p.Enabled, &p.TokenPrefix, &p.HasSavedToken); e != nil {
+		if e = rows.Scan(&p.ID, &p.Name, &p.Enabled, &p.TokenPrefix, &p.HasSavedToken, &p.MonthlyBudget); e != nil {
 			rows.Close()
 			return nil, e
 		}

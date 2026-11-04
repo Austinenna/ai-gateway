@@ -3,6 +3,7 @@ package gateway
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"sort"
@@ -18,6 +19,9 @@ type TaskFields struct {
 	Question        string             `json:"question_excerpt,omitempty"`
 	QuestionVersion int                `json:"question_version,omitempty"`
 	ReplyKind       string             `json:"reply_kind,omitempty"`
+	// Generic attribution from X-Gateway-Category / X-Gateway-Task-ID.
+	Category string `json:"category,omitempty"`
+	TaskRef  string `json:"task_ref,omitempty"`
 }
 type WorkBuddyGrouping struct {
 	Client          string `json:"client"`
@@ -70,6 +74,40 @@ func captureWorkBuddy(rec *Record, h http.Header, credential string) {
 	key, _ := json.Marshal([]string{rec.ProjectID, "workbuddy", root})
 	rec.TaskID = "task_" + digest(string(key))
 	rec.Grouping = &WorkBuddyGrouping{Client: "workbuddy", RootID: root, SessionID: session, TurnID: turn, ParentSessionID: parent, AgentType: agent, RequestID: request, Source: source}
+}
+
+// Any client may tag calls for cost attribution. Unlike the passive WorkBuddy
+// headers, these are explicit, so a malformed value is rejected rather than
+// silently recorded as untagged.
+func captureUsageTags(rec *Record, h http.Header) error {
+	read := func(name string) (string, error) {
+		values := h.Values(name)
+		if len(values) == 0 {
+			return "", nil
+		}
+		valid := len(values) == 1 && len(values[0]) > 0 && len(values[0]) <= 128
+		for _, c := range values[0] {
+			valid = valid && (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("._:-", c))
+		}
+		if !valid {
+			return "", fmt.Errorf("%s 只能有一个值，1 到 128 个字符，限字母、数字和 ._:-", name)
+		}
+		return values[0], nil
+	}
+	category, err := read("X-Gateway-Category")
+	if err != nil {
+		return err
+	}
+	task, err := read("X-Gateway-Task-ID")
+	if err != nil {
+		return err
+	}
+	rec.Category, rec.TaskRef = category, task
+	if task != "" && rec.TaskID == "" {
+		key, _ := json.Marshal([]string{rec.ProjectID, "header", task})
+		rec.TaskID = "task_" + digest(string(key))
+	}
+	return nil
 }
 
 func contentText(v any) string {
@@ -246,6 +284,7 @@ type RequestTask struct {
 	Grouping         *WorkBuddyGrouping `json:"grouping,omitempty"`
 	Models           []string           `json:"models"`
 	Providers        []string           `json:"providers"`
+	Cost             *CostTotals        `json:"cost,omitempty"`
 }
 type TaskDetail struct {
 	Task     RequestTask `json:"task"`
@@ -472,6 +511,11 @@ func (g *Gateway) listTasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	tasks := []RequestTask{}
+	book, err := g.loadPrices()
+	if err != nil {
+		problem(w, 500, "读取单价失败")
+		return
+	}
 	if len(keys) > 0 {
 		records, e := g.taskRecords(keys)
 		if e != nil {
@@ -489,6 +533,7 @@ func (g *Gateway) listTasks(w http.ResponseWriter, r *http.Request) {
 				problem(w, 500, "读取任务提问失败")
 				return
 			}
+			task.Cost = costTotalsOf(group, book)
 			tasks = append(tasks, task)
 		}
 		sort.Slice(tasks, func(i, j int) bool {
@@ -530,6 +575,12 @@ func (g *Gateway) getTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		problem(w, 500, "读取任务提问失败")
 		return
+	}
+	if book, err := g.loadPrices(); err == nil {
+		task.Cost = costTotalsOf(records, book)
+		for i := offset; i < end; i++ {
+			g.priceRecord(&records[i], book)
+		}
 	}
 	writeJSON(w, 200, TaskDetail{Task: task, Question: question, Calls: records[offset:end], Total: len(records), Offset: offset, HasMore: end < len(records)})
 }

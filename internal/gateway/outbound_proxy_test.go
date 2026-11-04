@@ -127,7 +127,7 @@ func TestConnectionProxyV8Migration(t *testing.T) {
 		t.Fatalf("migration should keep the connection and default to direct: %v", err)
 	}
 	var version int
-	if err = h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 9 {
+	if err = h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 10 {
 		t.Fatalf("version=%d err=%v", version, err)
 	}
 }

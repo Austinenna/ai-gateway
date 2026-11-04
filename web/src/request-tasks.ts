@@ -1,3 +1,4 @@
+import type { CostTotals } from './costs';
 import type { RequestRecord } from './monitoring';
 
 export type WorkBuddyGrouping = {
@@ -9,7 +10,7 @@ export type RequestTask = {
   started: number; updated: number; duration_ms: number; calls: number; active: number; failed: number;
   missing_records: number; input_tokens: number; output_tokens: number; input_samples: number; output_samples: number;
   question_record_id?: string; reply_record_id?: string; grouping?: WorkBuddyGrouping;
-  models: string[]; providers: string[];
+  models: string[]; providers: string[]; cost?: CostTotals;
 };
 export type TaskDetail = { task: RequestTask; question: string; calls: RequestRecord[]; total: number; offset: number; has_more: boolean };
 export const taskState = (t: RequestTask) => ({ running: '调用中', replied: '已回复', waiting: '等待后续', error: '调用异常' }[t.state] || '状态未知');

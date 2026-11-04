@@ -14,7 +14,7 @@
 .task-state.error { color: var(--red); }
 .task-state.running { color: var(--accent); background: var(--accent-bg); }
 .task-head h2 { font-size: 18px; line-height: 1.7; margin: 18px 0; overflow-wrap: anywhere; max-height: 5.1em; overflow: hidden; }
-.task-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.task-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .task-stats > div { padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; border-left: 1px solid var(--line); min-width: 0; }
 .task-stats > div:first-child { border-left: 0; }
 .task-stats span, .task-stats small { font-size: 10px; color: var(--muted); font-weight: 400; }
@@ -44,7 +44,7 @@
 .task-group-fields dd { margin: 0; overflow-wrap: anywhere; font-family: "SFMono-Regular", monospace; font-size: 11px; }
 @container request-detail (max-width: 650px) {
   .task-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .task-stats > div:nth-child(3) { border-left: 0; }
+  .task-stats > div:nth-child(odd) { border-left: 0; }
   .task-stats > div:nth-child(n+3) { border-top: 1px solid var(--line); }
   .task-call { flex-wrap: wrap; }
   .task-call-usage { flex-basis: 100%; padding-left: 36px; }

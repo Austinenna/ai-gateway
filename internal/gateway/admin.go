@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 )
@@ -270,6 +271,10 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, err.Error())
 		return
 	}
+	if err := validatePrices(m.Prices); err != nil {
+		problem(w, 400, err.Error())
+		return
+	}
 	defaults, _ := json.Marshal(m.Defaults)
 	protocols, _ := json.Marshal(m.Protocols)
 	creating := m.ID == ""
@@ -282,12 +287,17 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	tx, e := g.db.Begin()
+	if e != nil {
+		problem(w, 500, "模型保存失败")
+		return
+	}
+	defer tx.Rollback()
 	var result sql.Result
-	var e error
 	if creating {
-		result, e = g.db.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,context_window) VALUES(?,?,?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow)
+		result, e = tx.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,context_window) VALUES(?,?,?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow)
 	} else {
-		result, e = g.db.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=?,protocols_json=?,context_window=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow, m.ID)
+		result, e = tx.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=?,protocols_json=?,context_window=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow, m.ID)
 	}
 	if e != nil {
 		problem(w, 409, "模型保存失败，请检查调用别名是否重复")
@@ -296,6 +306,25 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 	if n, _ := result.RowsAffected(); n == 0 {
 		problem(w, 404, "模型不存在")
 		return
+	}
+	// Clients that omit prices keep the stored versions.
+	if m.Prices != nil {
+		sort.Slice(m.Prices, func(i, j int) bool { return m.Prices[i].EffectiveFrom < m.Prices[j].EffectiveFrom })
+		if e = replacePrices(tx, m.ID, m.Prices); e != nil {
+			problem(w, 500, "单价保存失败")
+			return
+		}
+	}
+	if tx.Commit() != nil {
+		problem(w, 500, "模型保存失败")
+		return
+	}
+	g.invalidateSpend()
+	if book, err := g.loadPrices(); err == nil {
+		m.Prices = book[m.ID]
+	}
+	if m.Prices == nil {
+		m.Prices = []ModelPrice{}
 	}
 	writeJSON(w, 200, m)
 }
@@ -311,6 +340,10 @@ func (g *Gateway) saveProject(w http.ResponseWriter, r *http.Request) {
 	p.Name = strings.TrimSpace(p.Name)
 	if !validName(p.Name) {
 		problem(w, 400, "请填写项目名称")
+		return
+	}
+	if !validBudget(p.MonthlyBudget) {
+		problem(w, 400, "月预算必须为大于 0 的金额（元），留空表示不限")
 		return
 	}
 	if len(p.ModelIDs) > 1000 {
@@ -334,13 +367,13 @@ func (g *Gateway) saveProject(w http.ResponseWriter, r *http.Request) {
 		p.ID = id("prj_")
 		token = newToken()
 		p.TokenPrefix = token[:11]
-		_, e = tx.Exec("INSERT INTO projects(id,name,enabled,token_digest,token_prefix) VALUES(?,?,?,?,?)", p.ID, p.Name, p.Enabled, digest(token), p.TokenPrefix)
+		_, e = tx.Exec("INSERT INTO projects(id,name,enabled,token_digest,token_prefix,monthly_budget) VALUES(?,?,?,?,?,?)", p.ID, p.Name, p.Enabled, digest(token), p.TokenPrefix, p.MonthlyBudget)
 		if e == nil {
 			e = saveProjectToken(tx, key, p.ID, token)
 		}
 	} else {
 		var result sql.Result
-		result, e = tx.Exec("UPDATE projects SET name=?,enabled=? WHERE id=?", p.Name, p.Enabled, p.ID)
+		result, e = tx.Exec("UPDATE projects SET name=?,enabled=?,monthly_budget=? WHERE id=?", p.Name, p.Enabled, p.MonthlyBudget, p.ID)
 		if e == nil {
 			n, _ := result.RowsAffected()
 			if n == 0 {
@@ -371,9 +404,16 @@ func (g *Gateway) saveProject(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "保存失败")
 		return
 	}
+	g.invalidateSpend()
 	writeJSON(w, 200, map[string]any{"project": p, "token": token})
 }
 func (g *Gateway) listRecords(w http.ResponseWriter, r *http.Request) {
+	// Load prices first: the database has one connection and rows hold it.
+	book, e := g.loadPrices()
+	if e != nil {
+		problem(w, 500, "读取单价失败")
+		return
+	}
 	query := "SELECT summary FROM requests"
 	args := []any{}
 	if p := r.URL.Query().Get("project_id"); p != "" {
@@ -399,6 +439,7 @@ func (g *Gateway) listRecords(w http.ResponseWriter, r *http.Request) {
 		rec.Output = ""
 		rec.ensureDiagnostic("")
 		rec.normalizeStoredUsage()
+		g.priceRecord(&rec, book)
 		out = append(out, rec)
 	}
 	writeJSON(w, 200, out)
@@ -410,6 +451,7 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 	if running {
 		active.RecordMissing = true
 		active.normalizeStoredUsage()
+		g.priceStored(&active)
 		writeJSON(w, 200, active)
 		return
 	}
@@ -428,6 +470,7 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 		rec.ensureDiagnostic("")
 		rec.RecordMissing = true
 		rec.normalizeStoredUsage()
+		g.priceStored(&rec)
 		writeJSON(w, 200, rec)
 		return
 	}
@@ -439,6 +482,7 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 	rec.normalizeStoredTruncation()
 	rec.ensureDiagnostic("")
 	rec.normalizeStoredUsage()
+	g.priceStored(&rec)
 	writeJSON(w, 200, rec)
 }
 func (g *Gateway) seedDemo(w http.ResponseWriter, r *http.Request) {
@@ -470,7 +514,7 @@ func (g *Gateway) seedDemo(w http.ResponseWriter, r *http.Request) {
 		_, e = tx.Exec("INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json) VALUES(?,?,?,?,?,?,?,?)", mid, "本地演示模型", "demo-chat", cid, "demo-v1", "{}", true, `["chat"]`)
 	}
 	if e == nil {
-		_, e = tx.Exec("INSERT INTO projects VALUES(?,?,?,?,?)", pid, "演示项目", true, digest(token), token[:11])
+		_, e = tx.Exec("INSERT INTO projects(id,name,enabled,token_digest,token_prefix) VALUES(?,?,?,?,?)", pid, "演示项目", true, digest(token), token[:11])
 	}
 	if e == nil {
 		e = saveProjectToken(tx, key, pid, token)

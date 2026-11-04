@@ -98,7 +98,7 @@ func TestLegacyProjectTokenMigrationAndBackfill(t *testing.T) {
 	}
 	restartHarness(t, h)
 	var version int
-	if err := h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 9 {
+	if err := h.g.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 10 {
 		t.Fatal("v2 migration failed")
 	}
 	projects, err := h.g.projects()

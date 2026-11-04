@@ -68,7 +68,7 @@ func (g *Gateway) project(r *http.Request) (Project, bool) {
 	if token == "" || len(token) > 200 {
 		return p, false
 	}
-	e := g.db.QueryRow("SELECT id,name,enabled,token_prefix FROM projects WHERE token_digest=?", digest(token)).Scan(&p.ID, &p.Name, &p.Enabled, &p.TokenPrefix)
+	e := g.db.QueryRow("SELECT id,name,enabled,token_prefix,monthly_budget FROM projects WHERE token_digest=?", digest(token)).Scan(&p.ID, &p.Name, &p.Enabled, &p.TokenPrefix, &p.MonthlyBudget)
 	return p, e == nil && p.Enabled
 }
 func (g *Gateway) modelList(w http.ResponseWriter, r *http.Request) {
@@ -138,6 +138,10 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	}
 	t.rec.ProjectID, t.rec.ProjectName = p.ID, p.Name
 	captureWorkBuddy(&t.rec, r.Header, projectCredential(r))
+	if err := captureUsageTags(&t.rec, r.Header); err != nil {
+		problem(w, 400, err.Error())
+		return
+	}
 	g.snapshotCall(t)
 	protocol := requestProtocol(r.URL.Path)
 	limit := int64(maxLLMRequestBytes)
@@ -179,6 +183,9 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	c, e = selectProtocol(m, c, protocol)
 	if e != nil {
 		problem(w, 400, e.Error())
+		return
+	}
+	if !g.checkBudget(w, &t.rec, p) {
 		return
 	}
 	g.forward(w, r, p, m, c, enc, body)

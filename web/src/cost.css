@@ -1,0 +1,28 @@
+.cost-page .cost-budgets,.cost-page .cost-breakdown{margin-bottom:18px}
+.cost-page .metric-foot .danger{display:inline-flex;align-items:center;gap:4px}
+.cost-groupings{display:flex;flex-wrap:wrap;gap:4px}
+.cost-groupings button{padding:5px 10px;font-size:11px;border-radius:6px}
+.cost-groupings button[aria-pressed=true]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.cost-breakdown td small.danger{color:var(--red)}
+.budget-list{display:grid}
+.budget-row{display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(80px,2fr) minmax(90px,auto) auto;align-items:center;gap:16px;padding:12px 20px;border-top:1px solid var(--line)}
+.budget-row:first-child{border-top:0}
+.budget-name,.budget-amount{display:grid;gap:3px;min-width:0}
+.budget-name small,.budget-amount small{font-size:10px;color:var(--muted)}
+.budget-amount{text-align:right;font-variant-numeric:tabular-nums}
+.budget-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.budget-bar i{display:block;height:100%;background:var(--green);border-radius:3px}
+.budget-row.warning .budget-bar i{background:var(--orange)}
+.budget-row.exceeded .budget-bar i{background:var(--red)}
+.budget-row.exceeded .budget-name small{color:var(--red)}
+.model-prices{margin:6px 0 14px}
+.price-version{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+.price-version-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.price-version-head .field{flex:1;max-width:240px}
+.price-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+.model-prices .link{display:inline-flex;align-items:center;gap:4px}
+@media(max-width:640px){.budget-row{grid-template-columns:1fr auto auto;gap:6px 12px;padding:12px 16px}.budget-bar{grid-column:1/-1;grid-row:2}}
+.cost-page .panel-head{flex-wrap:wrap;gap:10px}
+.cost-page .panel-head h2{white-space:nowrap}
+.cost-page .monitor-filters label{max-width:320px}
+.budget-name b{font-size:14px}

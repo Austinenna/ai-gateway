@@ -1,3 +1,4 @@
+import { uncertainText, yuan } from './costs';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, GitBranch, Layers3, RefreshCw, Search } from 'lucide-react';
 import { TaskCallDialog } from './TaskCallDialog';
@@ -79,12 +80,13 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
       {error && <div className="error" role="alert">{error}</div>}
       {t ? <>
         <header className="task-head">
-          <div className="task-heading-meta"><span><Layers3 size={14}/>WorkBuddy · 一次提问 · {t.project_name}</span><span className={'task-state ' + t.state}>{taskState(t)}</span></div>
+          <div className="task-heading-meta"><span><Layers3 size={14}/>{t.grouping ? 'WorkBuddy · 一次提问' : '调用方任务'} · {t.project_name}</span><span className={'task-state ' + t.state}>{taskState(t)}</span></div>
           <h2>{t.title}</h2>
           <div className="task-stats">
             <div><span>LLM 调用</span><b>{t.calls}<small> 次</small></b><small>{t.failed ? `${t.failed} 次失败，已计入统计` : t.active ? `${t.active} 次正在进行` : '全部已记录调用'}</small></div>
             <div><span>输入 Token</span><b>{t.input_samples ? number(t.input_tokens) : '—'}</b><small>{t.input_samples} / {t.calls} 次用量已知</small></div>
             <div><span>输出 Token</span><b>{t.output_samples ? number(t.output_tokens) : '—'}</b><small>{t.output_samples} / {t.calls} 次用量已知</small></div>
+            <div><span>估算费用</span><b>{t.cost ? yuan(t.cost.cost) : '—'}</b><small>{t.cost && uncertainText(t.cost) || '按模型单价估算'}</small></div>
             <div><span>调用时间跨度</span><b>{duration(t.duration_ms)}</b><small>{t.active ? '截至当前' : '首个开始 → 最后结束'}</small></div>
           </div>
         </header>
@@ -105,7 +107,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
             {detail!.has_more && <button className="task-load-more" onClick={() => setLimit(v => v + 100)}>加载更多调用（已显示 {detail!.calls.length} / {detail!.total}）</button>}
           </> : <>
             <p className="task-explanation">此组依据客户端显式标识合并，并限定在同一个网关项目内。兼容相同请求头的客户端也会识别为 WorkBuddy。</p>
-            <dl className="task-group-fields"><dt>分组方式</dt><dd>{t.grouping?.source === 'turn' ? '明确分组 · 主代理轮次 ID 回退' : '明确分组 · 根任务 ID'}</dd><dt>网关任务 ID</dt><dd>{t.id}</dd><dt>网关项目 ID</dt><dd>{t.project_id || '未识别'}</dd>{t.grouping && <><dt>根任务 ID</dt><dd>{t.grouping.root_id}</dd><dt>参考会话 ID</dt><dd>{t.grouping.session_id}</dd><dt>参考轮次 ID</dt><dd>{t.grouping.turn_id || '未提供'}</dd></>}</dl>
+            <dl className="task-group-fields"><dt>分组方式</dt><dd>{!t.grouping ? '调用方请求头 X-Gateway-Task-ID' : t.grouping.source === 'turn' ? '明确分组 · 主代理轮次 ID 回退' : '明确分组 · 根任务 ID'}</dd><dt>网关任务 ID</dt><dd>{t.id}</dd><dt>网关项目 ID</dt><dd>{t.project_id || '未识别'}</dd>{t.grouping && <><dt>根任务 ID</dt><dd>{t.grouping.root_id}</dd><dt>参考会话 ID</dt><dd>{t.grouping.session_id}</dd><dt>参考轮次 ID</dt><dd>{t.grouping.turn_id || '未提供'}</dd></>}</dl>
             <p className="task-explanation">同一会话的不同提问不会仅因会话 ID 相同而合并。仅统计经过网关且标识有效的调用，无法确认是否捕获了客户端的全部过程。</p>
           </>}
         </div>

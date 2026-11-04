@@ -31,6 +31,8 @@ func diagnosticCode(errorType string) string {
 		return "stream_interrupted"
 	case "client_canceled":
 		return "client_canceled"
+	case "budget_exceeded":
+		return "budget_exceeded"
 	default:
 		return "gateway_error"
 	}
@@ -42,7 +44,7 @@ func diagnosticPhase(code string) string {
 		return "unlock"
 	case "authentication_failed":
 		return "authentication"
-	case "permission_denied":
+	case "permission_denied", "budget_exceeded":
 		return "authorization"
 	case "invalid_request":
 		return "validation"
@@ -80,6 +82,8 @@ func diagnosticAction(code string) string {
 		return "check_project_credential"
 	case "permission_denied":
 		return "check_model_access"
+	case "budget_exceeded":
+		return "raise_budget_or_wait"
 	case "invalid_request":
 		return "fix_request"
 	case "upstream_connection", "upstream_timeout", "upstream_protocol", "upstream_error":
@@ -136,6 +140,8 @@ func diagnosticMessage(rec *Record, code, problemMessage string) string {
 		return "项目凭证无效或项目已停用"
 	case "permission_denied":
 		return "项目未获模型授权，或模型／连接已停用"
+	case "budget_exceeded":
+		return "项目本月预算已用完"
 	case "invalid_request":
 		return "请求未通过网关校验"
 	default:

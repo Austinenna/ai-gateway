@@ -148,6 +148,7 @@ func (g *Gateway) observeCall(next http.HandlerFunc) http.HandlerFunc {
 			g.metricsMu.Lock()
 			g.saveMetric(*rec)
 			delete(g.inflight, rec.ID)
+			g.recordSpend(*rec)
 			g.metricsMu.Unlock()
 			g.enqueue(*rec)
 		}()

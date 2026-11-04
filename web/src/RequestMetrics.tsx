@@ -1,6 +1,7 @@
 import { type RequestRecord, firstTiming, inputTotal, outputTotal, number, percent, duration, dateTime, recordStatus, errorName, diagnosticActionName, diagnosticPhaseName, diagnosticSourceName } from './monitoring';
 import { protocolName } from './connection-protocols';
 import { isWebTool } from './web-tools.mjs';
+import { costStatusName, costText } from './costs';
 
 export function RequestHeader({ record: r }: { record: RequestRecord }) {
   const outcomeHTTP = r.error_type === 'client_canceled' && r.upstream_status ? `上游 HTTP ${r.upstream_status}` : `HTTP ${r.status || '—'}`;
@@ -14,6 +15,8 @@ export function RequestHeader({ record: r }: { record: RequestRecord }) {
       <span>模型 <code>{r.alias || '未路由'}</code></span>
       {r.connection_name && <span>连接 <b>{r.connection_name}</b></span>}
       <span className="detail-mode">{r.protocol === 'dashscope-asr' ? '百炼 ASR · 同步转写' : isWebTool(r.protocol) ? protocolName(r.protocol) + ' · 同步' : r.stream === true ? '流式' : r.stream === false ? '非流式' : '历史记录'}</span>
+      {r.category && <span>用途 <code>{r.category}</code></span>}
+      {r.task_ref && <span>任务 <code>{r.task_ref}</code></span>}
       <code className="detail-request-id" title={'请求 ID：' + r.id}>{r.id}</code>
     </div>
     {r.diagnostic ? <div className="request-diagnostic-note"><strong>{r.diagnostic.message}</strong><span>{errorName(r.diagnostic.code)} · {outcomeHTTP} · {diagnosticPhaseName(r.diagnostic.phase)} · {diagnosticSourceName(r.diagnostic.source)}</span><small>{r.diagnostic.upstream_contacted ? '已尝试联系上游' : '未联系上游'} · {r.diagnostic.retryable ? '可重试' : '需要处理'} · {diagnosticActionName(r.diagnostic.recommended_action)}</small></div> : r.error_type && <div className="request-outcome-note">{errorName(r.error_type)} · {outcomeHTTP}</div>}
@@ -26,10 +29,12 @@ export function RequestMetrics({ record: r }: { record: RequestRecord }) {
   if (r.protocol === 'dashscope-asr') return <div className="detail-metric-grid">
     <div><span>总耗时</span><b>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</b></div>
     <div><span>音频时长</span><b>{number(r.audio_seconds, 2)} <em>秒</em></b></div>
+    <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}</b></div>
   </div>;
   if (isWebTool(r.protocol)) return <div className="detail-metric-grid">
     <div><span>总耗时</span><b>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</b></div>
     <div><span>Token 用量</span><b>不适用</b></div>
+    <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}</b></div>
   </div>;
   return <div className="detail-metric-grid">
     <div title="从开始转发到首段有效思考、正文或工具内容"><span>首个 Token · TTFT</span><b>{firstTiming(r)}</b></div>
@@ -38,6 +43,7 @@ export function RequestMetrics({ record: r }: { record: RequestRecord }) {
     <div><span>输入 / 输出 Token</span><b>{number(input)} <em>/</em> {number(output)}</b></div>
     <div><span>缓存命中</span><b>{number(r.cache_read_tokens)} <em>Token</em></b></div>
     <div title="根据厂商输出用量与首段至末段有效内容间隔估算"><span>估算输出速度</span><b>{number(r.output_tps, 1)} <em>Token/s</em></b></div>
+    <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}</b></div>
   </div>;
 }
 export function RequestTiming({ record: r }: { record: RequestRecord }) {
