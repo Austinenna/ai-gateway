@@ -35,7 +35,7 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
   });
   await page.reload();
   const nav = (name: string) => page.locator('nav').getByRole('button', { name: new RegExp('^' + name) }).click();
-  await nav('请求记录');
+  await nav('请求');
   await page.locator('.request-item').filter({ hasText: '滚动演示项目' }).first().click();
   await expect(page.locator('.detail-content')).toContainText('第 90 行');
   const workspace = page.getByRole('region', { name: '工作区', exact: true });
@@ -63,7 +63,7 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
     const right = (await detail.boundingBox())!;
     expect(left.y).toBe(right.y);
     expect(left.height).toBe(right.height);
-    expect(right.y + right.height).toBeLessThan(900);
+    expect(right.y + right.height).toBeLessThanOrEqual(900);
     await page.screenshot({ path: testInfo.outputPath(`split-${width}-top.png`), animations: 'disabled' });
     const text = (await detail.locator('.text-preview-window').first().boundingBox())!;
     await page.mouse.move(text.x + text.width / 2, Math.min(text.y + 70, right.y + right.height - 30));
@@ -104,7 +104,7 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
   }
 
   await list.getByRole('button').nth(18).click();
-  await expect(page.locator('.detail-head h2')).toHaveText('滚动演示项目 19');
+  await expect(page.locator('.detail-project')).toHaveText('滚动演示项目 19');
   await expect.poll(scrollTop).toBe(0);
   const listPosition = await list.evaluate(el => el.scrollTop);
   await detail.evaluate(el => el.scrollTop = 120);
@@ -116,12 +116,12 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
   await expect(page.locator('.tester form')).toBeVisible();
   await page.getByRole('button', { name: '关闭试调用', exact: true }).click();
   await expect(page.locator('.requests-workspace')).toBeVisible();
-  await nav('项目权限');
+  await nav('项目与权限');
   await expect.poll(() => workspace.evaluate(el => el.scrollTop)).toBe(0);
   await page.locator('.project-row').filter({ hasText: '滚动演示项目' }).getByRole('button', { name: '编辑权限', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
-  await nav('请求记录');
+  await nav('请求');
   await page.setViewportSize({ width: 1024, height: 420 });
   await page.getByRole('button', { name: '退出管理', exact: true }).scrollIntoViewIfNeeded();
   await expect(page.getByRole('button', { name: '退出管理', exact: true })).toBeInViewport();

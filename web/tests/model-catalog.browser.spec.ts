@@ -12,7 +12,7 @@ test('从厂商获取、排序搜索和选择模型，失败时保留手填', as
   await page.getByLabel('管理密码', { exact: true }).fill(password);
   if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
-  await expect(page.locator('nav').getByRole('button', { name: /^模型配置/ })).toBeVisible();
+  await expect(page.locator('nav').getByRole('button', { name: /^连接与模型/ })).toBeVisible();
   const requests: string[] = [];
   let mode = 'normal';
   const upstream = createServer((req, res) => {
@@ -51,7 +51,7 @@ test('从厂商获取、排序搜索和选择模型，失败时保留手填', as
     const connection = await addConnection('模型目录测试连接');
     const other = await addConnection('目录切换连接');
     await page.reload();
-    await page.locator('nav').getByRole('button', { name: /^模型配置/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     await page.getByRole('button', { name: '新增模型', exact: true }).first().click();
     await modal.getByRole('combobox', { name: '所属连接', exact: true }).selectOption(connection.id);
     await expect(modal.getByRole('button', { name: '获取模型列表', exact: true })).toBeEnabled();
@@ -111,7 +111,7 @@ test('从厂商获取、排序搜索和选择模型，失败时保留手填', as
     models.push(model.id);
     expect(model.upstream_model).toBe('messages-model');
     expect(model.protocols).toEqual(['chat', 'messages']); // Discovery does not assert support or alter protocol choices.
-    await page.locator('.models-table tbody tr').filter({ hasText: '我的稳定名称' }).getByRole('button', { name: '编辑', exact: true }).click();
+    await page.locator('.rack-models tbody tr').filter({ hasText: '我的稳定名称' }).getByRole('button', { name: '编辑', exact: true }).click();
     await modal.getByRole('button', { name: '获取模型列表', exact: true }).click();
     await expect(results).toHaveCount(10);
     await results.first().click();

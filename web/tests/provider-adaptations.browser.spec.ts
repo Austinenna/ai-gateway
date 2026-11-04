@@ -23,7 +23,7 @@ test('请求直接展示网关适配，原始请求保留且其他厂商与旧�
     return route.fulfill({ json: json ?? {} });
   });
   await page.goto('/');
-  await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+  await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
   await page.locator('.request-item').filter({ hasText: '已适配请求' }).click();
   const adaptation = page.getByRole('region', { name: '网关参数适配' });
   await expect(adaptation).toContainText('enabled → adaptive');

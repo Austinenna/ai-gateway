@@ -36,7 +36,7 @@ test.beforeEach(async ({ page }) => {
     return route.fulfill({ json: json ?? {} });
   });
   await page.goto('/');
-  await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+  await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
   await page.locator('.request-item').filter({ hasText: '计时演示' }).click();
 });
 
@@ -62,15 +62,15 @@ test('无正文响应提示实际返回内容，详情合并思考与多个工�
   await expect(page.locator('.detail-content')).toContainText('reasoning_content');
   await page.getByRole('button', { name: '响应详情', exact: true }).click();
   await page.locator('.request-item').filter({ hasText: '计时演示' }).click();
-  await expect(page.locator('.detail-head h2')).toHaveText('计时演示');
+  await expect(page.locator('.detail-project')).toHaveText('计时演示');
   await page.getByRole('button', { name: '响应详情', exact: true }).click();
   await expect(page.locator('.response-details .response-part-text')).toContainText('你好呀');
   await expect(page.locator('.response-details .response-part-tool')).toHaveCount(0);
 });
 
 test('请求检查器区分首个 token、正文首字及旧记录未采集状态', async ({ page }, testInfo) => {
-  await expect(page.locator('.detail-head')).toContainText('首个 Token · TTFT1.2 s');
-  await expect(page.locator('.detail-head')).toContainText('正文首字 · TTFC25.12 s');
+  await expect(page.locator('.detail-head')).toContainText('TTFT1.2 s');
+  await expect(page.locator('.detail-head')).toContainText('TTFC25.12 s');
   await page.getByRole('button', { name: '性能与用量', exact: true }).click();
   await expect(page.locator('.timeline')).toContainText('1.2 s');
   await expect(page.locator('.timeline')).toContainText('25.12 s');
@@ -78,10 +78,10 @@ test('请求检查器区分首个 token、正文首字及旧记录未采集状�
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath('timing-mobile.png'), fullPage: true });
   await page.locator('.request-item').filter({ hasText: '旧记录' }).click();
-  await expect(page.locator('.detail-head')).toContainText('首个 Token · TTFT未记录');
-  await expect(page.locator('.detail-head')).toContainText('正文首字 · TTFC25.12 s');
+  await expect(page.locator('.detail-head')).toContainText('TTFT未记录');
+  await expect(page.locator('.detail-head')).toContainText('TTFC25.12 s');
   await page.locator('.request-item').filter({ hasText: '空响应' }).click();
-  await expect(page.locator('.detail-head')).toContainText('首个 Token · TTFT未收到');
+  await expect(page.locator('.detail-head')).toContainText('TTFT未收到');
 });
 
 
@@ -125,7 +125,7 @@ test('消息块独立折叠、键盘展开及切换请求后恢复默认状态',
 test('长消息预览和全文都随页面滚动，支持键盘展开及切换请求后重置', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator('.request-item').filter({ hasText: '长消息预览' }).click();
-  await expect(page.locator('.detail-head h2')).toHaveText('长消息预览');
+  await expect(page.locator('.detail-project')).toHaveText('长消息预览');
   const detail = page.getByRole('region', { name: '请求详情', exact: true });
   const system = page.locator('.message').first();
   const preview = system.locator('.text-preview-window');
@@ -162,9 +162,9 @@ test('长消息预览和全文都随页面滚动，支持键盘展开及切换�
 
   await system.getByRole('button', { name: '展开全文', exact: true }).click();
   await page.locator('.request-item').filter({ hasText: '旧记录' }).click();
-  await expect(page.locator('.detail-head h2')).toHaveText('旧记录');
+  await expect(page.locator('.detail-project')).toHaveText('旧记录');
   await page.locator('.request-item').filter({ hasText: '长消息预览' }).click();
-  await expect(page.locator('.detail-head h2')).toHaveText('长消息预览');
+  await expect(page.locator('.detail-project')).toHaveText('长消息预览');
   await expect(system.getByRole('button', { name: '展开全文', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await detail.evaluate(el => el.scrollTop = 0);
   await page.screenshot({ path: testInfo.outputPath('message-preview-desktop.png'), animations: 'disabled' });

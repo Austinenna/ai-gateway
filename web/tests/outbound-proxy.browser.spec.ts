@@ -19,7 +19,7 @@ test('出站代理地址与连接级开关', async ({ page }) => {
   const row = page.locator('.connection-row').filter({ hasText: name });
   let connectionID = '';
   try {
-    await page.locator('nav').getByRole('button', { name: /^厂商连接/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     await expect(panel).toContainText('未设置');
 
     await test.step('无效地址被拒绝并保留输入，有效地址保存后回显', async () => {

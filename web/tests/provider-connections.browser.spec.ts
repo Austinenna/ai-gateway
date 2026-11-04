@@ -22,7 +22,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
   const names = ['双协议表单验证', '仅 Messages 表单验证', 'DeepSeek 模板验证'];
   let modelID = '', projectID = '';
   const openNew = async () => {
-    await page.locator('nav').getByRole('button', { name: /^厂商连接/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     await page.getByRole('button', { name: '新增连接', exact: true }).first().click();
   };
   const save = async (name: string) => {
@@ -72,7 +72,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       await messagesURL().fill('http://127.0.0.1:9/only-messages/v1');
       await save(names[1]);
       await page.reload();
-      await page.locator('nav').getByRole('button', {name:/^厂商连接/}).click();
+      await page.locator('nav').getByRole('button', {name:/^连接与模型/}).click();
       await row(names[1]).getByRole('button', {name:'编辑',exact:true}).click();
       await expect(chat()).not.toBeChecked(); await expect(messages()).toBeChecked();
       await expect(modal.getByLabel('更换厂商 Token')).toHaveValue('');
@@ -86,8 +86,8 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       await expect(messagesURL()).toHaveValue('https://api.deepseek.com/anthropic/v1');
       await save(names[2]);
       await page.reload();
-      await page.locator('nav').getByRole('button', { name: /^厂商连接/ }).click();
-      await expect(row(names[2]).locator('.connection-identity span')).toHaveText('DeepSeek');
+      await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
+      await expect(row(names[2]).locator('.rack-h .ep')).toContainText('DeepSeek');
       await expect(row(names[2])).toContainText('https://api.deepseek.com/anthropic/v1');
       await row(names[2]).getByRole('button', { name: '编辑', exact: true }).click();
       await expect(modal.getByRole('combobox', { name: '厂商', exact: true })).toHaveValue('deepseek');
@@ -102,7 +102,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       }
       await modal.getByRole('button', { name: '保存连接', exact: true }).click();
       await expect(modal).toHaveCount(0);
-      await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+      await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
       await page.getByRole('combobox', { name: '按厂商筛选' }).click();
       await page.getByRole('option', { name: 'DeepSeek', exact: true }).click();
       await expect(page.getByRole('combobox', { name: '按厂商筛选' })).toHaveText('DeepSeek');
@@ -111,7 +111,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
     await test.step('一个模型启用两种协议，测试明确选择协议', async () => {
       const state = await (await page.request.get('/api/admin/state')).json();
       const connection = state.connections.find((c:{name:string}) => c.name===names[0]);
-      await page.locator('nav').getByRole('button', {name:/^模型配置/}).click();
+      await page.locator('nav').getByRole('button', {name:/^连接与模型/}).click();
       await page.getByRole('button', {name:'新增模型',exact:true}).first().click();
       await modal.getByLabel('显示名称').fill('双协议模型验证');
       await modal.getByLabel('调用别名').fill('dual-protocol-ui');
@@ -144,7 +144,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       const created=await page.request.post('/api/admin/projects',{headers,data:{name:'双协议项目验证',enabled:true,model_ids:[modelID]}});
       expect(created.status()).toBe(200); const project=await created.json(); projectID=project.project.id;
       await page.reload();
-      await page.locator('nav').getByRole('button',{name:/^项目权限/}).click();
+      await page.locator('nav').getByRole('button',{name:/^项目与权限/}).click();
       const projectRow=page.locator('.project-card').filter({hasText:'双协议项目验证'});
       await projectRow.getByRole('button',{name:'接入信息',exact:true}).click();
       for (const p of ['chat','messages']) {

@@ -30,8 +30,8 @@ test('异常与诊断聚合锁定错误并跳转代表请求', async ({ page }) 
     return route.fulfill({ json });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: '异常与诊断', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '异常与诊断', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: /^异常诊断/ }).click();
+  await expect(page.getByRole('heading', { name: '异常诊断', level: 1 })).toBeVisible();
   await expect(page.locator('.diagnostic-runtime-card.locked')).toContainText('已锁定');
   await expect(page.locator('.diagnostic-group-list')).toContainText('网关已锁定，请在管理页面解锁');
   await expect(page.locator('.diagnostic-detail')).toContainText('没有到达上游');

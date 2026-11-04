@@ -16,7 +16,7 @@ for (const protocol of ['chat', 'messages']) {
       return route.fulfill({ json });
     });
     await page.goto('/');
-    await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
     await page.locator('.request-item').filter({ hasText: '工具定义演示' }).click();
     const outer = page.getByRole('button', { name: 'TOOLS · 6 个工具', exact: true });
     const list = page.locator('.tool-definitions');

@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }) => {
     return route.fulfill({ json });
   });
   await page.goto('/');
-  await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+  await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
   await page.locator('.request-item').first().click();
 });
 

@@ -24,7 +24,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
     expect(model.status()).toBe(200);
     modelID = (await model.json()).id;
     await page.reload();
-    await navigate('项目权限');
+    await navigate('项目与权限');
     await page.getByRole('button', { name: '新建项目', exact: true }).first().click();
     await page.getByLabel('项目名称').fill('删除测试项目');
     await page.getByLabel('删除测试模型').check();
@@ -39,13 +39,13 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
   });
 
   await test.step('有引用的连接列出模型并提供级联入口，取消不做修改', async () => {
-    await navigate('厂商连接');
+    await navigate('连接与模型');
     await connectionRow.getByRole('button', { name: '删除', exact: true }).click();
     await expect(dialog('删除厂商连接')).toContainText('删除测试模型');
     await expect(dialog('删除厂商连接').getByRole('button', { name: '删除厂商及 1 个模型', exact: true })).toBeEnabled();
     await page.screenshot({ path: testInfo.outputPath('connection-reference.png') });
     await dialog('删除厂商连接').getByRole('button', { name: '取消', exact: true }).click();
-    await navigate('模型配置');
+    await navigate('连接与模型');
     await expect(modelRow).toBeVisible();
   });
 
@@ -69,7 +69,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
   });
 
   await test.step('删除项目清除暂存凭证，旧凭证失效，历史请求仍可筛选查看', async () => {
-    await navigate('项目权限');
+    await navigate('项目与权限');
     await projectCard.getByRole('button', { name: '编辑权限', exact: true }).click();
     await dialog('编辑项目权限').getByRole('button', { name: '删除项目', exact: true }).click();
     await expect(dialog('删除项目')).toContainText('项目凭证立即失效');
@@ -78,7 +78,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
     await expect(projectCard).toHaveCount(0);
     const old = await page.request.get('/v1/models', { headers: { Authorization: 'Bearer ' + token } });
     expect(old.status()).toBe(401);
-    await navigate('请求记录');
+    await navigate('请求');
     await expect(page.getByLabel('网关项目凭证')).toHaveValue('');
     await page.getByRole('combobox', { name: '按项目筛选' }).click();
     await page.getByRole('option', { name: '删除测试项目（已删除）', exact: true }).click();
@@ -88,7 +88,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
   });
 
   await test.step('无引用连接允许删除；服务失败保留配置并可重试', async () => {
-    await navigate('厂商连接');
+    await navigate('连接与模型');
     await connectionRow.getByRole('button', { name: '删除', exact: true }).click();
     const url = '**/api/admin/connections/' + connectionID + '?cascade=true';
     await page.route(url, route => route.fulfill({ status: 500, json: { error: { message: '模拟删除失败，请重试' } } }));
@@ -99,7 +99,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
     await dialog('删除厂商连接').getByRole('button', { name: '删除厂商连接', exact: true }).click();
     await expect(connectionRow).toHaveCount(0);
     await page.reload();
-    await navigate('厂商连接');
+    await navigate('连接与模型');
     await expect(connectionRow).toHaveCount(0);
     const state = await (await page.request.get('/api/admin/state')).json();
     expect(state.connections.some((c: { id: string }) => c.id === connectionID)).toBe(false);

@@ -72,7 +72,13 @@ import { DiagnosticsPage } from './DiagnosticsPage';
 import { ChatPage } from './ChatPage';
 import { RequestHeader, RequestTiming } from './RequestMetrics';
 import { type RequestRecord, recordStatus } from './monitoring';
-import { StatusBar } from './StatusBar';
+import { TopBar, Rail, ViewHead, type CrPage, type RailBadge } from './cr/Shell';
+import { Overview } from './cr/Overview';
+import { Inspector, RequestList } from './cr/Requests';
+import { Routing } from './cr/Routing';
+import { Projects } from './cr/Projects';
+import { CostBoard, DiagnosticsBoard } from './cr/Boards';
+import './cr/cr.css';
 import { SystemPage } from './SystemPage';
 import { Attempts } from './Attempts';
 import { HealthBlocks } from './ConnectionHealthView';
@@ -409,7 +415,26 @@ function App() {
     };
   }, [status?.authenticated, page, search, filter, projectFilter, modelFilter, providerFilter, bodySearch]);
   useEffect(() => {
-    if (!status?.authenticated || (page !== 'connections' && page !== 'overview')) return;
+    if (!status?.authenticated) return;
+    let disposed = false;
+    const loadRuntime = () =>
+      api('/admin/runtime')
+        .then((r) => {
+          // Ignore malformed replies instead of breaking the console.
+          if (!disposed && r && typeof r.started_at === 'number') setRuntime({ ...r, breakers: r.breakers || {}, limits: r.limits || {} });
+        })
+        .catch(() => {});
+    loadRuntime();
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') loadRuntime();
+    }, 5000);
+    return () => {
+      disposed = true;
+      clearInterval(t);
+    };
+  }, [status?.authenticated]);
+  useEffect(() => {
+    if (!status?.authenticated || (page !== 'connections' && page !== 'models' && page !== 'overview' && page !== 'diagnostics')) return;
     loadHealth().catch(() => {});
     const t = setInterval(() => {
       if (document.visibilityState === 'visible') loadHealth().catch(() => {});
@@ -850,6 +875,35 @@ function App() {
   const selectedCallProtocol = callProtocols.includes(callProtocol) ? callProtocol : callProtocols[0] || '';
   const testProtocols = protocolsFor(testModel || undefined);
   const selectedTestProtocol = testProtocols.includes(testProtocol) ? testProtocol : testProtocols[0] || '';
+  // The control-room rail merges connections into the routing page.
+  const crPage: CrPage = page === 'connections' ? 'models' : (page as CrPage);
+  const railBadges: Partial<Record<CrPage, RailBadge>> = {
+    ...(runtime && runtime.inflight > 0 ? { requests: { text: runtime.inflight + ' RUN', hot: true } } : {}),
+    ...(tasks.length ? { tasks: { text: String(tasks.length) } } : {}),
+    ...(runtime && Object.keys(runtime.breakers).length
+      ? { models: { text: Object.keys(runtime.breakers).length + ' 熔断', hot: true } }
+      : {}),
+    ...(pendingApplications.length ? { projects: { text: pendingApplications.length + ' 待批', hot: true } } : {}),
+  };
+  const headActions =
+    page === 'models' || page === 'connections' ? (
+      <>
+        <button className="kb" onClick={newConn}>
+          + 连接
+        </button>
+        <button className="kb go" onClick={newModel} disabled={!state.connections.length}>
+          + 模型
+        </button>
+      </>
+    ) : page === 'projects' ? (
+      <button className="kb go" onClick={newProject}>
+        + 项目
+      </button>
+    ) : recordsPage ? (
+      <button className="kb go" onClick={() => (tester ? closeTester() : openTester())}>
+        <span aria-hidden="true">▶ </span>试调用
+      </button>
+    ) : null;
   const errorView = error && (
     <div className="error" role="alert">
       {error}
@@ -963,275 +1017,161 @@ function App() {
       </div>
     );
   return (
-    <div className="app">
-      <Sidebar collapsed={sidebar.collapsed}>
-        <nav id="workspace-navigation" aria-label="工作空间">
-          {navGroups.map(([group, pages]) => (
-            <div className="nav-group" key={group}>
-              <div className="nav-caption">{group}</div>
-              {pages.map((p) => {
-                const Icon = icons[p];
-                return (
-                  <button
-                    key={p}
-                    className={page === p ? 'active' : ''}
-                    aria-current={page === p ? 'page' : undefined}
-                    title={
-                      labels[p] +
-                      (p === 'projects' && pendingApplications.length > 0
-                        ? `（${pendingApplications.length} 个待批准）`
-                        : p === 'requests' && state.request_count > 0
-                          ? `（${state.request_count} 条）`
-                          : '')
-                    }
-                    aria-label={
-                      labels[p] +
-                      (p === 'projects' && pendingApplications.length > 0
-                        ? `，${pendingApplications.length} 个待批准`
-                        : p === 'requests' && state.request_count > 0
-                          ? `，${state.request_count} 条`
-                          : '')
-                    }
-                    onClick={() => navigate(p)}
-                  >
-                    <Icon size={16} />
-                    <em className="nav-no" aria-hidden="true">
-                      {navNumber[p]}
-                    </em>
-                    <span className="sidebar-label">{labels[p]}</span>
-                    {p === 'projects' && pendingApplications.length > 0 && (
-                      <span className="nav-count nav-count-pending" aria-label="待批准项目数">
-                        {pendingApplications.length}
-                      </span>
-                    )}
-                    {p === 'requests' && state.request_count > 0 && <span className="nav-count">{state.request_count}</span>}
-                    {p === 'connections' && runtime && Object.keys(runtime.breakers).length > 0 && (
-                      <span className="nav-count nav-count-pending">{Object.keys(runtime.breakers).length} 熔断</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div
-            className="gateway-status"
-            title={`网关已就绪 · ${new URL(state.base_url || location.origin).host}`}
-            aria-label={`网关已就绪 · ${new URL(state.base_url || location.origin).host}`}
-          >
-            <Badge on>
-              <span className="sidebar-label">网关已就绪</span>
-            </Badge>
-            <code className="gateway-address" aria-label="网关地址">
-              {new URL(state.base_url || location.origin).host}
-            </code>
-          </div>
-          <button
-            className="quiet"
-            aria-label="退出管理"
-            title="退出管理"
-            onClick={() =>
-              run(async () => {
-                await api('/admin/logout', 'POST', {});
-                abort.current?.abort();
-                setCallToken('');
-                setFreshKey(null);
-                setRevealed('');
-                setReveal(null);
-                setConn(null);
-                setModel(null);
-                setProject(null);
-                setSelected(null);
-                setState(initial);
-                setRecords([]);
-                setTasks([]);
-                await refreshStatus();
-              })
+    <div className="cr">
+      <TopBar
+        runtime={runtime}
+        mode={status.passwordless_enabled ? '本机 · 自动解锁' : '密码登录'}
+        host={new URL(state.base_url || location.origin).host}
+      />
+      <div className="wrap">
+        <Rail
+          page={crPage}
+          onNavigate={(p) => navigate(p)}
+          badges={railBadges}
+          foot={
+            <>
+              SCHEMA <b>v{runtime?.schema_ext ?? '—'}</b>
+              <br />
+              REQUESTS <b>{state.request_count.toLocaleString()}</b>
+              <br />
+              REFRESH <b>5s</b> · <span style={{ color: 'var(--go)' }}>LIVE</span>
+            </>
+          }
+          onLogout={() =>
+            run(async () => {
+              await api('/admin/logout', 'POST', {});
+              abort.current?.abort();
+              setCallToken('');
+              setFreshKey(null);
+              setRevealed('');
+              setReveal(null);
+              setConn(null);
+              setModel(null);
+              setProject(null);
+              setSelected(null);
+              setState(initial);
+              setRecords([]);
+              setTasks([]);
+              await refreshStatus();
+            })
+          }
+        />
+        <div
+          className={'workspace' + (recordsPage && !tester ? ' requests-workspace' : page === 'chat' ? ' chat-workspace' : '')}
+          ref={workspace}
+          tabIndex={0}
+          role="region"
+          aria-label="工作区"
+        >
+          {page !== 'overview' && crPage !== 'models' && page !== 'projects' && <ViewHead page={crPage}>{headActions}</ViewHead>}
+          <main
+            className={
+              'main ' +
+              (recordsPage
+                ? 'requests-main'
+                : page === 'chat'
+                  ? 'chat-main'
+                  : page === 'models'
+                    ? 'models-main'
+                    : page === 'projects'
+                      ? 'projects-main'
+                      : page === 'diagnostics'
+                        ? 'diagnostics-main'
+                        : '')
             }
           >
-            <LockKeyhole size={15} />
-            <span className="sidebar-label">退出管理</span>
-          </button>
-        </div>
-      </Sidebar>
-      <div
-        className={'workspace' + (recordsPage && !tester ? ' requests-workspace' : page === 'chat' ? ' chat-workspace' : '')}
-        ref={workspace}
-        tabIndex={0}
-        role="region"
-        aria-label="工作区"
-      >
-        <StatusBar api={api} host={new URL(state.base_url || location.origin).host} runtime={runtime} onRuntime={setRuntime} />
-        <header className={'page-head' + (recordsPage ? ' request-page-head' : '')}>
-          <div className="page-head-inner">
-            <div className="page-heading">
-              <SidebarToggle collapsed={sidebar.collapsed} onToggle={sidebar.toggle} />
-              <h1>
-                <em className="page-no" aria-hidden="true">
-                  {navNumber[page]}
-                </em>
-                {page === 'overview' ? '运行总览' : labels[page]}
-              </h1>
-            </div>
-            {page === 'connections' ? (
-              <button className="primary" onClick={newConn}>
-                <Plus size={17} />
-                新增连接
-              </button>
-            ) : page === 'models' ? (
-              <button className="primary" onClick={newModel} disabled={!state.connections.length}>
-                <Plus size={17} />
-                新增模型
-              </button>
-            ) : page === 'projects' ? (
-              <button className="primary" onClick={newProject}>
-                <Plus size={17} />
-                新建项目
-              </button>
-            ) : recordsPage ? (
-              <button onClick={() => (tester ? closeTester() : openTester())}>
-                <Terminal size={16} />
-                试调用
-              </button>
-            ) : (
-              <button onClick={() => navigate('requests')}>
-                查看请求
+            {errorView}
+            {state.dropped_records > 0 && <div className="error">有 {state.dropped_records} 条记录未能写入，请检查磁盘空间。</div>}
+            {page !== 'projects' && pendingApplications.length > 0 && (
+              <button className="application-banner" onClick={() => navigate('projects')}>
+                <ShieldCheck size={18} />
+                <span>{pendingApplications.length} 个项目等待批准接入</span>
                 <ArrowRight size={16} />
               </button>
             )}
-          </div>
-        </header>
-        <main
-          className={
-            'main ' +
-            (recordsPage
-              ? 'requests-main'
-              : page === 'chat'
-                ? 'chat-main'
-                : page === 'models'
-                  ? 'models-main'
-                  : page === 'projects'
-                    ? 'projects-main'
-                    : page === 'diagnostics'
-                      ? 'diagnostics-main'
-                      : '')
-          }
-        >
-          {errorView}
-          {state.dropped_records > 0 && <div className="error">有 {state.dropped_records} 条记录未能写入，请检查磁盘空间。</div>}
-          {page !== 'projects' && pendingApplications.length > 0 && (
-            <button className="application-banner" onClick={() => navigate('projects')}>
-              <ShieldCheck size={18} />
-              <span>{pendingApplications.length} 个项目等待批准接入</span>
-              <ArrowRight size={16} />
-            </button>
-          )}
-          <ChatPage
-            active={page === 'chat'}
-            models={state.models}
-            connections={state.connections}
-            api={api}
-            refresh={load}
-            onOpenRecord={(id) => {
-              navigate('requests');
-              selectRecord(id);
-            }}
-            onConfigure={() => navigate('models')}
-          />
-          {page === 'overview' && state.connections.length > 0 && (
-            <section className="panel upstream-strip" aria-label="厂商连接健康">
-              <div className="panel-head">
-                <h2>厂商连接 · 近 24 小时</h2>
-                <button className="link" onClick={() => navigate('connections')}>
-                  查看连接
-                  <ArrowRight size={14} />
-                </button>
-              </div>
-              <div className="upstream-rows">
-                {state.connections.map((c) =>
-                  health[c.id] ? (
-                    <div className={'upstream-row health-' + health[c.id].state} key={c.id}>
-                      <span className="ur-name">{c.name}</span>
-                      <span className="ur-state">
-                        {healthLabel[health[c.id].state]}
-                        {health[c.id].breaker_until && health[c.id].breaker_until! > Date.now()
-                          ? ` · 熔断 ${Math.ceil((health[c.id].breaker_until! - Date.now()) / 1000)}s`
-                          : ''}
-                      </span>
-                      <HealthBlocks health={health[c.id]} />
-                    </div>
-                  ) : null,
-                )}
-              </div>
-            </section>
-          )}
-          {page === 'system' && <SystemPage api={api} onNotice={setNotice} onError={setError} />}
-          {page === 'overview' && (
-            <MonitorOverview
-              projects={state.projects}
-              connections={state.connections}
+            <ChatPage
+              active={page === 'chat'}
               models={state.models}
-              onSelect={(id) => {
+              connections={state.connections}
+              api={api}
+              refresh={load}
+              onOpenRecord={(id) => {
                 navigate('requests');
                 selectRecord(id);
               }}
-              onNewConnection={newConn}
-              onDemo={demo}
+              onConfigure={() => navigate('models')}
             />
-          )}
-          {page === 'diagnostics' && (
-            <DiagnosticsPage
-              onSelect={(id) => {
-                navigate('requests');
-                selectRecord(id);
-              }}
-            />
-          )}
-          {page === 'costs' && (
-            <CostPage
-              projects={state.projects}
-              onSelect={(id) => {
-                navigate('requests');
-                selectRecord(id);
-              }}
-              onEditProject={(id) => {
-                const p = state.projects.find((x) => x.id === id);
-                if (p) setProject({ ...p, model_ids: [...p.model_ids] });
-              }}
-            />
-          )}
-          {page === 'connections' && (
-            <OutboundProxyPanel
-              value={state.outbound_proxy || ''}
-              proxiedCount={state.connections.filter((c) => c.use_proxy).length}
-              busy={busy}
-              onSave={(url) =>
-                run(async () => {
-                  await api('/admin/outbound-proxy', 'PUT', { url });
-                  await load();
-                  setNotice(url ? '出站代理已保存' : '出站代理已清除');
-                })
-              }
-            />
-          )}
-          {page === 'connections' &&
-            (!state.connections.length ? (
-              <Empty
-                title="添加厂商连接"
-                text="将端点和 Token 配置一次，多个模型可以共用这个连接。"
-                action={
-                  <button onClick={newConn}>
-                    <Plus size={16} />
-                    新增连接
-                  </button>
-                }
-              />
-            ) : (
-              <ConnectionList
+            {page === 'system' && <SystemPage api={api} onNotice={setNotice} onError={setError} />}
+            {page === 'overview' && (
+              <Overview
+                api={api}
+                projects={state.projects}
                 connections={state.connections}
+                applications={state.applications || []}
+                health={health}
+                onOpenRecord={(id) => {
+                  navigate('requests');
+                  selectRecord(id);
+                }}
+                onNavigate={(p) => navigate(p)}
+              />
+            )}
+            {page === 'overview' && (
+              <div className="cr-section-h">
+                DETAIL<span className="zh">监控明细 · 按时间范围、项目、连接、模型筛选</span>
+              </div>
+            )}
+            {page === 'overview' && (
+              <MonitorOverview
+                projects={state.projects}
+                connections={state.connections}
+                models={state.models}
+                onSelect={(id) => {
+                  navigate('requests');
+                  selectRecord(id);
+                }}
+                onNewConnection={newConn}
+                onDemo={demo}
+              />
+            )}
+            {page === 'diagnostics' && (
+              <>
+                <DiagnosticsBoard api={api} connections={state.connections} health={health} />
+
+                <DiagnosticsPage
+                  onSelect={(id) => {
+                    navigate('requests');
+                    selectRecord(id);
+                  }}
+                />
+              </>
+            )}
+            {page === 'costs' && (
+              <>
+                <CostBoard api={api} projects={state.projects} />
+
+                <CostPage
+                  projects={state.projects}
+                  onSelect={(id) => {
+                    navigate('requests');
+                    selectRecord(id);
+                  }}
+                  onEditProject={(id) => {
+                    const p = state.projects.find((x) => x.id === id);
+                    if (p) setProject({ ...p, model_ids: [...p.model_ids] });
+                  }}
+                />
+              </>
+            )}
+            {(page === 'connections' || page === 'models') && (
+              <Routing
+                api={api}
+                connections={state.connections}
+                models={state.models}
                 health={health}
                 probing={probing}
+                outboundProxy={state.outbound_proxy || ''}
+                onNewConnection={newConn}
                 onProbe={(c) =>
                   run(async () => {
                     setProbing(c.id);
@@ -1244,53 +1184,66 @@ function App() {
                     }
                   })
                 }
-                onEdit={(c) => setConn({ ...c, token: '' })}
+                onEditConnection={(c) => setConn({ ...(c as Conn), token: '' })}
+                onDeleteConnection={(c) => askDelete('connections', c)}
                 onReveal={(c) => {
-                  setReveal(c);
+                  setReveal(c as Conn);
                   setRevealed('');
                   setRevealPassword('');
                 }}
-                onDelete={(c) => askDelete('connections', c)}
-              />
-            ))}
-          {page === 'models' &&
-            (!state.models.length ? (
-              <Empty
-                title="配置一个模型"
-                text={state.connections.length ? '选择已有连接，填写程序调用别名与厂商模型 ID。' : '先添加厂商连接，然后再创建模型。'}
-                action={
-                  <button onClick={state.connections.length ? newModel : () => navigate('connections')}>
-                    {state.connections.length ? '新增模型' : '去添加连接'}
-                    <ArrowRight size={15} />
-                  </button>
+                onNewModel={(cid) => {
+                  newModel();
+                  if (cid) {
+                    const c = state.connections.find((x) => x.id === cid);
+                    setModel((m) => (m ? { ...m, connection_id: cid, protocols: defaultModelProtocols(c) } : m));
+                  }
+                }}
+                onEditModel={(m) => {
+                  const full = state.models.find((x) => x.id === m.id)!;
+                  setModel({ ...full, protocols: protocolsFor(full), defaults: { ...full.defaults } });
+                }}
+                onTestModel={(m) => openModelTest(state.models.find((x) => x.id === m.id)!)}
+                onToggleModel={(m) =>
+                  run(async () => {
+                    const full = state.models.find((x) => x.id === m.id)!;
+                    await api('/admin/models/' + full.id, 'PUT', { ...full, enabled: !full.enabled });
+                    await load();
+                    setNotice((full.enabled ? '已停用 ' : '已启用 ') + full.alias);
+                  })
+                }
+                proxyPanel={
+                  <OutboundProxyPanel
+                    value={state.outbound_proxy || ''}
+                    proxiedCount={state.connections.filter((c) => c.use_proxy).length}
+                    busy={busy}
+                    onSave={(url) =>
+                      run(async () => {
+                        await api('/admin/outbound-proxy', 'PUT', { url });
+                        await load();
+                        setNotice(url ? '出站代理已保存' : '出站代理已清除');
+                      })
+                    }
+                  />
                 }
               />
-            ) : (
-              <ModelList
-                models={state.models}
-                connections={state.connections}
-                onEdit={(m) => setModel({ ...m, protocols: protocolsFor(m), defaults: { ...m.defaults } })}
-                onTest={openModelTest}
-                onDelete={(m) => askDelete('models', m)}
-                onCopyAlias={copy}
-              />
-            ))}
-          {page === 'projects' &&
-            (!state.projects.length ? (
-              <Empty
-                title="让项目接入网关"
-                text="新建项目、勾选模型权限，再把独立凭证填到你的程序里。"
-                action={
-                  <button onClick={newProject}>
-                    <Plus size={16} />
-                    新建项目
-                  </button>
+            )}
+            {page === 'projects' && (
+              <Projects
+                api={api}
+                projects={state.projects}
+                models={state.models.map((m) => ({ ...m, protocols: protocolsFor(m) }))}
+                applications={state.applications || []}
+                usage={runtime?.limits || {}}
+                usable={(m) => m.enabled && !!connectionsByID.get(m.connection_id)?.enabled && m.protocols.length > 0}
+                busy={busy}
+                onNewProject={newProject}
+                onSave={(p, message) =>
+                  run(async () => {
+                    await api('/admin/projects/' + p.id, 'PUT', p);
+                    await load();
+                    setNotice(message);
+                  })
                 }
-              />
-            ) : (
-              <ProjectList
-                applications={state.applications}
-                deciding={busy}
                 onDecision={(application, decision) =>
                   run(async () => {
                     await api('/admin/applications/' + application.id + '/decision', 'POST', { decision });
@@ -1298,162 +1251,204 @@ function App() {
                     setNotice(decision === 'approve' ? '已批准，客户端原 Token 立即生效' : '已拒绝，客户端 Token 保持不可用');
                   })
                 }
-                projects={state.projects}
-                models={state.models}
-                onEdit={(p) => setProject({ ...p, model_ids: [...p.model_ids] })}
-                onAccess={setConfig}
-                onTest={openTester}
+                onEdit={(p) => setProject({ ...(p as Project), model_ids: [...p.model_ids] })}
+                onTest={(p) => openTester(p as Project)}
                 onDelete={(p) => askDelete('projects', p)}
-                usage={runtime?.limits || {}}
+                onAccess={(p) => setConfig(p as Project)}
+                accessContent={(p) => (
+                  <ProjectAccessContent
+                    key={p.id}
+                    project={p as Project}
+                    baseURL={state.base_url}
+                    models={state.models
+                      .filter((m) => p.model_ids.includes(m.id))
+                      .map((m) => ({
+                        ...m,
+                        protocols: protocolsFor(m),
+                        enabled: m.enabled && !!connectionsByID.get(m.connection_id)?.enabled,
+                      }))}
+                    resolveToken={async () => {
+                      const out = await api('/admin/projects/' + p.id + '/credential', 'POST', {});
+                      return out.token;
+                    }}
+                    saveToken={async (token) => {
+                      await api('/admin/projects/' + p.id + '/credential/save', 'POST', { token });
+                      await load();
+                    }}
+                    rotateToken={async () => {
+                      const out = await api('/admin/projects/' + p.id + '/rotate', 'POST', {});
+                      credentialMemory.current.remember(p.id, out.token);
+                      if (callProjectId === p.id) setCallToken('');
+                      await load();
+                    }}
+                  />
+                )}
               />
-            ))}
-          {recordsPage && (
-            <>
-              {tester && (
-                <section className="panel tester">
-                  <div className="panel-head">
-                    <h2>
-                      <Terminal size={17} />
-                      以项目身份试调用
-                    </h2>
-                    <button className="icon-btn" onClick={closeTester} aria-label="关闭试调用">
-                      <X size={18} />
-                    </button>
-                  </div>
-                  <form onSubmit={call}>
-                    <div className="form-grid">
-                      <div className="credential-field">
-                        <Field label="网关项目凭证" hint="填写完整的 gw_ 开头凭证；管理密码和厂商 Token 用在各自的配置页面。">
-                          <input
-                            type="password"
-                            autoComplete="off"
-                            spellCheck={false}
-                            aria-invalid={!!credentialError}
-                            aria-describedby={credentialError ? 'project-credential-error' : undefined}
-                            value={callToken}
-                            onChange={(e) => {
-                              setCallToken(e.target.value);
-                              setCallProjectId('');
-                              setCredentialError('');
-                            }}
-                            placeholder="粘贴完整项目凭证（gw_ 开头）"
-                          />
+            )}
+            {recordsPage && (
+              <>
+                {tester && (
+                  <section className="panel tester">
+                    <div className="panel-head">
+                      <h2>
+                        <Terminal size={17} />
+                        以项目身份试调用
+                      </h2>
+                      <button className="icon-btn" onClick={closeTester} aria-label="关闭试调用">
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <form onSubmit={call}>
+                      <div className="form-grid">
+                        <div className="credential-field">
+                          <Field label="网关项目凭证" hint="填写完整的 gw_ 开头凭证；管理密码和厂商 Token 用在各自的配置页面。">
+                            <input
+                              type="password"
+                              autoComplete="off"
+                              spellCheck={false}
+                              aria-invalid={!!credentialError}
+                              aria-describedby={credentialError ? 'project-credential-error' : undefined}
+                              value={callToken}
+                              onChange={(e) => {
+                                setCallToken(e.target.value);
+                                setCallProjectId('');
+                                setCredentialError('');
+                              }}
+                              placeholder="粘贴完整项目凭证（gw_ 开头）"
+                            />
+                          </Field>
+                          {credentialError && (
+                            <p id="project-credential-error" className="credential-error" role="alert">
+                              {credentialError}
+                            </p>
+                          )}
+                          <button type="button" className="link" disabled={calling} onClick={() => showCredentialGuide()}>
+                            <KeyRound size={14} />
+                            选择项目并填入
+                          </button>
+                        </div>
+                        <Field label="模型别名">
+                          <select value={callAlias} onChange={(e) => setCallAlias(e.target.value)} required>
+                            <option value="">选择模型</option>
+                            {state.models.map((m) => (
+                              <option key={m.id} value={m.alias}>
+                                {m.alias} · {m.name}
+                              </option>
+                            ))}
+                          </select>
                         </Field>
-                        {credentialError && (
-                          <p id="project-credential-error" className="credential-error" role="alert">
-                            {credentialError}
-                          </p>
-                        )}
-                        <button type="button" className="link" disabled={calling} onClick={() => showCredentialGuide()}>
-                          <KeyRound size={14} />
-                          选择项目并填入
-                        </button>
                       </div>
-                      <Field label="模型别名">
-                        <select value={callAlias} onChange={(e) => setCallAlias(e.target.value)} required>
-                          <option value="">选择模型</option>
-                          {state.models.map((m) => (
-                            <option key={m.id} value={m.alias}>
-                              {m.alias} · {m.name}
+                      <Field label="调用协议">
+                        <select
+                          value={selectedCallProtocol}
+                          onChange={(e) => setCallProtocol(e.target.value)}
+                          disabled={calling || !callProtocols.length}
+                        >
+                          {!callProtocols.length && <option value="">无可用协议</option>}
+                          {callProtocols.map((p) => (
+                            <option key={p} value={p}>
+                              {protocolName(p)}
                             </option>
                           ))}
                         </select>
                       </Field>
-                    </div>
-                    <Field label="调用协议">
-                      <select
-                        value={selectedCallProtocol}
-                        onChange={(e) => setCallProtocol(e.target.value)}
-                        disabled={calling || !callProtocols.length}
-                      >
-                        {!callProtocols.length && <option value="">无可用协议</option>}
-                        {callProtocols.map((p) => (
-                          <option key={p} value={p}>
-                            {protocolName(p)}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    {selectedCallProtocol === 'dashscope-asr' ? (
-                      <AsrAudioFields
-                        audio={callAudio}
-                        onAudio={setCallAudio}
-                        hotwords={callHotwords}
-                        onHotwords={setCallHotwords}
-                        disabled={calling}
-                      />
-                    ) : (
-                      <>
-                        {selectedCallProtocol === 'dashscope-tts' && (
-                          <Field label="音色 ID" hint="百炼控制台的音色 ID，例如 anmingyuan_v3.1。">
-                            <input required value={callVoice} onChange={(e) => setCallVoice(e.target.value)} />
-                          </Field>
-                        )}
-                        <Field label={selectedCallProtocol === 'dashscope-tts' ? '要合成的文字' : '消息'}>
-                          <textarea required rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-                        </Field>
-                      </>
-                    )}
-                    <div className="actions">
-                      <button className="primary" disabled={calling || (selectedCallProtocol === 'dashscope-asr' && !callAudio)}>
-                        <Send size={15} />
-                        {calling ? (selectedCallProtocol === 'dashscope-asr' ? '正在转写…' : '正在接收…') : '发送请求'}
-                      </button>
-                      {calling && (
-                        <button type="button" onClick={() => abort.current?.abort()}>
-                          停止
-                        </button>
-                      )}
-                    </div>
-                    {callOutput && (
-                      <div className="call-output" aria-live="polite">
-                        {callOutput}
-                      </div>
-                    )}
-                    {callSpeech && <audio controls src={callSpeech} aria-label="合成的语音" />}
-                  </form>
-                </section>
-              )}
-              {taskView ? (
-                <TaskWorkspace
-                  tasks={tasks}
-                  api={api}
-                  refresh={() => run(load)}
-                  renderRecord={(record, callTab, setCallTab, callCopy) => (
-                    <RecordDetail selected={record} tab={callTab} setTab={setCallTab} copy={callCopy} />
-                  )}
-                />
-              ) : (
-                <div className="inspector">
-                  <section className="request-rail">
-                    <div className="rail-head">
-                      <div>
-                        <h2>请求</h2>
-                        <span className="muted small">
-                          {reqTotal === null
-                            ? `已载入 ${records.length} 条`
-                            : `${records.length} / ${reqTotal.toLocaleString()} 条${hasFilters ? '（已筛选）' : ''}`}
-                        </span>
-                        <button className="icon-btn" aria-label="刷新请求" onClick={() => run(refreshRequests)}>
-                          <RefreshCw size={15} />
-                        </button>
-                      </div>
-                      <label className="search">
-                        <Search size={15} />
-                        <input
-                          aria-label="搜索请求"
-                          placeholder="搜索项目、模型、ID、错误、提问"
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
+                      {selectedCallProtocol === 'dashscope-asr' ? (
+                        <AsrAudioFields
+                          audio={callAudio}
+                          onAudio={setCallAudio}
+                          hotwords={callHotwords}
+                          onHotwords={setCallHotwords}
+                          disabled={calling}
                         />
-                      </label>
-                      <label className="check body-search">
-                        <input type="checkbox" checked={bodySearch} onChange={(e) => setBodySearch(e.target.checked)} />
-                        同时搜索正文（较慢，最多 10 秒；只有保留期内的正文可搜）
-                      </label>
-                      {bodySearchState === 'timeout' && <small className="warning-text">正文搜索超时，下方只显示摘要匹配的结果。</small>}
-                      <div className="request-filters">
-                        <div className="request-project-filter">
+                      ) : (
+                        <>
+                          {selectedCallProtocol === 'dashscope-tts' && (
+                            <Field label="音色 ID" hint="百炼控制台的音色 ID，例如 anmingyuan_v3.1。">
+                              <input required value={callVoice} onChange={(e) => setCallVoice(e.target.value)} />
+                            </Field>
+                          )}
+                          <Field label={selectedCallProtocol === 'dashscope-tts' ? '要合成的文字' : '消息'}>
+                            <textarea required rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+                          </Field>
+                        </>
+                      )}
+                      <div className="actions">
+                        <button className="primary" disabled={calling || (selectedCallProtocol === 'dashscope-asr' && !callAudio)}>
+                          <Send size={15} />
+                          {calling ? (selectedCallProtocol === 'dashscope-asr' ? '正在转写…' : '正在接收…') : '发送请求'}
+                        </button>
+                        {calling && (
+                          <button type="button" onClick={() => abort.current?.abort()}>
+                            停止
+                          </button>
+                        )}
+                      </div>
+                      {callOutput && (
+                        <div className="call-output" aria-live="polite">
+                          {callOutput}
+                        </div>
+                      )}
+                      {callSpeech && <audio controls src={callSpeech} aria-label="合成的语音" />}
+                    </form>
+                  </section>
+                )}
+                {taskView ? (
+                  <TaskWorkspace
+                    tasks={tasks}
+                    api={api}
+                    refresh={() => run(load)}
+                    renderRecord={(record, callTab, setCallTab, callCopy) => (
+                      <RecordDetail selected={record} tab={callTab} setTab={setCallTab} copy={callCopy} />
+                    )}
+                  />
+                ) : (
+                  <div className="rq">
+                    <div className="rq-list request-rail">
+                      <div className="rq-tools rail-head">
+                        <div className="rq-count">
+                          <span>
+                            {reqTotal === null
+                              ? `已载入 ${records.length} 条`
+                              : `${records.length} / ${reqTotal.toLocaleString()} 条${hasFilters ? '（已筛选）' : ''}`}
+                          </span>
+                          <button type="button" className="kb" aria-label="刷新请求" onClick={() => run(refreshRequests)}>
+                            ↻
+                          </button>
+                        </div>
+                        <label className="cmd">
+                          ›
+                          <input
+                            aria-label="搜索请求"
+                            placeholder="搜索别名、项目、请求 ID、错误、提问…"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                          />
+                        </label>
+                        <div className="fk filter-tabs">
+                          {[
+                            ['all', '全部'],
+                            ['success', '完成'],
+                            ['unfinished', '未完成'],
+                            ['fallback', '回退'],
+                            ['limited', '限流'],
+                          ].map(([v, t]) => (
+                            <button
+                              key={v}
+                              type="button"
+                              className={filter === v ? 'on selected' : ''}
+                              aria-pressed={filter === v}
+                              onClick={() => setFilter(v)}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                          {hasFilters && (
+                            <button type="button" className="request-reset" onClick={clearRequestFilters} aria-label="清除请求筛选">
+                              ✕ 清除
+                            </button>
+                          )}
+                        </div>
+                        <div className="request-filters rq-selects">
                           <FilterSelect
                             label="按项目筛选"
                             value={projectFilter}
@@ -1466,93 +1461,50 @@ function App() {
                               ...historyProjects.map(([id, name]) => ({ value: id, label: id ? name + '（已删除）' : '未识别项目' })),
                             ]}
                           />
+                          <FilterSelect label="按模型筛选" value={modelFilter} onChange={setModelFilter} options={filterOptions.models} />
+                          <FilterSelect
+                            label="按厂商筛选"
+                            value={providerFilter}
+                            onChange={setProviderFilter}
+                            options={filterOptions.providers}
+                          />
                         </div>
-                        <FilterSelect label="按模型筛选" value={modelFilter} onChange={setModelFilter} options={filterOptions.models} />
-                        <FilterSelect
-                          label="按厂商筛选"
-                          value={providerFilter}
-                          onChange={setProviderFilter}
-                          options={filterOptions.providers}
-                        />
+                        <label className="chk2 body-search">
+                          <input type="checkbox" checked={bodySearch} onChange={(e) => setBodySearch(e.target.checked)} />
+                          <span className="zh">同时搜索正文（较慢，最多 10 秒；只有保留期内的正文可搜）</span>
+                        </label>
+                        {bodySearchState === 'timeout' && <small className="warning-text">正文搜索超时，只显示摘要匹配的结果。</small>}
                       </div>
-                      <div className="filter-tabs">
-                        {[
-                          ['all', '全部'],
-                          ['success', '完成'],
-                          ['unfinished', '未完成'],
-                          ['fallback', '回退'],
-                          ['limited', '限流'],
-                        ].map(([v, t]) => (
-                          <button
-                            key={v}
-                            className={filter === v ? 'selected' : ''}
-                            aria-pressed={filter === v}
-                            onClick={() => setFilter(v)}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                        {hasFilters && (
-                          <button className="request-reset" onClick={clearRequestFilters} aria-label="清除请求筛选">
-                            清除
-                          </button>
-                        )}
-                      </div>
+                      <RequestList
+                        records={visible}
+                        selectedId={selected?.id}
+                        onSelect={selectRecord}
+                        loading={reqLoading}
+                        hasMore={!!reqNext}
+                        onLoadMore={loadMoreRequests}
+                      />
                     </div>
-                    <div className="request-items" role="region" aria-label="请求列表" tabIndex={0}>
-                      {visible.length ? (
-                        visible.map((r) => (
-                          <button
-                            key={r.id}
-                            className={'request-item ' + (selected?.id === r.id ? 'selected' : '')}
-                            onClick={() => selectRecord(r.id)}
-                          >
-                            <span>
-                              <b>{r.project_name}</b>
-                              <small>{time(r.started)}</small>
-                            </span>
-                            <span>
-                              <code>{r.alias}</code>
-                              <small className={r.state === 'complete' ? 'good-text' : 'warning-text'}>{r.status}</small>
-                            </span>
-                            <small>
-                              {recordStatus(r)} · {r.stream === true ? '流式' : r.stream === false ? '非流式' : '方式未记录'}
-                              {r.fallback_from && <span className="request-tag tag-fallback">回退自 {r.fallback_from}</span>}
-                              {(r.error_type === 'project_rate_limit' || r.error_type === 'project_concurrency') && (
-                                <span className="request-tag tag-limited">项目限流</span>
-                              )}
-                              {r.body_purged && <span className="request-tag tag-purged">正文已清理</span>}
-                            </small>
-                          </button>
-                        ))
+                    <section className="ins request-detail" aria-label="请求详情" tabIndex={0}>
+                      {selected ? (
+                        <Inspector
+                          record={selected}
+                          tab={tab}
+                          setTab={setTab}
+                          onCopyCurl={() => copy(curlFor(selected, state.base_url || location.origin + '/v1'))}
+                          onOpenTask={selected.task_id ? () => navigate('tasks') : undefined}
+                        >
+                          <RecordTabContent selected={selected} tab={tab} setTab={setTab} copy={copy} />
+                        </Inspector>
                       ) : (
-                        <p className="rail-empty">{reqLoading ? '正在读取…' : '没有匹配的请求'}</p>
+                        <Empty title="选择一条请求" text="查看消息结构、原始数据和首字耗时。" />
                       )}
-                      {reqNext && (
-                        <button className="load-more" onClick={loadMoreRequests} disabled={reqLoading}>
-                          {reqLoading ? '正在读取…' : '加载更早的 50 条'}
-                        </button>
-                      )}
-                    </div>
-                  </section>
-                  <section className="request-detail" aria-label="请求详情" tabIndex={0}>
-                    {selected ? (
-                      <RecordDetail selected={selected} tab={tab} setTab={setTab} copy={copy} />
-                    ) : (
-                      <Empty title="选择一条请求" text="查看消息结构、原始数据和首字耗时。" />
-                    )}
-                  </section>
-                </div>
-              )}
-            </>
-          )}
-        </main>
-        <footer className="app-footer">
-          <span>
-            <span className="dot" /> 本地服务 · Go + SQLite
-          </span>
-          <span>厂商凭据不随项目调用接口返回</span>
-        </footer>
+                    </section>
+                  </div>
+                )}
+              </>
+            )}
+          </main>
+        </div>
       </div>
       {notice && (
         <div className="toast" role="status">
@@ -2459,6 +2411,86 @@ function ttsRecordText(output: string) {
   } catch {
     return '';
   }
+}
+/** curlFor rebuilds the original project request as a copyable command; the token stays a placeholder. */
+function curlFor(r: RequestRecord, base: string) {
+  const path =
+    r.protocol === 'messages'
+      ? '/messages'
+      : r.protocol === 'dashscope-asr'
+        ? '/asr/transcriptions'
+        : r.protocol === 'dashscope-tts'
+          ? '/tts/speech'
+          : isWebTool(r.protocol)
+            ? webToolPath(r.protocol)
+            : '/chat/completions';
+  return `curl -sS ${base.replace(/\/$/, '')}${path} \\\n  -H 'Authorization: Bearer $GATEWAY_TOKEN' \\\n  -H 'Content-Type: application/json' \\\n  -d '${(r.input || '{}').replace(/'/g, "'\\''")}'`;
+}
+function RecordTabContent({
+  selected,
+  tab,
+  setTab,
+  copy,
+}: {
+  selected: RequestRecord;
+  tab: string;
+  setTab: (tab: string) => void;
+  copy: (value: string) => void;
+}) {
+  return (
+    <>
+      <RequestAdaptations changes={selected.adaptations} />
+      {selected.record_missing &&
+        (selected.body_purged ? (
+          <div className="request-outcome-note">正文已按保留策略过期清理，只剩监控摘要和指标；保留天数可在「数据与系统」调整。</div>
+        ) : (
+          <div className="request-outcome-note">当前仅有监控摘要；请求可能仍在进行、正文日志尚未写入或未能保存。</div>
+        ))}
+      {recordLimitNote(selected)}
+      {tab === 'messages' ? (
+        <Messages key={selected.id} record={selected} onResponseDetails={() => setTab('response')} />
+      ) : tab === 'response' ? (
+        selected.protocol === 'dashscope-asr' ? (
+          <AsrResponseDetails key={selected.id} output={selected.output || ''} />
+        ) : (
+          <ResponseDetails key={selected.id} output={selected.output || ''} />
+        )
+      ) : tab === 'raw' ? (
+        <>
+          <div className="raw-data-heading">
+            <h3>项目请求</h3>
+            <button
+              type="button"
+              className="raw-data-copy"
+              aria-label="复制项目请求原始数据"
+              disabled={!selected.input}
+              onClick={() => copy(selected.input || '')}
+            >
+              <Copy size={14} />
+              复制
+            </button>
+          </div>
+          <pre>{pretty(selected.input || '')}</pre>
+          <div className="raw-data-heading">
+            <h3>上游响应 / SSE 事件</h3>
+            <button
+              type="button"
+              className="raw-data-copy"
+              aria-label="复制上游响应原始数据"
+              disabled={!selected.output}
+              onClick={() => copy(selected.output || '')}
+            >
+              <Copy size={14} />
+              复制
+            </button>
+          </div>
+          <pre>{pretty(selected.output || '')}</pre>
+        </>
+      ) : (
+        <RequestTiming record={selected} />
+      )}
+    </>
+  );
 }
 function RecordDetail({
   selected,

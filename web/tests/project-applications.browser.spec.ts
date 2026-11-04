@@ -55,7 +55,7 @@ test('客户端立即领取待启用 Token，管理员批准原 Token 或拒绝�
   await expect(reject).toContainText('已拒绝');
   expect((await client.get('/v1/models', { headers: { Authorization: 'Bearer ' + second.token } })).status()).toBe(401);
   await page.goto('/?view=projects');
-  await expect(page.getByRole('heading', { name: '项目权限', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '项目与权限', exact: true })).toBeVisible();
   for (const result of [first, second]) await page.request.delete('/api/admin/projects/' + result.application.project_id, { headers: admin });
   await page.request.delete('/api/admin/models/' + model.id, { headers: admin });
   await page.request.delete('/api/admin/connections/' + connection.id, { headers: admin });

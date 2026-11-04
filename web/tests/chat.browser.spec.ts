@@ -63,7 +63,7 @@ test('对话调试贯通双协议、多轮、临时参数、取消、重试和�
     await page.getByLabel('管理密码', { exact: true }).fill('isolated-ui-test-password-2026');
     if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill('isolated-ui-test-password-2026');
     await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
-    await expect(page.locator('nav').getByRole('button', { name: '对话调试', exact: true })).toBeVisible();
+    await expect(page.locator('nav').getByRole('button', { name: /^调试台/ })).toBeVisible();
     const c = await page.request.post('/api/admin/connections', { headers, data: { name: '本地对话测试连接', provider: 'custom', endpoints: { chat: endpoint, messages: endpoint, 'dashscope-asr': endpoint }, token: 'fake-chat-browser-key', enabled: true } });
     expect(c.ok(), await c.text()).toBe(true); connectionID = (await c.json()).id;
     for (const [name, alias, protocols, enabled, max_tokens] of [
@@ -77,7 +77,7 @@ test('对话调试贯通双协议、多轮、临时参数、取消、重试和�
     }
     await page.reload();
     const nav = page.locator('nav');
-    await nav.getByRole('button', { name: '对话调试', exact: true }).click();
+    await nav.getByRole('button', { name: /^调试台/ }).click();
     const chat = page.locator('.chat-page');
     const model = chat.getByLabel('对话模型', { exact: true });
     await model.selectOption(modelIDs[0]);
@@ -125,8 +125,8 @@ test('对话调试贯通双协议、多轮、临时参数、取消、重试和�
     await chat.getByRole('tab', { name: '响应原文', exact: true }).click();
     await expect(chat.locator('.chat-raw')).toContainText('第一轮回答');
     await chat.getByRole('button', { name: '在请求记录中查看', exact: true }).click();
-    await expect(page.locator('.detail-head h2')).toHaveText('对话调试');
-    await nav.getByRole('button', { name: '对话调试', exact: true }).click();
+    await expect(page.locator('.detail-project')).toHaveText('对话调试');
+    await nav.getByRole('button', { name: /^调试台/ }).click();
     await expect(chat.locator('.chat-message')).toHaveCount(4);
     await chat.getByRole('button', { name: '新对话', exact: true }).click();
     await expect(model).toHaveValue(modelIDs[1]);
@@ -173,7 +173,7 @@ test('对话调试贯通双协议、多轮、临时参数、取消、重试和�
     await settings.click(); await expect(chat.locator('.chat-panel')).toHaveCount(0);
     await settings.click(); await expect(chat.locator('.chat-settings')).toBeVisible();
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await page.reload(); await nav.getByRole('button', { name: '对话调试', exact: true }).click();
+    await page.reload(); await nav.getByRole('button', { name: /^调试台/ }).click();
     await expect(chat.locator('.chat-message')).toHaveCount(0);
     await model.selectOption(modelIDs[1]);
     await send('慢速回答');
@@ -183,7 +183,7 @@ test('对话调试贯通双协议、多轮、临时参数、取消、重试和�
     await expect.poll(() => canceled).toBe(2);
     await page.getByLabel('管理密码', { exact: true }).fill('isolated-ui-test-password-2026');
     await page.getByRole('button', { name: '进入管理页面', exact: true }).click();
-    await nav.getByRole('button', { name: '对话调试', exact: true }).click();
+    await nav.getByRole('button', { name: /^调试台/ }).click();
     await expect(chat.locator('.chat-message')).toHaveCount(0);
     expect(errors).toEqual([]);
   } finally {
@@ -199,9 +199,9 @@ test('空配置可直接打开对话页并引导配置模型', async ({ page }) 
     return route.fulfill({ json: path === '/api/status' ? { configured: true, authenticated: true, locked: false } : path === '/api/admin/state' ? { connections: [], models: [], projects: [], request_count: 0, dropped_records: 0, base_url: 'http://127.0.0.1:18318' } : path === '/api/admin/request-tasks' ? { tasks: [] } : [] });
   });
   await page.goto('/?view=chat');
-  await expect(page.getByRole('heading', { name: '对话调试', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '调试台', exact: true })).toBeVisible();
   await expect(page.getByLabel('对话模型', { exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: '发送', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '去配置模型', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '模型配置', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '连接与模型', exact: true })).toBeVisible();
 });

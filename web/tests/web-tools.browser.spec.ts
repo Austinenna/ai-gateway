@@ -11,7 +11,7 @@ test('DeepSeek 搜索与抓取：连接模板、默认不勾选、单独建模�
   const box = (name: string) => modal.getByRole('checkbox', { name, exact: true });
 
   await test.step('DeepSeek 连接预填两个搜索端点', async () => {
-    await page.locator('nav').getByRole('button', { name: /^厂商连接/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     await page.getByRole('button', { name: '新增连接', exact: true }).first().click();
     await modal.getByRole('combobox', { name: '厂商', exact: true }).selectOption('deepseek');
     await box('DeepSeek 搜索').check();
@@ -27,7 +27,7 @@ test('DeepSeek 搜索与抓取：连接模板、默认不勾选、单独建模�
   await test.step('新建模型默认不勾选搜索；只勾搜索时不显示模型目录和默认参数', async () => {
     const state = await (await page.request.get('/api/admin/state')).json();
     const connection = state.connections.find((c: { name: string }) => c.name === 'DeepSeek 搜索验证');
-    await page.locator('nav').getByRole('button', { name: /^模型配置/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     await page.getByRole('button', { name: '新增模型', exact: true }).first().click();
     await modal.getByRole('combobox', { name: '所属连接', exact: true }).selectOption(connection.id);
     await expect(box('Chat Completions')).toBeChecked();

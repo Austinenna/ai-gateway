@@ -9,7 +9,7 @@ test('模型上下文窗口保存、回显、公开目录与窄屏显示', async
   await page.getByLabel('管理密码', { exact: true }).fill('isolated-ui-test-password-2026');
   if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill('isolated-ui-test-password-2026');
   await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
-  await expect(page.locator('nav').getByRole('button', { name: /^模型配置/ })).toBeVisible();
+  await expect(page.locator('nav').getByRole('button', { name: /^连接与模型/ })).toBeVisible();
   const connection = await page.request.post('/api/admin/connections', { headers, data: {
     name: '上下文测试连接', provider: 'custom', enabled: true,
     endpoints: { chat: 'https://mock.invalid/v1', 'dashscope-asr': 'https://mock.invalid/api/v1' }, token: 'fake-context-ui-key',
@@ -21,7 +21,7 @@ test('模型上下文窗口保存、回显、公开目录与窄屏显示', async
   mkdirSync(output, { recursive: true });
   try {
     await page.reload();
-    await page.locator('nav').getByRole('button', { name: /^模型配置/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     await page.getByRole('button', { name: '新增模型', exact: true }).first().click();
     const modal = page.getByRole('dialog');
     await modal.getByLabel('显示名称', { exact: false }).fill('上下文测试模型');
@@ -43,8 +43,8 @@ test('模型上下文窗口保存、回显、公开目录与窄屏显示', async
     const catalog = await (await page.request.get('/api/public/models')).json();
     expect(catalog.data.find((m: { id: string }) => m.id === 'context-ui-test').context_window).toBe(1048576);
     await page.reload();
-    await page.locator('nav').getByRole('button', { name: /^模型配置/ }).click();
-    const row = page.locator('.models-table tbody tr').filter({ hasText: '上下文测试模型' });
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
+    const row = page.locator('.rack-models tbody tr').filter({ hasText: '上下文测试模型' });
     await expect(row).toContainText('上下文 1,048,576 Token');
     await page.screenshot({ path: resolve(output, 'models-desktop.png') });
     await row.getByRole('button', { name: '编辑', exact: true }).click();

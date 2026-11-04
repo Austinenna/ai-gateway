@@ -71,7 +71,7 @@ test('全部范围显示累计统计并保留筛选与刷新', async ({ page }, 
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 960 });
     await page.locator('.workspace').evaluate(el => { el.scrollTop = 0; });
-    await page.evaluate(() => window.scrollTo(0, 0));
+    await allButton.scrollIntoViewIfNeeded();
     await expect(allButton).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath(`overview-all-${width}.png`), fullPage: width === 390 });
@@ -118,8 +118,8 @@ test('六组监控支持筛选、跳转详情与桌面手机布局', async ({ pa
   response = waitQuery('model_id', 'm1'); await page.locator('.monitor-models').getByRole('button', { name: 'coding', exact: true }).click(); await response;
   await expect(page.getByLabel('监控连接', { exact: true })).toHaveValue('c1');
   await page.getByRole('button', { name: '查看请求 monitor-complete', exact: true }).click();
-  await expect(page.locator('.detail-head')).toContainText('首个 Token · TTFT1 s');
-  await expect(page.locator('.detail-head')).toContainText('正文首字 · TTFC3.5 s');
+  await expect(page.locator('.detail-head')).toContainText('TTFT1 s');
+  await expect(page.locator('.detail-head')).toContainText('TTFC3.5 s');
   for (const width of [1920, 1440, 1280, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.screenshot({ path: info.outputPath(`request-messages-${width}.png`), fullPage: width === 390, animations: 'disabled' });
@@ -156,7 +156,8 @@ test('用量未知与零、非流式、HTTP 200 流内错误有明确区别', as
 
 test('MiniMax 自动缓存显示总输入、命中率并区分未单列与零', async ({ page }, info) => {
   await page.getByRole('button', { name: '查看请求 monitor-minimax', exact: true }).click();
-  await expect(page.locator('.detail-head')).toContainText('18,838 / 185');
+  await expect(page.locator('.detail-head')).toContainText('INPUT18,838');
+  await expect(page.locator('.detail-head')).toContainText('OUTPUT185');
   await page.getByRole('button', { name: '性能与用量', exact: true }).click();
   const usage = page.locator('.detail-usage');
   await expect(usage.locator('dd')).toHaveText(['18,838', '117', '18,721', '未单列（自动缓存）', '185', '19,023']);

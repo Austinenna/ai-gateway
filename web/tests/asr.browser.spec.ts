@@ -29,7 +29,7 @@ test('百炼 ASR 配置、原生音频调用、项目授权与转写详情', asy
     await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     const modal = page.getByRole('dialog');
-    await page.locator('nav').getByRole('button', { name: /^厂商连接/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     await page.getByRole('button', { name: '新增连接', exact: true }).first().click();
     await modal.getByRole('combobox', { name: '厂商', exact: true }).selectOption('dashscope');
     await expect(modal.getByRole('checkbox', { name: '百炼 ASR', exact: true })).toBeChecked();
@@ -54,7 +54,7 @@ test('百炼 ASR 配置、原生音频调用、项目授权与转写详情', asy
     await expect(modal.getByLabel('更换厂商 Token')).toHaveValue('');
     await modal.getByRole('button', { name: '取消', exact: true }).click();
 
-    await page.locator('nav').getByRole('button', { name: /^模型配置/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     await page.getByRole('button', { name: '新增模型', exact: true }).first().click();
     await modal.getByRole('combobox', { name: '所属连接', exact: true }).selectOption(connectionID);
     await modal.getByLabel('显示名称').fill('测试语音识别');
@@ -94,7 +94,7 @@ test('百炼 ASR 配置、原生音频调用、项目授权与转写详情', asy
     expect(unauthorized.status()).toBe(403); expect(upstreamCalls).toHaveLength(1);
 
     await page.reload();
-    await page.locator('nav').getByRole('button', { name: /^项目权限/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^项目与权限/ }).click();
     const row = page.locator('.project-card').filter({ hasText: 'ASR 授权验证' });
     await row.getByRole('button', { name: '接入信息', exact: true }).click();
     await expect(modal.getByRole('tab', { name: '百炼 ASR', exact: true })).toHaveAttribute('aria-selected', 'true');

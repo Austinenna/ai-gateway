@@ -10,7 +10,7 @@ test('MiniMax 按协议设置思考默认值，保存、回显及取消补充', 
   await page.getByLabel('管理密码', { exact: true }).fill('isolated-ui-test-password-2026');
   if (!status.configured) await page.getByLabel('再次输入密码', { exact: true }).fill('isolated-ui-test-password-2026');
   await page.getByRole('button', { name: status.configured ? (status.locked ? '解锁并进入' : '进入管理页面') : '创建并进入', exact: true }).click();
-  await expect(page.locator('nav').getByRole('button', { name: /^模型配置/ })).toBeVisible();
+  await expect(page.locator('nav').getByRole('button', { name: /^连接与模型/ })).toBeVisible();
   const connections: string[] = [];
   let modelID = '';
   const output = resolve('../output/model-thinking-qa');
@@ -31,9 +31,9 @@ test('MiniMax 按协议设置思考默认值，保存、回显及取消补充', 
     expect(response.ok(), await response.text()).toBeTruthy();
     modelID = (await response.json()).id;
     await page.reload();
-    await page.locator('nav').getByRole('button', { name: /^模型配置/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     const modal = page.getByRole('dialog');
-    const row = page.locator('.models-table tbody tr').filter({ hasText: '思考设置测试模型' });
+    const row = page.locator('.rack-models tbody tr').filter({ hasText: '思考设置测试模型' });
     const split = modal.getByLabel('Chat · 思考拆分', { exact: true });
     const thinking = modal.getByLabel('Messages · 思考模式', { exact: true });
     async function open() { await row.getByRole('button', { name: '编辑', exact: true }).click(); }

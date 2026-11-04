@@ -26,13 +26,13 @@ async function setup(page: Page, count = 4) {
     return route.fulfill({ json });
   });
   await page.goto('/');
-  await page.locator('nav').getByRole('button', { name: '任务记录', exact: true }).click();
+  await page.locator('nav').getByRole('button', { name: /^任务/ }).click();
   return { tasks, first, calls };
 }
 
 test('独立导航进入任务汇总与逐次请求，保留子代理与原始调用详情', async ({ page }, info) => {
   const { calls } = await setup(page);
-  await expect(page.locator('nav').getByRole('button', { name: '任务记录', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('nav').getByRole('button', { name: /^任务/ })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: '任务记录', level: 1 })).toBeVisible();
   await expect(page.getByRole('button', { name: /^(按任务|逐次调用)$/ })).toHaveCount(0);
   await expect(page.locator('.task-item')).toHaveCount(2);
@@ -61,10 +61,10 @@ test('独立导航进入任务汇总与逐次请求，保留子代理与原始�
   await expect(page.locator('.task-answer')).toContainText('回归用例已添加');
   await page.getByRole('button', { name: '分组信息', exact: true }).click();
   await expect(page.locator('.task-group-fields')).toContainText('root-second');
-  await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+  await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
   await expect(page.getByRole('heading', { name: '请求记录', level: 1 })).toBeVisible();
   await expect(page.locator('nav [aria-current=page]')).toHaveCount(1);
-  await expect(page.locator('nav [aria-current=page]')).toContainText('请求记录');
+  await expect(page.locator('nav [aria-current=page]')).toContainText('请求');
   await expect(page.locator('.task-inspector')).toHaveCount(0);
   await page.getByRole('button', { name: '刷新请求', exact: true }).click();
   await expect(page.locator('.request-item')).toHaveCount(6);
@@ -72,8 +72,7 @@ test('独立导航进入任务汇总与逐次请求，保留子代理与原始�
   await expect(page.locator('.detail-request-id')).toHaveText('legacy');
   await page.locator('.request-item').first().click();
   await expect(page.getByRole('button', { name: '响应详情', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '收起侧边栏', exact: true }).click();
-  const taskEntry = page.locator('nav').getByRole('button', { name: '任务记录', exact: true });
+  const taskEntry = page.locator('nav').getByRole('button', { name: /^任务/ });
   await taskEntry.focus();
   await page.keyboard.press('Enter');
   await expect(taskEntry).toHaveAttribute('aria-current', 'page');
@@ -120,8 +119,8 @@ test('任务分页、搜索、需关注筛选以及窄屏深色布局', async ({
   await page.getByRole('button', { name: '对话概览', exact: true }).click();
   for (const [width, height] of [[1440, 900], [1024, 420], [390, 844]]) {
     await page.setViewportSize({ width, height });
-    const taskEntry = page.locator('nav').getByRole('button', { name: '任务记录', exact: true });
-    const requestEntry = page.locator('nav').getByRole('button', { name: /^请求记录/ });
+    const taskEntry = page.locator('nav').getByRole('button', { name: /^任务/ });
+    const requestEntry = page.locator('nav').getByRole('button', { name: /^请求/ });
     const railBefore = (await page.locator('.request-rail').boundingBox())!;
     await requestEntry.click();
     await expect(page.getByRole('heading', { name: '请求记录', level: 1 })).toBeVisible();
@@ -153,16 +152,16 @@ test('没有已识别任务时说明请求入口，刷新后显示新任务', as
   await setup(page);
   await page.route('**/api/admin/request-tasks', route => route.fulfill({ json: { tasks: [], recent_call_limit: 200 } }));
   await page.reload();
-  await page.locator('nav').getByRole('button', { name: '任务记录', exact: true }).click();
+  await page.locator('nav').getByRole('button', { name: /^任务/ }).click();
   await expect(page.locator('.task-item')).toHaveCount(0);
   await expect(page.getByRole('region', { name: '任务列表' })).toContainText('暂无已识别的任务。未分组的调用可在「请求记录」中查看。');
   await expect(page.locator('.task-head')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('empty-tasks.png'), animations: 'disabled' });
-  await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+  await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
   await expect(page.locator('.request-item')).toHaveCount(6);
   await page.locator('.request-item').last().click();
   await expect(page.locator('.detail-request-id')).toHaveText('legacy');
-  await page.locator('nav').getByRole('button', { name: '任务记录', exact: true }).click();
+  await page.locator('nav').getByRole('button', { name: /^任务/ }).click();
   await page.unroute('**/api/admin/request-tasks');
   await page.getByRole('button', { name: '刷新任务', exact: true }).click();
   await expect(page.locator('.task-item')).toHaveCount(2);

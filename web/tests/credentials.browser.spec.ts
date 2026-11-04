@@ -52,7 +52,7 @@ test('项目试调用的凭证填入、校验、加密取回与退出管理', as
 
   await test.step('刷新清除暂存，取回加密凭证不会更换正在使用的 Token', async () => {
     await page.reload();
-    await page.locator('nav').getByRole('button', { name: /^请求记录/ }).click();
+    await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
     await page.getByRole('button', { name: '试调用', exact: true }).click();
     await expect(key).toHaveValue('');
     await openGuide();
@@ -90,7 +90,7 @@ test('项目试调用的凭证填入、校验、加密取回与退出管理', as
     const disabled = await page.request.put('/api/admin/projects/' + projectID, { headers, data: { name: '演示项目', enabled: false, model_ids: [modelID] } });
     expect(disabled.ok()).toBe(true);
     await page.reload();
-    await page.getByRole('button', { name: '项目权限', exact: true }).click();
+    await page.locator('nav').getByRole('button', { name: /^项目与权限/ }).click();
     await page.locator('.project-card').getByRole('button', { name: '试调用', exact: true }).click();
     await expect(guide).toContainText('此项目已停用');
     await expect(guide.getByRole('button', { name: '重置凭证并填入', exact: true })).toHaveCount(0);

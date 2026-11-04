@@ -50,7 +50,7 @@ test('关联模型逐个删除与厂商级联删除，检查桌面和窄屏布�
   }
 
   await test.step('模型列表在桌面、窄窗口和手机宽度下无溢出或操作重叠', async () => {
-    await nav('模型配置');
+    await nav('连接与模型');
     for (const [name, width, height] of [['desktop', 1440, 1000], ['compact', 1024, 900], ['mobile', 390, 844]] as const) {
       await page.setViewportSize({ width, height });
       await checkLayout();
@@ -68,7 +68,7 @@ test('关联模型逐个删除与厂商级联删除，检查桌面和窄屏布�
   });
 
   await test.step('删除窗口直接列出模型和项目，并验证滚动及窄屏按钮可达', async () => {
-    await nav('厂商连接');
+    await nav('连接与模型');
     await page.locator('.connection-row').filter({ hasText: '智谱 · 开发环境' }).getByRole('button', { name: '删除', exact: true }).click();
     await expect(modal.locator('.linked-model')).toHaveCount(8);
     await expect(modal).toContainText('代码助手项目');
