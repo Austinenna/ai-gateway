@@ -71,7 +71,7 @@ systemd 服务不会读取 shell 配置或 `/etc/environment` 中的代理变量
 sudo cat /proc/$(systemctl show -p MainPID --value ai-gateway)/environ | tr '\0' '\n' | grep -i proxy
 ```
 
-历史：2026-11-03 曾用 drop-in `/etc/systemd/system/ai-gateway.service.d/proxy.conf` 给整个网关设置 `HTTPS_PROXY=http://127.0.0.1:7890`。2026-11-04 出站代理版本上线、用户在页面保存地址并给 OpenRouter 打开开关且调用验证通过后，删除该 drop-in 并重启：服务 active、健康检查通过，进程代理变量为 0 个。原文件备份在服务器 `/var/lib/ai-gateway/backups/proxy-dropin-20261104/proxy.conf`；需要回退时拷回原路径，执行 `daemon-reload` 并重启服务。
+历史：2026-11-03 曾用 drop-in `/etc/systemd/system/ai-gateway.service.d/proxy.conf` 给整个网关设置 `HTTPS_PROXY=http://127.0.0.1:7890`。2026-11-04 出站代理版本上线、用户在页面保存地址并给 OpenRouter 打开开关且调用验证通过后，删除该 drop-in 并重启：服务 active、健康检查通过，进程代理变量为 0 个。用户随后确认 OpenRouter 调用正常，该备份已于同日删除。
 
 ## 当前网络边界
 
