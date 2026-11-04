@@ -29,12 +29,12 @@ export function RequestMetrics({ record: r }: { record: RequestRecord }) {
   if (r.protocol === 'dashscope-asr') return <div className="detail-metric-grid">
     <div><span>总耗时</span><b>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</b></div>
     <div><span>音频时长</span><b>{number(r.audio_seconds, 2)} <em>秒</em></b></div>
-    <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}</b></div>
+    <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}{r.cost?.peak && <em> 高峰价</em>}</b></div>
   </div>;
   if (isWebTool(r.protocol)) return <div className="detail-metric-grid">
     <div><span>总耗时</span><b>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</b></div>
     <div><span>Token 用量</span><b>不适用</b></div>
-    <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}</b></div>
+    <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}{r.cost?.peak && <em> 高峰价</em>}</b></div>
   </div>;
   return <div className="detail-metric-grid">
     <div title="从开始转发到首段有效思考、正文或工具内容"><span>首个 Token · TTFT</span><b>{firstTiming(r)}</b></div>
@@ -43,7 +43,7 @@ export function RequestMetrics({ record: r }: { record: RequestRecord }) {
     <div><span>输入 / 输出 Token</span><b>{number(input)} <em>/</em> {number(output)}</b></div>
     <div><span>缓存命中</span><b>{number(r.cache_read_tokens)} <em>Token</em></b></div>
     <div title="根据厂商输出用量与首段至末段有效内容间隔估算"><span>估算输出速度</span><b>{number(r.output_tps, 1)} <em>Token/s</em></b></div>
-    <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}</b></div>
+    <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}{r.cost?.peak && <em> 高峰价</em>}</b></div>
   </div>;
 }
 export function RequestTiming({ record: r }: { record: RequestRecord }) {

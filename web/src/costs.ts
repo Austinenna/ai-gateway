@@ -3,10 +3,13 @@ export type ModelPrice = {
   input_per_mtok?: number | null; output_per_mtok?: number | null;
   cache_read_per_mtok?: number | null; cache_write_per_mtok?: number | null;
   audio_per_minute?: number | null; per_call?: number | null;
+  peak?: PeakPrice | null;
 };
+// Weekdays use 1 = Monday … 7 = Sunday; hours are Asia/Shanghai "HH:MM-HH:MM", end exclusive.
+export type PeakPrice = Omit<ModelPrice, 'effective_from' | 'peak'> & { weekdays: number[]; hours: string[] };
 export type RecordCost = {
   status: 'none' | 'running' | 'priced' | 'partial' | 'usage_unknown' | 'unpriced';
-  amount: number; currency: string; price_effective_from?: number;
+  amount: number; currency: string; price_effective_from?: number; peak?: boolean;
   input_tokens?: number; cache_read_tokens?: number; cache_write_tokens?: number; output_tokens?: number;
   audio_seconds?: number; billable_calls?: number;
 };

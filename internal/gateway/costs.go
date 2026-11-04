@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +37,109 @@ type ModelPrice struct {
 	CacheWrite    *float64 `json:"cache_write_per_mtok"`
 	AudioMinute   *float64 `json:"audio_per_minute"`
 	PerCall       *float64 `json:"per_call"`
+	// Optional peak-hour rates, e.g. DeepSeek charges double on weekday
+	// working hours. Unset peak fields fall back to the base rates.
+	Peak *PeakPrice `json:"peak,omitempty"`
+}
+
+// PeakPrice applies on the listed weekdays (1=Monday … 7=Sunday) within the
+// listed Asia/Shanghai time ranges, end exclusive. Public holidays are not
+// known to the gateway and are treated as ordinary days.
+type PeakPrice struct {
+	Weekdays    []int    `json:"weekdays"`
+	Hours       []string `json:"hours"`
+	Input       *float64 `json:"input_per_mtok"`
+	Output      *float64 `json:"output_per_mtok"`
+	CacheRead   *float64 `json:"cache_read_per_mtok"`
+	CacheWrite  *float64 `json:"cache_write_per_mtok"`
+	AudioMinute *float64 `json:"audio_per_minute"`
+	PerCall     *float64 `json:"per_call"`
+}
+
+func parseClock(s string) (int, bool) {
+	t, err := time.Parse("15:04", s)
+	if err != nil || len(s) != 5 {
+		return 0, false
+	}
+	return t.Hour()*60 + t.Minute(), true
+}
+
+// parseRange accepts "09:00-12:00"; "24:00" may end a range.
+func parseRange(s string) (int, int, bool) {
+	from, to, ok := strings.Cut(s, "-")
+	if !ok {
+		return 0, 0, false
+	}
+	start, ok1 := parseClock(from)
+	end, ok2 := parseClock(to)
+	if to == "24:00" {
+		end, ok2 = 24*60, true
+	}
+	return start, end, ok1 && ok2 && start < end
+}
+
+func (p *PeakPrice) covers(started int64) bool {
+	t := time.UnixMilli(started).In(costZone)
+	day := int(t.Weekday())
+	if day == 0 {
+		day = 7
+	}
+	if !slices.Contains(p.Weekdays, day) {
+		return false
+	}
+	minute := t.Hour()*60 + t.Minute()
+	for _, r := range p.Hours {
+		if start, end, ok := parseRange(r); ok && minute >= start && minute < end {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *PeakPrice) validate() error {
+	if len(p.Weekdays) == 0 || len(p.Weekdays) > 7 || len(p.Hours) == 0 || len(p.Hours) > 8 {
+		return errors.New("高峰时段需要选择星期并填写 1 到 8 个时间段")
+	}
+	seen := map[int]bool{}
+	for _, d := range p.Weekdays {
+		if d < 1 || d > 7 || seen[d] {
+			return errors.New("高峰时段的星期无效或重复")
+		}
+		seen[d] = true
+	}
+	for _, r := range p.Hours {
+		if _, _, ok := parseRange(r); !ok {
+			return fmt.Errorf("高峰时间段 %q 格式应为 09:00-12:00", r)
+		}
+	}
+	set := false
+	for _, v := range []*float64{p.Input, p.Output, p.CacheRead, p.CacheWrite, p.AudioMinute, p.PerCall} {
+		if !validPrice(v) {
+			return fmt.Errorf("单价必须为 0 到 %g 之间的数字", maxUnitPrice)
+		}
+		set = set || v != nil
+	}
+	if !set {
+		return errors.New("高峰时段至少填写一项单价")
+	}
+	return nil
+}
+
+// rateAt returns the rates in force at a moment: peak fields override base ones.
+func (p ModelPrice) rateAt(started int64) (ModelPrice, bool) {
+	if p.Peak == nil || !p.Peak.covers(started) {
+		return p, false
+	}
+	pick := func(peak, base *float64) *float64 {
+		if peak != nil {
+			return peak
+		}
+		return base
+	}
+	k := p.Peak
+	p.Input, p.Output, p.CacheRead = pick(k.Input, p.Input), pick(k.Output, p.Output), pick(k.CacheRead, p.CacheRead)
+	p.CacheWrite, p.AudioMinute, p.PerCall = pick(k.CacheWrite, p.CacheWrite), pick(k.AudioMinute, p.AudioMinute), pick(k.PerCall, p.PerCall)
+	return p, true
 }
 
 func migrateCosts(db *sql.DB) error {
@@ -87,6 +191,11 @@ func validatePrices(prices []ModelPrice) error {
 		}
 		if !set {
 			return errors.New("每个价格版本至少填写一项单价")
+		}
+		if p.Peak != nil {
+			if err := p.Peak.validate(); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -151,6 +260,7 @@ type RecordCost struct {
 	Amount        float64 `json:"amount"`
 	Currency      string  `json:"currency"`
 	PriceFrom     *int64  `json:"price_effective_from,omitempty"`
+	Peak          bool    `json:"peak,omitempty"`
 	InputTokens   int64   `json:"input_tokens,omitempty"`
 	CacheRead     int64   `json:"cache_read_tokens,omitempty"`
 	CacheWrite    int64   `json:"cache_write_tokens,omitempty"`
@@ -175,12 +285,15 @@ func costOf(rec Record, book priceBook) RecordCost {
 	if !rec.Forwarded {
 		return c
 	}
-	p := book.at(rec.ModelID, rec.Started)
-	if p == nil {
+	version := book.at(rec.ModelID, rec.Started)
+	if version == nil {
 		c.Status = "unpriced"
 		return c
 	}
-	c.PriceFrom = &p.EffectiveFrom
+	c.PriceFrom = &version.EffectiveFrom
+	rates, peak := version.rateAt(rec.Started)
+	p := &rates
+	c.Peak = peak
 	known, complete := false, true
 	switch {
 	case rec.Protocol == "dashscope-asr":

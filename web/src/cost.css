@@ -26,3 +26,7 @@
 .cost-page .panel-head h2{white-space:nowrap}
 .cost-page .monitor-filters label{max-width:320px}
 .budget-name b{font-size:14px}
+.price-peak{border-top:1px dashed var(--line);margin-top:10px;padding-top:10px}
+.weekday-picker{display:flex;flex-wrap:wrap;gap:4px}
+.weekday-picker button{padding:5px 9px;font-size:12px}
+.weekday-picker button[aria-pressed=true]{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}

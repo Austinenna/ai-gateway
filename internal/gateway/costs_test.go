@@ -248,3 +248,42 @@ func TestCostsV9Migration(t *testing.T) {
 		t.Fatalf("version=%d err=%v", version, err)
 	}
 }
+
+func TestPeakHourPricing(t *testing.T) {
+	peak := &PeakPrice{Weekdays: []int{1, 2, 3, 4, 5}, Hours: []string{"09:00-12:00", "14:00-18:00"}, Input: f(2), Output: f(8), CacheRead: f(0.04)}
+	book := priceBook{"ds": {{EffectiveFrom: 0, Input: f(1), Output: f(4), CacheRead: f(0.02), Peak: peak}}}
+	at := func(y int, m time.Month, d, h, min int) int64 {
+		return time.Date(y, m, d, h, min, 0, 0, costZone).UnixMilli()
+	}
+	rec := Record{ModelID: "ds", Protocol: "chat", State: "complete", OutputTokens: 1_000_000, MetricsFields: MetricsFields{MetricsVersion: 1, Forwarded: true, InputTotal: n(1_000_000), InputUncached: n(1_000_000), OutputReported: true}}
+	for _, tc := range []struct {
+		started int64
+		amount  float64
+		peak    bool
+	}{
+		{at(2026, 11, 4, 9, 0), 10, true},   // Wednesday, start of peak
+		{at(2026, 11, 4, 11, 59), 10, true}, // still peak
+		{at(2026, 11, 4, 12, 0), 5, false},  // end is exclusive
+		{at(2026, 11, 4, 17, 30), 10, true}, // afternoon peak
+		{at(2026, 11, 7, 10, 0), 5, false},  // Saturday
+		{at(2026, 11, 4, 1, 30), 5, false},  // night
+	} {
+		rec.Started = tc.started
+		if c := costOf(rec, book); !near(c.Amount, tc.amount) || c.Peak != tc.peak {
+			t.Fatalf("%s: %+v", time.UnixMilli(tc.started).In(costZone), c)
+		}
+	}
+	for _, bad := range []*PeakPrice{
+		{Weekdays: []int{8}, Hours: []string{"09:00-12:00"}, Input: f(1)},
+		{Weekdays: []int{1}, Hours: []string{"12:00-09:00"}, Input: f(1)},
+		{Weekdays: []int{1}, Hours: []string{"9:00-12:00"}, Input: f(1)},
+		{Weekdays: []int{1}, Hours: []string{"09:00-12:00"}},
+	} {
+		if validatePrices([]ModelPrice{{Input: f(1), Peak: bad}}) == nil {
+			t.Fatalf("accepted invalid peak %+v", bad)
+		}
+	}
+	if validatePrices([]ModelPrice{{Input: f(1), Peak: &PeakPrice{Weekdays: []int{6, 7}, Hours: []string{"20:00-24:00"}, Input: f(2)}}}) != nil {
+		t.Fatal("rejected a valid peak window ending at 24:00")
+	}
+}
