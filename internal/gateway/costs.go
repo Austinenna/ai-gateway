@@ -36,6 +36,7 @@ type ModelPrice struct {
 	CacheRead     *float64 `json:"cache_read_per_mtok"`
 	CacheWrite    *float64 `json:"cache_write_per_mtok"`
 	AudioMinute   *float64 `json:"audio_per_minute"`
+	Chars10K      *float64 `json:"per_10k_characters"`
 	PerCall       *float64 `json:"per_call"`
 	// Optional peak-hour rates, e.g. DeepSeek charges double on weekday
 	// working hours. Unset peak fields fall back to the base rates.
@@ -53,6 +54,7 @@ type PeakPrice struct {
 	CacheRead   *float64 `json:"cache_read_per_mtok"`
 	CacheWrite  *float64 `json:"cache_write_per_mtok"`
 	AudioMinute *float64 `json:"audio_per_minute"`
+	Chars10K    *float64 `json:"per_10k_characters"`
 	PerCall     *float64 `json:"per_call"`
 }
 
@@ -113,7 +115,7 @@ func (p *PeakPrice) validate() error {
 		}
 	}
 	set := false
-	for _, v := range []*float64{p.Input, p.Output, p.CacheRead, p.CacheWrite, p.AudioMinute, p.PerCall} {
+	for _, v := range []*float64{p.Input, p.Output, p.CacheRead, p.CacheWrite, p.AudioMinute, p.Chars10K, p.PerCall} {
 		if !validPrice(v) {
 			return fmt.Errorf("单价必须为 0 到 %g 之间的数字", maxUnitPrice)
 		}
@@ -139,6 +141,7 @@ func (p ModelPrice) rateAt(started int64) (ModelPrice, bool) {
 	k := p.Peak
 	p.Input, p.Output, p.CacheRead = pick(k.Input, p.Input), pick(k.Output, p.Output), pick(k.CacheRead, p.CacheRead)
 	p.CacheWrite, p.AudioMinute, p.PerCall = pick(k.CacheWrite, p.CacheWrite), pick(k.AudioMinute, p.AudioMinute), pick(k.PerCall, p.PerCall)
+	p.Chars10K = pick(k.Chars10K, p.Chars10K)
 	return p, true
 }
 
@@ -181,7 +184,7 @@ func validatePrices(prices []ModelPrice) error {
 			return errors.New("价格生效时间无效或重复")
 		}
 		seen[p.EffectiveFrom] = true
-		values := []*float64{p.Input, p.Output, p.CacheRead, p.CacheWrite, p.AudioMinute, p.PerCall}
+		values := []*float64{p.Input, p.Output, p.CacheRead, p.CacheWrite, p.AudioMinute, p.Chars10K, p.PerCall}
 		set := false
 		for _, v := range values {
 			if !validPrice(v) {
@@ -266,6 +269,7 @@ type RecordCost struct {
 	CacheWrite    int64   `json:"cache_write_tokens,omitempty"`
 	OutputTokens  int64   `json:"output_tokens,omitempty"`
 	AudioSeconds  float64 `json:"audio_seconds,omitempty"`
+	TTSCharacters int64   `json:"tts_characters,omitempty"`
 	BillableCalls int     `json:"billable_calls,omitempty"`
 }
 
@@ -304,6 +308,16 @@ func costOf(rec Record, book priceBook) RecordCost {
 		if rec.AudioSeconds != nil {
 			c.AudioSeconds = *rec.AudioSeconds
 			c.Amount += *rec.AudioSeconds / 60 * *p.AudioMinute
+			known = true
+		}
+	case rec.Protocol == "dashscope-tts":
+		if p.Chars10K == nil {
+			c.Status = "unpriced"
+			return c
+		}
+		if rec.TTSCharacters != nil {
+			c.TTSCharacters = *rec.TTSCharacters
+			c.Amount += float64(*rec.TTSCharacters) / 1e4 * *p.Chars10K
 			known = true
 		}
 	case isWebTool(rec.Protocol):
@@ -406,6 +420,7 @@ type CostTotals struct {
 	CacheWrite   int64   `json:"cache_write_tokens"`
 	OutputTokens int64   `json:"output_tokens"`
 	AudioSeconds float64 `json:"audio_seconds"`
+	Characters   int64   `json:"tts_characters"`
 }
 
 func (t *CostTotals) add(c RecordCost) {
@@ -419,6 +434,7 @@ func (t *CostTotals) add(c RecordCost) {
 	t.CacheWrite += c.CacheWrite
 	t.OutputTokens += c.OutputTokens
 	t.AudioSeconds += c.AudioSeconds
+	t.Characters += c.TTSCharacters
 	switch c.Status {
 	case "priced":
 		t.Priced++

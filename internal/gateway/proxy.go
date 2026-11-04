@@ -147,6 +147,8 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	limit := int64(maxLLMRequestBytes)
 	if protocol == "dashscope-asr" {
 		limit = maxASRRequestBytes
+	} else if protocol == "dashscope-tts" {
+		limit = maxTTSRequestBytes
 	} else if isWebTool(protocol) {
 		limit = maxWebToolRequestBytes
 	}
@@ -200,6 +202,7 @@ func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 		Input      json.RawMessage `json:"input"`
 		Parameters json.RawMessage `json:"parameters"`
 		Stream     json.RawMessage `json:"stream"`
+		Voice      string          `json:"voice"`
 	}
 	if !decodeLimit(w, r, &in, maxASRRequestBytes) {
 		return
@@ -237,6 +240,10 @@ func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 			body["stream"] = in.Stream
 		}
 		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, body)
+		return
+	}
+	if c.Protocol == "dashscope-tts" {
+		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, ttsTestBody(aliasJSON, in.Message, in.Voice))
 		return
 	}
 	if isWebTool(c.Protocol) {
@@ -295,6 +302,11 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	g.snapshotCall(t)
 	if c.Protocol == "dashscope-asr" {
 		if err := validateASRRequest(body); err != nil {
+			problem(w, 400, err.Error())
+			return
+		}
+	} else if c.Protocol == "dashscope-tts" {
+		if err := validateTTSRequest(body); err != nil {
 			problem(w, 400, err.Error())
 			return
 		}
@@ -372,12 +384,14 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 		path = "/messages"
 	} else if c.Protocol == "dashscope-asr" {
 		path = "/services/aigc/multimodal-generation/generation"
+	} else if c.Protocol == "dashscope-tts" {
+		path = "/services/audio/tts/SpeechSynthesizer"
 	} else if isWebTool(c.Protocol) {
 		path = webToolPath(c.Protocol)
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
-	if c.Protocol == "dashscope-asr" {
+	if c.Protocol == "dashscope-asr" || c.Protocol == "dashscope-tts" {
 		ctx = context.WithValue(ctx, asrTransportKey{}, true)
 	}
 	ctx = g.withUpstreamProxy(ctx, c.UseProxy != nil && *c.UseProxy)
@@ -538,6 +552,8 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	if c.Protocol == "dashscope-asr" {
 		captured.add(asrLogPayload(data))
 		rec.readUsage(data)
+	} else if c.Protocol == "dashscope-tts" {
+		captured.add(ttsLogPayload(data))
 	} else {
 		captured.add(data)
 	}

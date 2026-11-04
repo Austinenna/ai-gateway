@@ -27,6 +27,10 @@ func (rec *Record) readUsage(data []byte) {
 		rec.readASRUsage(data)
 		return
 	}
+	if rec.Protocol == "dashscope-tts" {
+		rec.readTTSUsage(data)
+		return
+	}
 	if isWebTool(rec.Protocol) {
 		return
 	}

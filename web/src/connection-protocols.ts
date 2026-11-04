@@ -1,7 +1,7 @@
 import { isWebTool } from './web-tools.mjs';
 
-export const protocols = ['chat', 'messages', 'dashscope-asr', 'deepseek-search', 'deepseek-fetch'] as const;
-export const protocolName = (protocol: string) => ({ chat: 'Chat Completions', messages: 'Anthropic Messages', 'dashscope-asr': '百炼 ASR', 'deepseek-search': 'DeepSeek 搜索', 'deepseek-fetch': 'DeepSeek 抓取' }[protocol] || protocol);
+export const protocols = ['chat', 'messages', 'dashscope-asr', 'dashscope-tts', 'deepseek-search', 'deepseek-fetch'] as const;
+export const protocolName = (protocol: string) => ({ chat: 'Chat Completions', messages: 'Anthropic Messages', 'dashscope-asr': '百炼 ASR', 'dashscope-tts': '百炼 TTS', 'deepseek-search': 'DeepSeek 搜索', 'deepseek-fetch': 'DeepSeek 抓取' }[protocol] || protocol);
 const templates: Record<string, Record<string, string>> = {
   zhipu: { chat: 'https://open.bigmodel.cn/api/paas/v4', messages: 'https://open.bigmodel.cn/api/anthropic/v1' },
   minimax: { chat: 'https://api.minimax.cn/v1', messages: 'https://api.minimax.cn/anthropic/v1' },

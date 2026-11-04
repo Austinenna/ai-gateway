@@ -26,6 +26,7 @@ export function messageList(input) {
   if (!value || typeof value !== 'object') return [];
   const result = [];
   if (value.system) result.push({role: 'system', content: value.system});
+  if (typeof value.input?.text === 'string') result.push({role: 'user', content: value.input.text + (value.input.voice ? `\n\n（音色 ${value.input.voice}）` : '')});
   const messages = value.input?.messages || value.messages;
   if (Array.isArray(messages)) for (const message of messages) {
     if (!message || typeof message !== 'object') continue;

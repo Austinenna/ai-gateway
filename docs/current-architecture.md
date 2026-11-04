@@ -145,6 +145,7 @@ MODEL=coding
 | `POST /v1/chat/completions` | Chat Completions 普通／流式调用 | 连接的 `chat` 基础端点追加 `/chat/completions` |
 | `POST /v1/messages` | Messages 普通／流式调用 | 连接的 `messages` 基础端点追加 `/messages` |
 | `POST /v1/asr/transcriptions` | 百炼原生 JSON 同步转写 | 连接的 `dashscope-asr` 基础端点追加 `/services/aigc/multimodal-generation/generation` |
+| `POST /v1/tts/speech` | 百炼原生 JSON 同步语音合成 | 连接的 `dashscope-tts` 基础端点追加 `/services/audio/tts/SpeechSynthesizer`，见 [TTS 接入](tts.md) |
 | `POST /v1/tools/search` | DeepSeek 联网搜索，请求体与 DeepSeek 原生相同，可不带 `model` | 连接的 `deepseek-search` 基础端点追加 `/tools/search`，转发前删除 `model` |
 | `POST /v1/tools/fetch` | DeepSeek 网页抓取，转为 Markdown | 连接的 `deepseek-fetch` 基础端点追加 `/tools/fetch`，转发前删除 `model` |
 

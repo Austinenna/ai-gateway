@@ -258,6 +258,9 @@ func (g *Gateway) applicationEndpoints(protocol string) (string, string) {
 	if protocol == "dashscope-asr" {
 		return g.origin + "/v1", g.origin + "/v1/asr/transcriptions"
 	}
+	if protocol == "dashscope-tts" {
+		return g.origin + "/v1", g.origin + "/v1/tts/speech"
+	}
 	if protocol == "messages" {
 		return g.origin, g.origin + "/v1/messages"
 	}

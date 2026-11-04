@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, KeyRound, RefreshCw, ShieldCheck } from 'lucide-react';
 import { asrExample } from './asr.mjs';
+import { ttsExample } from './tts.mjs';
 import { protocolName } from './connection-protocols';
 import { isWebTool, webToolExample, webToolPath } from './web-tools.mjs';
 
-type Protocol = 'chat' | 'messages' | 'dashscope-asr' | 'deepseek-search' | 'deepseek-fetch';
+type Protocol = 'chat' | 'messages' | 'dashscope-asr' | 'dashscope-tts' | 'deepseek-search' | 'deepseek-fetch';
 type Model = { id: string; alias: string; name?: string; protocols: string[]; enabled: boolean };
 
 type Props = {
@@ -16,7 +17,7 @@ type Props = {
   rotateToken: () => Promise<void>;
 };
 
-const protocolOrder: Protocol[] = ['chat', 'messages', 'dashscope-asr', 'deepseek-search', 'deepseek-fetch'];
+const protocolOrder: Protocol[] = ['chat', 'messages', 'dashscope-asr', 'dashscope-tts', 'deepseek-search', 'deepseek-fetch'];
 
 export function ProjectAccessContent({ project, baseURL, models, resolveToken, saveToken, rotateToken }: Props) {
   const protocolOptions = protocolOrder.filter(protocol => models.some(model => model.enabled && model.protocols.includes(protocol)));
@@ -41,6 +42,7 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   const selectedAlias = selectedModel?.alias || '';
   const isAsr = protocol === 'dashscope-asr';
   const isWeb = isWebTool(protocol);
+  const isTts = protocol === 'dashscope-tts';
 
   useEffect(() => {
     if (!visibleProtocols.includes(protocol)) setProtocol(visibleProtocols[0]);
@@ -54,6 +56,7 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   }
   function endpointFor(target: Protocol) {
     if (target === 'dashscope-asr') return `${gatewayBaseURL}/asr/transcriptions`;
+    if (target === 'dashscope-tts') return `${gatewayBaseURL}/tts/speech`;
     if (isWebTool(target)) return `${gatewayBaseURL}${webToolPath(target)}`;
     return `${origin}/v1/${target === 'messages' ? 'messages' : 'chat/completions'}`;
   }
@@ -104,6 +107,10 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
         if (protocol === 'dashscope-asr') {
           const endpoint = endpointFor(protocol);
           return `# ${protocolName(protocol)} · ${model.alias}\nASR_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${model.alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${asrExample(model.alias)}`;
+        }
+        if (protocol === 'dashscope-tts') {
+          const endpoint = endpointFor(protocol);
+          return `# ${protocolName(protocol)} · ${model.alias}\nTTS_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${model.alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${ttsExample(model.alias)}`;
         }
         if (isWebTool(protocol)) {
           const endpoint = endpointFor(protocol);
@@ -180,6 +187,8 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
     </section>
 
     {isWeb && <section className="access-field"><h3>请求示例</h3><pre>{webToolExample(protocol)}</pre><p className="access-hint">不用写 model：网关会在此项目的授权里找到启用了该协议的模型。授权了多个时，再加 model 指定。</p></section>}
+
+    {isTts && <section className="access-field"><h3>合成请求示例</h3><pre>{ttsExample(selectedAlias)}</pre><p className="access-hint">请求体与百炼原生接口相同；响应里 output.audio.data（Base64）或 output.audio.url（有时效）就是音频。</p></section>}
 
     {isAsr && <section className="access-field"><h3>音频请求示例</h3><pre>{asrExample(selectedAlias)}</pre><p className="access-hint">替换音频 Base64，format 与文件实际格式保持一致。热词可选；接口接收 JSON。</p></section>}
 

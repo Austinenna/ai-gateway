@@ -33,6 +33,7 @@ type MetricsFields struct {
 	CacheWrite      *int64   `json:"cache_write_tokens"`
 	OutputReported  bool     `json:"output_reported"`
 	AudioSeconds    *float64 `json:"audio_seconds,omitempty"`
+	TTSCharacters   *int64   `json:"tts_characters,omitempty"`
 	UsageStatus     string   `json:"usage_status"`
 	OutputTPS       *float64 `json:"output_tps"`
 	TPOT            *float64 `json:"tpot_ms"`
@@ -180,8 +181,8 @@ func finalizeUsage(rec *Record) {
 	if isWebTool(rec.Protocol) {
 		return
 	}
-	if rec.Protocol == "dashscope-asr" {
-		if rec.AudioSeconds != nil {
+	if rec.Protocol == "dashscope-asr" || rec.Protocol == "dashscope-tts" {
+		if rec.AudioSeconds != nil || rec.TTSCharacters != nil {
 			rec.UsageStatus = "partial"
 			if rec.State == "complete" {
 				rec.UsageStatus = "complete"
@@ -241,6 +242,7 @@ type metricAggregate struct {
 	UsageEligible               int                `json:"usage_eligible"`
 	AudioSeconds                float64            `json:"audio_seconds,omitempty"`
 	AudioSamples                int                `json:"audio_samples,omitempty"`
+	TTSCharacters               int64              `json:"tts_characters,omitempty"`
 	CacheRatio                  *float64           `json:"cache_ratio"`
 	TTFT                        metricDistribution `json:"ttft"`
 	TTFC                        metricDistribution `json:"ttfc"`
@@ -270,10 +272,13 @@ func (a *metricAggregate) add(rec Record) {
 		a.AudioSeconds += *rec.AudioSeconds
 		a.AudioSamples++
 	}
-	if rec.Forwarded && rec.Protocol != "dashscope-asr" && !isWebTool(rec.Protocol) {
+	if rec.TTSCharacters != nil {
+		a.TTSCharacters += *rec.TTSCharacters
+	}
+	if rec.Forwarded && usesTokens(rec.Protocol) {
 		a.UsageEligible++
 	}
-	if rec.UsageStatus == "complete" && rec.Protocol != "dashscope-asr" && !isWebTool(rec.Protocol) {
+	if rec.UsageStatus == "complete" && usesTokens(rec.Protocol) {
 		a.UsageComplete++
 	}
 	if rec.InputTotal != nil {

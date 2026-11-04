@@ -7,7 +7,7 @@
 ## 已确认的范围和方案
 
 - **先在本地实现，为未来迁移单台 Linux 服务器做好准备。** 现在不部署远程服务，也不引入分布式组件。
-- **已在大语言模型之外增加百炼同步 ASR。** 提供智谱、MiniMax、DeepSeek、阿里百炼模板与自定义连接，支持 Chat Completions、Anthropic Messages 和百炼 ASR；豆包 ASR、图像与视频生成仍为后续候选能力。
+- **已在大语言模型之外增加百炼同步 ASR。** 提供智谱、MiniMax、DeepSeek、阿里百炼模板与自定义连接，支持 Chat Completions、Anthropic Messages、百炼 ASR 和百炼 TTS；豆包 ASR、图像与视频生成仍为后续候选能力。
 - 技术栈固定为 **Go＋React／TypeScript＋Vite＋SQLite**：Go 标准库处理 HTTP 与 SSE，前端嵌入一个可执行文件，SQLite 保存配置和记录。运行时无需 Node 服务。
 - 界面采用 A 的整体侧栏结构＋B 的请求检查器，已根据实际使用调整项目列表、接入信息、删除流程和独立滚动。
 
@@ -52,6 +52,8 @@ bash scripts/start.sh
 已实现 `GET /v1/models`、`POST /v1/chat/completions`、`POST /v1/messages`。同一模型别名可用于两种请求路径，网关按路径选择连接中相应的上游端点。普通与 SSE 调用采用同协议转发，内部按实际厂商、模型和协议适配参数，外部继续使用统一端点与模型别名；保留工具调用及相关内容块，工具由客户端执行。当前已支持 MiniMax M3 的 Messages 思考参数从 `enabled` 转为 `adaptive`，转换记录可在请求详情查看。当前不支持 Responses，也不进行任意协议互转。
 
 百炼 ASR 使用 `POST /v1/asr/transcriptions`，接受原生 DashScope JSON 音频请求并保留原生响应，支持热词、转写文本、逐词时间戳与音频秒数。它沿用连接、模型别名和项目授权；音频正文不会写入请求记录。管理页可选择音频文件测试，具体配置与客户端示例见 [百炼 ASR 接入](docs/asr.md)。本轮仅扩展网关，未修改 Dustoff 或迁移其凭据。
+
+百炼语音合成使用 `POST /v1/tts/speech`，请求和响应都是百炼原生 `SpeechSynthesizer` 格式，按 `usage.characters` 以「元／万字符」估算费用，合成的音频不写入请求记录。管理页可填音色测试并直接播放，见 [百炼 TTS 接入](docs/tts.md)。
 
 公开模型目录为 `GET /api/public/models`，无需 Token 或管理登录，返回全网关已启用且有可用协议的模型别名、显示名称与协议。`GET /v1/models` 仍需项目凭证，仅返回该项目获授权的模型；实际调用也继续校验项目权限。用法见 [模型列表接口](docs/demo.md#模型列表接口)。
 
@@ -106,6 +108,7 @@ npm run test:local-unlock
 - [GitHub 推送后自动部署](docs/deployment/github-actions-cd.md)：生产环境 Secrets、部署检查与自动回滚。
 - [手动部署到生产](docs/deployment/manual-production-deploy.md)：本机 Linux amd64 构建、SSH 上传、备份、回滚与验收流程。
 - [百炼 ASR 接入](docs/asr.md)：音频转写配置、请求示例、记录与验证边界。
+- [百炼 TTS 接入](docs/tts.md)：语音合成配置、请求示例、记录与计费。
 - [DeepSeek 搜索与抓取接入](docs/deepseek-search.md)：借用模型条目转发 Search／Fetch、配置、调用与记录。
 - [配置与项目权限设计](docs/configuration-and-permissions.md)、[当前界面说明](docs/design-directions.md)。
 - [项目理解报告](docs/project-understanding-report.md)：2026-09-15 的说明快照，生成方式见 [报告说明](docs/report-assets/README.md)。

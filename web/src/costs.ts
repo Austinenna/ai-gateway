@@ -2,7 +2,7 @@ export type ModelPrice = {
   effective_from: number;
   input_per_mtok?: number | null; output_per_mtok?: number | null;
   cache_read_per_mtok?: number | null; cache_write_per_mtok?: number | null;
-  audio_per_minute?: number | null; per_call?: number | null;
+  audio_per_minute?: number | null; per_10k_characters?: number | null; per_call?: number | null;
   peak?: PeakPrice | null;
 };
 // Weekdays use 1 = Monday … 7 = Sunday; hours are Asia/Shanghai "HH:MM-HH:MM", end exclusive.
@@ -11,11 +11,11 @@ export type RecordCost = {
   status: 'none' | 'running' | 'priced' | 'partial' | 'usage_unknown' | 'unpriced';
   amount: number; currency: string; price_effective_from?: number; peak?: boolean;
   input_tokens?: number; cache_read_tokens?: number; cache_write_tokens?: number; output_tokens?: number;
-  audio_seconds?: number; billable_calls?: number;
+  audio_seconds?: number; tts_characters?: number; billable_calls?: number;
 };
 export type CostTotals = {
   requests: number; cost: number; priced: number; usage_partial: number; usage_unknown: number; unpriced: number;
-  input_tokens: number; cache_read_tokens: number; cache_write_tokens: number; output_tokens: number; audio_seconds: number;
+  input_tokens: number; cache_read_tokens: number; cache_write_tokens: number; output_tokens: number; audio_seconds: number; tts_characters?: number;
 };
 export type UsageGroup = CostTotals & { key: string; label: string };
 export type UsageCall = { id: string; started: number; project_id: string; project_name: string; model: string; protocol: string; category: string; task: string; state: string; cost: RecordCost };

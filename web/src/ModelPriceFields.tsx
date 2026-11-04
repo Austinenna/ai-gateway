@@ -11,6 +11,7 @@ function fieldsFor(protocols: string[]) {
   const out: [Key, string, string][] = [];
   if (protocols.some(p => p === 'chat' || p === 'messages')) out.push(...textFields.map(([k, l]) => [k, l, '元 / 百万 Token'] as [Key, string, string]));
   if (protocols.includes('dashscope-asr')) out.push(['audio_per_minute', '音频', '元 / 分钟']);
+  if (protocols.includes('dashscope-tts')) out.push(['per_10k_characters', '语音合成', '元 / 万字符']);
   if (protocols.some(isWebTool)) out.push(['per_call', '每次调用', '元 / 次']);
   return out;
 }

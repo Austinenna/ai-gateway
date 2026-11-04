@@ -58,8 +58,8 @@ func (g *Gateway) discoverModels(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "请选择连接已配置的协议")
 		return
 	}
-	if in.Protocol == "dashscope-asr" {
-		problem(w, 400, "当前不支持获取百炼 ASR 模型列表，请手动填写模型 ID")
+	if in.Protocol == "dashscope-asr" || in.Protocol == "dashscope-tts" {
+		problem(w, 400, "当前不支持获取百炼语音模型列表，请手动填写模型 ID")
 		return
 	}
 	if isWebTool(in.Protocol) {
