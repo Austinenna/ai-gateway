@@ -41,7 +41,7 @@ func newHTTPClient() *http.Client {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.MaxIdleConns = 32
 	t.MaxIdleConnsPerHost = 8
-	t.ResponseHeaderTimeout = 45 * time.Second
+	t.ResponseHeaderTimeout = 5 * time.Minute
 	t.DisableCompression = true
 	t.Proxy = proxyForRequest
 	asr := t.Clone()

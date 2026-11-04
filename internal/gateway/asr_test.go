@@ -320,7 +320,7 @@ func (f asrRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) { re
 func TestASRTransportTimeoutIsolation(t *testing.T) {
 	client := newHTTPClient()
 	transport, ok := client.Transport.(*protocolTransport)
-	if !ok || transport.text.ResponseHeaderTimeout != 45*time.Second || transport.asr.ResponseHeaderTimeout != 10*time.Minute || client.Timeout != 10*time.Minute {
+	if !ok || transport.text.ResponseHeaderTimeout != 5*time.Minute || transport.asr.ResponseHeaderTimeout != 10*time.Minute || client.Timeout != 10*time.Minute {
 		t.Fatal("ASR timeout must not reduce the text protocol header limit or overall deadline")
 	}
 	// Exercise selection without a socket: each transport has its own protocol handler.
