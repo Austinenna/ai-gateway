@@ -54,14 +54,28 @@ func ttsLogPayload(raw []byte) []byte {
 	return out
 }
 
+// Qwen-Audio 3.0 TTS reports billable characters; 3.1 models are billed by
+// tokens and also report input_tokens / output_tokens.
 func (rec *Record) readTTSUsage(data []byte) {
 	var value struct {
 		Usage struct {
 			Characters *int64 `json:"characters"`
+			Input      *int64 `json:"input_tokens"`
+			Output     *int64 `json:"output_tokens"`
 		} `json:"usage"`
 	}
-	if json.Unmarshal(data, &value) == nil && value.Usage.Characters != nil && *value.Usage.Characters >= 0 {
-		rec.TTSCharacters = value.Usage.Characters
+	if json.Unmarshal(data, &value) != nil {
+		return
+	}
+	u := value.Usage
+	if u.Characters != nil && *u.Characters >= 0 {
+		rec.TTSCharacters = u.Characters
+	}
+	if n := tokenValue(u.Input); n != nil {
+		rec.InputTotal = n
+	}
+	if n := tokenValue(u.Output); n != nil {
+		rec.OutputTokens, rec.OutputReported = *n, true
 	}
 }
 

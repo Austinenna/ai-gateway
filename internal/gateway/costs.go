@@ -311,14 +311,32 @@ func costOf(rec Record, book priceBook) RecordCost {
 			known = true
 		}
 	case rec.Protocol == "dashscope-tts":
-		if p.Chars10K == nil {
+		// Token prices win when set (Qwen-Audio 3.1); otherwise characters (3.0).
+		switch {
+		case p.Input != nil && p.Output != nil:
+			if rec.InputTotal != nil {
+				c.InputTokens = *rec.InputTotal
+				c.Amount += float64(c.InputTokens) / 1e6 * *p.Input
+				known = true
+			} else {
+				complete = false
+			}
+			if rec.OutputReported {
+				c.OutputTokens = rec.OutputTokens
+				c.Amount += float64(c.OutputTokens) / 1e6 * *p.Output
+				known = true
+			} else {
+				complete = false
+			}
+		case p.Chars10K != nil:
+			if rec.TTSCharacters != nil {
+				c.TTSCharacters = *rec.TTSCharacters
+				c.Amount += float64(*rec.TTSCharacters) / 1e4 * *p.Chars10K
+				known = true
+			}
+		default:
 			c.Status = "unpriced"
 			return c
-		}
-		if rec.TTSCharacters != nil {
-			c.TTSCharacters = *rec.TTSCharacters
-			c.Amount += float64(*rec.TTSCharacters) / 1e4 * *p.Chars10K
-			known = true
 		}
 	case isWebTool(rec.Protocol):
 		if p.PerCall == nil {

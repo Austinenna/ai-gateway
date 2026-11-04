@@ -33,7 +33,7 @@ export function RequestMetrics({ record: r }: { record: RequestRecord }) {
   </div>;
   if (r.protocol === 'dashscope-tts') return <div className="detail-metric-grid">
     <div><span>总耗时</span><b>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</b></div>
-    <div><span>计费字符</span><b>{number(r.tts_characters)}</b></div>
+    {input != null || output != null ? <div><span>输入 / 输出 Token</span><b>{number(input)} <em>/</em> {number(output)}</b></div> : <div><span>计费字符</span><b>{number(r.tts_characters)}</b></div>}
     <div title={costStatusName(r.cost?.status)}><span>估算费用</span><b>{costText(r.cost)}{r.cost?.peak && <em> 高峰价</em>}</b></div>
   </div>;
   if (isWebTool(r.protocol)) return <div className="detail-metric-grid">
@@ -59,7 +59,7 @@ export function RequestTiming({ record: r }: { record: RequestRecord }) {
   </div>;
   if (r.protocol === 'dashscope-tts') return <div className="request-metrics-detail">
     <section className="detail-timing"><h3>同步合成耗时</h3><dl className="usage-breakdown"><div><dt>网关收到请求</dt><dd>{dateTime(r.started)}</dd></div><div><dt>总耗时</dt><dd>{r.state === 'running' ? '进行中' : r.state === 'interrupted' ? '未知' : duration(r.duration_ms)}</dd></div></dl></section>
-    <section className="detail-usage"><h3>合成用量</h3><dl className="usage-breakdown"><div><dt>计费字符</dt><dd>{number(r.tts_characters)}</dd></div></dl><p className="metric-explanation">字符数采用厂商返回的 usage.characters，未报告时显示 —。合成的音频不写入请求记录。</p></section>
+    <section className="detail-usage"><h3>合成用量</h3><dl className="usage-breakdown"><div><dt>输入 / 输出 Token</dt><dd>{number(inputTotal(r))} / {number(outputTotal(r))}</dd></div><div><dt>计费字符</dt><dd>{number(r.tts_characters)}</dd></div></dl><p className="metric-explanation">采用厂商返回的 usage：Qwen-Audio 3.1 报告 Token，3.0 报告字符，未报告时显示 —。合成的音频不写入请求记录。</p></section>
     <section className="detail-outcome"><h3>请求结果</h3><dl className="usage-breakdown"><div><dt>最终结果</dt><dd>{recordStatus(r)}</dd></div><div><dt>客户端 HTTP / 上游 HTTP</dt><dd>{r.status || '—'} / {r.upstream_status || '—'}</dd></div></dl>{r.error_type && <p className="metric-explanation">{errorName(r.error_type)}</p>}</section>
   </div>;
   if (isWebTool(r.protocol)) return <div className="request-metrics-detail">

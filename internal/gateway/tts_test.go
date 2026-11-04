@@ -97,3 +97,30 @@ func TestTTSRejectsMissingTextVoiceAndStream(t *testing.T) {
 	}
 	h.want(h.request("POST", "/v1/tts/speech", map[string]any{"model": "tts", "stream": true, "input": map[string]any{"text": "你好", "voice": "v"}}, p.Token, false), 400)
 }
+
+func TestTTSTokenPricingForQwenAudio31(t *testing.T) {
+	rec := Record{Protocol: "dashscope-tts", State: "complete"}
+	rec.Forwarded = true
+	rec.readTTSUsage([]byte(`{"output":{"audio":{"url":"https://oss.test/a.wav"}},"usage":{"input_tokens":20,"output_tokens":300,"total_tokens":320,"characters":17}}`))
+	if rec.InputTotal == nil || *rec.InputTotal != 20 || !rec.OutputReported || rec.OutputTokens != 300 || rec.TTSCharacters == nil {
+		t.Fatalf("token usage not read: %+v", rec)
+	}
+	finalizeUsage(&rec)
+	if rec.UsageStatus != "complete" {
+		t.Fatalf("usage status %s", rec.UsageStatus)
+	}
+	book := priceBook{"m": {{EffectiveFrom: 0, Input: f(1.5), Output: f(12), Chars10K: f(2)}}}
+	rec.ModelID = "m"
+	c := costOf(rec, book)
+	// Token prices win over the character price: 20×1.5/1e6 + 300×12/1e6.
+	if c.Status != "priced" || !near(c.Amount, 0.00363) || c.InputTokens != 20 || c.OutputTokens != 300 {
+		t.Fatalf("token cost wrong: %+v", c)
+	}
+	book = priceBook{"m": {{EffectiveFrom: 0, Input: f(1.5), Output: f(12)}}}
+	old := Record{Protocol: "dashscope-tts", State: "complete", ModelID: "m"}
+	old.Forwarded = true
+	old.readTTSUsage([]byte(`{"usage":{"characters":17}}`))
+	if c := costOf(old, book); c.Status != "usage_unknown" {
+		t.Fatalf("character-only usage under token prices should be usage_unknown: %+v", c)
+	}
+}

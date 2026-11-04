@@ -182,7 +182,7 @@ func finalizeUsage(rec *Record) {
 		return
 	}
 	if rec.Protocol == "dashscope-asr" || rec.Protocol == "dashscope-tts" {
-		if rec.AudioSeconds != nil || rec.TTSCharacters != nil {
+		if rec.AudioSeconds != nil || rec.TTSCharacters != nil || rec.InputTotal != nil || rec.OutputReported {
 			rec.UsageStatus = "partial"
 			if rec.State == "complete" {
 				rec.UsageStatus = "complete"
