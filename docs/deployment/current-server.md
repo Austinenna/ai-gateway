@@ -63,26 +63,15 @@ https://<SERVER_IPV4>/v1
 
 ## 出站代理
 
-网关支持在管理页「厂商连接」顶部设置出站代理地址，并在每条连接上选择是否走代理（见 [当前架构](../current-architecture.md) 3.1）。未在页面保存地址时，网关沿用下面 drop-in 提供的环境变量；在生产页面保存 `http://127.0.0.1:7890` 并给境外厂商打开开关后，页面设置优先，可删除该 drop-in 并重启服务，国内厂商随即直连、不再依赖 mihomo。
+网关访问厂商的出站请求由管理页「厂商连接」顶部的出站代理地址和每条连接的「走出站代理」开关决定（见 [当前架构](../current-architecture.md) 3.1）。生产地址设为本机 mihomo（规则模式）的 mixed-port `http://127.0.0.1:7890`，OpenRouter 等境外厂商打开开关，国内厂商直连；直连 OpenRouter 不可达。mihomo 以 `ubuntu` 用户级 systemd 服务 `mihomo.service` 运行，已开启 linger，开机自动启动；未启用 TUN。mihomo 停止时只影响打开开关的连接。
 
-网关访问厂商的出站请求经本机 mihomo（规则模式）的 mixed-port `127.0.0.1:7890`，由 mihomo 规则决定直连或代理；OpenRouter 等境外厂商直连不可达。mihomo 以 `ubuntu` 用户级 systemd 服务 `mihomo.service` 运行，已开启 linger，开机自动启动；未启用 TUN。
-
-systemd 服务不会读取 shell 配置或 `/etc/environment` 中的代理变量，所以代理通过 drop-in `/etc/systemd/system/ai-gateway.service.d/proxy.conf` 传给网关：
-
-```ini
-[Service]
-Environment="HTTPS_PROXY=http://127.0.0.1:7890"
-Environment="HTTP_PROXY=http://127.0.0.1:7890"
-Environment="NO_PROXY=localhost,127.0.0.1,::1"
-```
-
-部署脚本只替换二进制，不覆盖该文件。修改后需 `sudo systemctl daemon-reload` 并重启 `ai-gateway.service`。mihomo 停止时，所有厂商请求都会失败。核对网关进程实际拿到的代理变量：
+systemd 服务不会读取 shell 配置或 `/etc/environment` 中的代理变量。页面未保存代理地址时，网关才按进程环境变量 `HTTPS_PROXY`／`HTTP_PROXY`／`NO_PROXY` 出站；当前生产不设置这些变量。核对网关进程的代理变量：
 
 ```bash
 sudo cat /proc/$(systemctl show -p MainPID --value ai-gateway)/environ | tr '\0' '\n' | grep -i proxy
 ```
 
-2026-11-03 新增该 drop-in：重启后服务 active、健康检查通过，进程环境包含上述变量；服务器经 7890 访问 OpenRouter 返回 200，直连超时。
+历史：2026-11-03 曾用 drop-in `/etc/systemd/system/ai-gateway.service.d/proxy.conf` 给整个网关设置 `HTTPS_PROXY=http://127.0.0.1:7890`。2026-11-04 出站代理版本上线、用户在页面保存地址并给 OpenRouter 打开开关且调用验证通过后，删除该 drop-in 并重启：服务 active、健康检查通过，进程代理变量为 0 个。原文件备份在服务器 `/var/lib/ai-gateway/backups/proxy-dropin-20261104/proxy.conf`；需要回退时拷回原路径，执行 `daemon-reload` 并重启服务。
 
 ## 当前网络边界
 
