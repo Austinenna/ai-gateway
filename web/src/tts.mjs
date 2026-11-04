@@ -11,10 +11,12 @@ export function ttsExample(model) {
 }
 
 // Playable source from a DashScope response: inline base64 first, else the temporary URL.
+// DashScope returns an http:// OSS link; the same signed URL works over https, which the
+// HTTPS admin page needs (mixed content) and the CSP media-src allows (*.aliyuncs.com).
 export function ttsAudioSource(value) {
   const audio = value?.output?.audio;
   if (typeof audio?.data === 'string' && audio.data) return 'data:audio/mp3;base64,' + audio.data;
-  return typeof audio?.url === 'string' && /^https?:\/\//.test(audio.url) ? audio.url : '';
+  return typeof audio?.url === 'string' && /^https?:\/\//.test(audio.url) ? audio.url.replace(/^http:\/\//, 'https://') : '';
 }
 
 export function ttsSummary(value) {

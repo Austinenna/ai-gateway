@@ -13,6 +13,7 @@ test('tts request is the DashScope-native body', () => {
 test('tts response plays inline data first, then an http url', () => {
   assert.equal(ttsAudioSource({ output: { audio: { data: 'QUJD', url: 'https://oss.test/a.mp3' } } }), 'data:audio/mp3;base64,QUJD');
   assert.equal(ttsAudioSource({ output: { audio: { data: '', url: 'https://oss.test/a.mp3' } } }), 'https://oss.test/a.mp3');
+  assert.equal(ttsAudioSource({ output: { audio: { url: 'http://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/a.wav?Signature=x' } } }), 'https://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/a.wav?Signature=x');
   assert.equal(ttsAudioSource({ output: { audio: { url: 'javascript:alert(1)' } } }), '');
   // Stored records replace data with a summary object; it must not be played.
   assert.equal(ttsAudioSource({ output: { audio: { data: { omitted: 'audio' } } } }), '');
