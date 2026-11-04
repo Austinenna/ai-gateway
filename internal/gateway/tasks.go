@@ -453,6 +453,11 @@ func summarizeTask(records []Record) RequestTask {
 		} else if latestMain.ReplyKind == "reply" {
 			task.State = "replied"
 			task.ReplyRecordID = latestMain.ID
+		} else if task.Grouping == nil {
+			// X-Gateway-Task-ID callers often end on a tool call they consume
+			// themselves (structured output); nothing in the gateway follows.
+			task.State = "done"
+			task.ReplyRecordID = latestMain.ID
 		}
 	}
 	if !task.Grouped {

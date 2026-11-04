@@ -350,4 +350,15 @@ func TestHeaderTaskDetailShowsQuery(t *testing.T) {
 	if err != nil || question != "【本轮】\n用户：你好" || task.Title != question || task.QuestionRecordID != rec.ID || task.Category != "memory" {
 		t.Fatalf("header task lost its query: %+v %q %v", task, question, err)
 	}
+	// A caller that ends on its own tool call (structured output) is finished, not waiting.
+	rec.ReplyKind = "tools"
+	if task := summarizeTask([]Record{rec}); task.State != "done" || task.ReplyRecordID != rec.ID {
+		t.Fatalf("header task ending on a tool call: %+v", task)
+	}
+	buddy := Record{ID: "buddy-tools", ProjectID: "p", Started: 1, State: "complete"}
+	buddy.ReplyKind = "tools"
+	captureWorkBuddy(&buddy, buddyHeaders("root", "session", "turn", "main"), "")
+	if task := summarizeTask([]Record{buddy}); task.State != "waiting" {
+		t.Fatalf("WorkBuddy agent ending on a tool call should still wait: %+v", task)
+	}
 }
