@@ -471,19 +471,16 @@ func (t CostTotals) rounded() CostTotals {
 	return t
 }
 
-// costRecords reads finished calls started in [from,to), including body-log
-// records that predate the metrics table.
+// costRecords reads calls started in [from,to). request_metrics holds every
+// call's summary (older body-only rows were copied there by migrateExtensions).
 func (g *Gateway) costRecords(from, to int64, projectID string) ([]Record, error) {
-	where := " WHERE started>=? AND started<?"
+	query := "SELECT summary FROM request_metrics WHERE started>=? AND started<?"
 	args := []any{from, to}
-	metricsWhere := where
 	if projectID != "" {
-		metricsWhere += " AND json_extract(summary,'$.project_id')=?"
-		where += " AND project_id=?"
+		query += " AND m_project=?"
 		args = append(args, projectID)
 	}
-	query := "SELECT summary FROM request_metrics" + metricsWhere + " UNION ALL SELECT summary FROM requests" + where + " AND NOT EXISTS(SELECT 1 FROM request_metrics m WHERE m.id=requests.id)"
-	rows, err := g.db.Query(query, append(args, args...)...)
+	rows, err := g.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -636,15 +633,18 @@ func (g *Gateway) usageReport(w http.ResponseWriter, r *http.Request, projectID 
 	book, err := g.loadPrices()
 	if err == nil {
 		var records []Record
+		var rollups []dailyUsage
 		if records, err = g.costRecords(rng.from, rng.to, projectID); err == nil {
-			g.writeUsage(w, q, rng, projectID, admin, groupBy, limit, book, records)
-			return
+			if rollups, err = g.dailyRollups(rng, projectID); err == nil {
+				g.writeUsage(w, q, rng, projectID, admin, groupBy, limit, book, records, rollups)
+				return
+			}
 		}
 	}
 	problem(w, 500, "读取用量失败")
 }
 
-func (g *Gateway) writeUsage(w http.ResponseWriter, q map[string][]string, rng usageRange, projectID string, admin bool, groupBy string, limit int, book priceBook, records []Record) {
+func (g *Gateway) writeUsage(w http.ResponseWriter, q map[string][]string, rng usageRange, projectID string, admin bool, groupBy string, limit int, book priceBook, records []Record, rollups []dailyUsage) {
 	filters := map[string]func(Record) string{
 		"model":      func(r Record) string { return r.Alias },
 		"category":   func(r Record) string { return r.Category },
@@ -699,7 +699,42 @@ func (g *Gateway) writeUsage(w http.ResponseWriter, q map[string][]string, rng u
 		}
 		groups[key].add(c)
 	}
-	out := map[string]any{"currency": costCurrency, "timezone": costZone.String(), "from": rng.from, "to": rng.to, "total": total.rounded()}
+	// Days older than summary retention only exist as per-day rollups. They
+	// carry project, model, category and day, but not tasks or single calls.
+	rollupUsed := false
+	if groupBy != "task" && groupBy != "request" && len(q["task"]) == 0 && len(q["request_id"]) == 0 {
+		for _, d := range rollups {
+			if v, ok := q["model"]; ok && d.Alias != v[0] {
+				continue
+			}
+			if v, ok := q["category"]; ok && d.Category != v[0] {
+				continue
+			}
+			rollupUsed = true
+			total = mergeTotals(total, d.Totals)
+			var key, label string
+			switch groupBy {
+			case "project":
+				key, label = d.ProjectID, d.ProjectName
+			case "model":
+				key, label = d.ModelID, d.Alias
+			case "category":
+				key, label = d.Category, d.Category
+			case "day":
+				key, label = d.Day, d.Day
+			default:
+				continue
+			}
+			if label == "" {
+				label = "未标记"
+			}
+			if groups[key] == nil {
+				groups[key] = &usageGroup{Key: key, Label: label}
+			}
+			groups[key].CostTotals = mergeTotals(groups[key].CostTotals, d.Totals)
+		}
+	}
+	out := map[string]any{"currency": costCurrency, "timezone": costZone.String(), "from": rng.from, "to": rng.to, "total": total.rounded(), "includes_daily_rollups": rollupUsed}
 	if groupBy != "" && groupBy != "request" {
 		list := make([]usageGroup, 0, len(groups))
 		for _, v := range groups {

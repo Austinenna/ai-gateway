@@ -275,6 +275,10 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, err.Error())
 		return
 	}
+	if err := g.validateFallback(m); err != nil {
+		problem(w, 400, err.Error())
+		return
+	}
 	defaults, _ := json.Marshal(m.Defaults)
 	protocols, _ := json.Marshal(m.Protocols)
 	creating := m.ID == ""
@@ -295,9 +299,9 @@ func (g *Gateway) saveModel(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 	var result sql.Result
 	if creating {
-		result, e = tx.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,context_window) VALUES(?,?,?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow)
+		result, e = tx.Exec(`INSERT INTO models(id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,context_window,fallback_model_id) VALUES(?,?,?,?,?,?,?,?,?,?)`, m.ID, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow, m.FallbackModelID)
 	} else {
-		result, e = tx.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=?,protocols_json=?,context_window=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow, m.ID)
+		result, e = tx.Exec(`UPDATE models SET name=?,alias=?,connection_id=?,upstream_model=?,defaults_json=?,enabled=?,protocols_json=?,context_window=?,fallback_model_id=? WHERE id=?`, m.Name, m.Alias, m.ConnectionID, m.UpstreamModel, string(defaults), m.Enabled, string(protocols), m.ContextWindow, m.FallbackModelID, m.ID)
 	}
 	if e != nil {
 		problem(w, 409, "模型保存失败，请检查调用别名是否重复")
@@ -346,6 +350,20 @@ func (g *Gateway) saveProject(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "月预算必须为大于 0 的金额（元），留空表示不限")
 		return
 	}
+	if err := p.ProjectLimits.validate(); err != nil {
+		problem(w, 400, err.Error())
+		return
+	}
+	if p.ID == "" {
+		// New projects start from the configured defaults unless the caller set limits.
+		s := g.currentSettings()
+		if p.RateRPM == nil {
+			p.RateRPM = &s.DefaultRPM
+		}
+		if p.MaxConcurrent == nil {
+			p.MaxConcurrent = &s.DefaultConcurrent
+		}
+	}
 	if len(p.ModelIDs) > 1000 {
 		problem(w, 400, "授权数量过多")
 		return
@@ -367,13 +385,13 @@ func (g *Gateway) saveProject(w http.ResponseWriter, r *http.Request) {
 		p.ID = id("prj_")
 		token = newToken()
 		p.TokenPrefix = token[:11]
-		_, e = tx.Exec("INSERT INTO projects(id,name,enabled,token_digest,token_prefix,monthly_budget) VALUES(?,?,?,?,?,?)", p.ID, p.Name, p.Enabled, digest(token), p.TokenPrefix, p.MonthlyBudget)
+		_, e = tx.Exec("INSERT INTO projects(id,name,enabled,token_digest,token_prefix,monthly_budget,rate_rpm,rate_burst,max_concurrent) VALUES(?,?,?,?,?,?,?,?,?)", p.ID, p.Name, p.Enabled, digest(token), p.TokenPrefix, p.MonthlyBudget, p.RateRPM, p.RateBurst, p.MaxConcurrent)
 		if e == nil {
 			e = saveProjectToken(tx, key, p.ID, token)
 		}
 	} else {
 		var result sql.Result
-		result, e = tx.Exec("UPDATE projects SET name=?,enabled=?,monthly_budget=? WHERE id=?", p.Name, p.Enabled, p.MonthlyBudget, p.ID)
+		result, e = tx.Exec("UPDATE projects SET name=?,enabled=?,monthly_budget=?,rate_rpm=COALESCE(?,rate_rpm),rate_burst=COALESCE(?,rate_burst),max_concurrent=COALESCE(?,max_concurrent) WHERE id=?", p.Name, p.Enabled, p.MonthlyBudget, p.RateRPM, p.RateBurst, p.MaxConcurrent, p.ID)
 		if e == nil {
 			n, _ := result.RowsAffected()
 			if n == 0 {
@@ -407,43 +425,6 @@ func (g *Gateway) saveProject(w http.ResponseWriter, r *http.Request) {
 	g.invalidateSpend()
 	writeJSON(w, 200, map[string]any{"project": p, "token": token})
 }
-func (g *Gateway) listRecords(w http.ResponseWriter, r *http.Request) {
-	// Load prices first: the database has one connection and rows hold it.
-	book, e := g.loadPrices()
-	if e != nil {
-		problem(w, 500, "读取单价失败")
-		return
-	}
-	query := "SELECT summary FROM requests"
-	args := []any{}
-	if p := r.URL.Query().Get("project_id"); p != "" {
-		query += " WHERE project_id=?"
-		args = append(args, p)
-	}
-	query += " ORDER BY started DESC LIMIT 200"
-	rows, e := g.db.Query(query, args...)
-	if e != nil {
-		problem(w, 500, "读取记录失败")
-		return
-	}
-	defer rows.Close()
-	out := []Record{}
-	for rows.Next() {
-		var s string
-		var rec Record
-		if rows.Scan(&s) != nil || json.Unmarshal([]byte(s), &rec) != nil {
-			problem(w, 500, "读取记录失败")
-			return
-		}
-		rec.Input = ""
-		rec.Output = ""
-		rec.ensureDiagnostic("")
-		rec.normalizeStoredUsage()
-		g.priceRecord(&rec, book)
-		out = append(out, rec)
-	}
-	writeJSON(w, 200, out)
-}
 func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 	g.metricsMu.Lock()
 	active, running := g.inflight[r.PathValue("id")]
@@ -469,6 +450,8 @@ func (g *Gateway) getRecord(w http.ResponseWriter, r *http.Request) {
 		rec.normalizeStoredTruncation()
 		rec.ensureDiagnostic("")
 		rec.RecordMissing = true
+		bodyCutoff, _ := retentionCutoffs(g.currentSettings(), time.Now())
+		rec.BodyPurged = rec.State != "running" && rec.Started < bodyCutoff
 		rec.normalizeStoredUsage()
 		g.priceStored(&rec)
 		writeJSON(w, 200, rec)

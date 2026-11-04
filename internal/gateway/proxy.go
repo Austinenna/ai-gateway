@@ -68,7 +68,7 @@ func (g *Gateway) project(r *http.Request) (Project, bool) {
 	if token == "" || len(token) > 200 {
 		return p, false
 	}
-	e := g.db.QueryRow("SELECT id,name,enabled,token_prefix,monthly_budget FROM projects WHERE token_digest=?", digest(token)).Scan(&p.ID, &p.Name, &p.Enabled, &p.TokenPrefix, &p.MonthlyBudget)
+	e := g.db.QueryRow("SELECT id,name,enabled,token_prefix,monthly_budget,rate_rpm,rate_burst,max_concurrent FROM projects WHERE token_digest=?", digest(token)).Scan(&p.ID, &p.Name, &p.Enabled, &p.TokenPrefix, &p.MonthlyBudget, &p.RateRPM, &p.RateBurst, &p.MaxConcurrent)
 	return p, e == nil && p.Enabled
 }
 func (g *Gateway) modelList(w http.ResponseWriter, r *http.Request) {
@@ -110,13 +110,13 @@ func (g *Gateway) route(alias, projectID string, admin bool) (Model, Connection,
 	var encrypted []byte
 	var defaults, protocols, endpoints string
 	var useProxy bool
-	q := `SELECT m.id,m.name,m.alias,m.connection_id,m.upstream_model,m.defaults_json,m.enabled,m.protocols_json,c.id,c.name,c.provider,c.endpoints_json,c.enabled,c.use_proxy,c.credential FROM models m JOIN connections c ON c.id=m.connection_id WHERE m.alias=? AND m.enabled=1 AND c.enabled=1`
+	q := `SELECT m.id,m.name,m.alias,m.connection_id,m.upstream_model,m.defaults_json,m.enabled,m.fallback_model_id,m.protocols_json,c.id,c.name,c.provider,c.endpoints_json,c.enabled,c.use_proxy,c.credential FROM models m JOIN connections c ON c.id=m.connection_id WHERE m.alias=? AND m.enabled=1 AND c.enabled=1`
 	args := []any{alias}
 	if !admin {
 		q += ` AND EXISTS(SELECT 1 FROM project_models pm WHERE pm.model_id=m.id AND pm.project_id=?)`
 		args = append(args, projectID)
 	}
-	e := g.db.QueryRow(q, args...).Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &defaults, &m.Enabled, &protocols, &c.ID, &c.Name, &c.Provider, &endpoints, &c.Enabled, &useProxy, &encrypted)
+	e := g.db.QueryRow(q, args...).Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &defaults, &m.Enabled, &m.FallbackModelID, &protocols, &c.ID, &c.Name, &c.Provider, &endpoints, &c.Enabled, &useProxy, &encrypted)
 	if e == nil {
 		e = json.Unmarshal([]byte(defaults), &m.Defaults)
 	}
@@ -144,6 +144,14 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	}
 	g.snapshotCall(t)
 	protocol := requestProtocol(r.URL.Path)
+	// Cheap admission checks come first so a runaway client is stopped before
+	// its body is read or any upstream quota is spent.
+	if rej := g.admit(p, time.Now()); rej != nil {
+		t.rec.ErrorType = rej.kind
+		writeLimitRejection(w, protocol, rej)
+		return
+	}
+	defer g.release(p.ID)
 	limit := int64(maxLLMRequestBytes)
 	if protocol == "dashscope-asr" {
 		limit = maxASRRequestBytes
@@ -190,7 +198,7 @@ func (g *Gateway) proxy(w http.ResponseWriter, r *http.Request) {
 	if !g.checkBudget(w, &t.rec, p) {
 		return
 	}
-	g.forward(w, r, p, m, c, enc, body)
+	g.forwardWithFallback(w, r, p, m, c, enc, body, protocol)
 }
 func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 	t := traceOf(r)
@@ -239,15 +247,15 @@ func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 		if len(in.Stream) > 0 {
 			body["stream"] = in.Stream
 		}
-		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, body)
+		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, body, nil)
 		return
 	}
 	if c.Protocol == "dashscope-tts" {
-		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, ttsTestBody(aliasJSON, in.Message, in.Voice))
+		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, ttsTestBody(aliasJSON, in.Message, in.Voice), nil)
 		return
 	}
 	if isWebTool(c.Protocol) {
-		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, webToolTestBody(c.Protocol, in.Message))
+		g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, webToolTestBody(c.Protocol, in.Message), nil)
 		return
 	}
 	if in.Message == "" {
@@ -255,7 +263,7 @@ func (g *Gateway) testModel(w http.ResponseWriter, r *http.Request) {
 	}
 	messages, _ := json.Marshal([]map[string]string{{"role": "user", "content": in.Message}})
 	body := map[string]json.RawMessage{"model": aliasJSON, "messages": messages, "max_tokens": json.RawMessage("128"), "stream": json.RawMessage("false")}
-	g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, body)
+	g.forward(w, r, Project{ID: "admin-test", Name: "管理员测试"}, m, c, enc, body, nil)
 }
 
 const maxLog = 1024 * 1024
@@ -294,7 +302,9 @@ func redact(s string, secrets ...string) string {
 	}
 	return s
 }
-func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m Model, c Connection, encrypted []byte, body map[string]json.RawMessage) {
+
+// ctl is nil for calls that must not fall back (admin tests and the fallback itself).
+func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m Model, c Connection, encrypted []byte, body map[string]json.RawMessage, ctl *attemptCtl) {
 	t := traceOf(r)
 	rec := &t.rec
 	rec.ProjectID, rec.ProjectName, rec.ModelID, rec.Alias, rec.UpstreamModel, rec.Protocol = p.ID, p.Name, m.ID, m.Alias, m.UpstreamModel, c.Protocol
@@ -414,6 +424,16 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	res, e := g.client.Do(req)
 	if e != nil {
 		classifyTransport(rec, r.Context(), ctx, e)
+		if r.Context().Err() == nil {
+			g.observeUpstream(c.ID, 0, true, "")
+			if ctl != nil {
+				ctl.eligible = true
+				if ctl.allowRetry {
+					ctl.retry = true
+					return
+				}
+			}
+		}
 		status := 502
 		if rec.State == "timeout" {
 			status = 504
@@ -427,11 +447,20 @@ func (g *Gateway) forward(w http.ResponseWriter, r *http.Request, p Project, m M
 	defer res.Body.Close()
 	rec.Status = res.StatusCode
 	rec.UpstreamStatus = res.StatusCode
+	g.observeUpstream(c.ID, res.StatusCode, false, res.Header.Get("Retry-After"))
 	if res.StatusCode >= 400 {
 		rec.State = "error"
 		rec.ErrorType = "upstream_error"
 		if res.StatusCode == 429 {
 			rec.ErrorType = "rate_limit"
+		}
+	}
+	if ctl != nil && fallbackStatus(res.StatusCode) {
+		ctl.eligible = true
+		if ctl.allowRetry {
+			_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 64*1024))
+			ctl.retry = true
+			return
 		}
 	}
 	if res.StatusCode >= 300 && res.StatusCode < 400 {

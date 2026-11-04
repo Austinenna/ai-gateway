@@ -97,6 +97,11 @@ func (g *Gateway) deleteModel(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "移除模型授权失败")
 		return
 	}
+	// Models that fell back to this one simply lose their fallback.
+	if _, err = tx.Exec("UPDATE models SET fallback_model_id='' WHERE fallback_model_id=?", id); err != nil {
+		problem(w, 500, "移除备用模型引用失败")
+		return
+	}
 	result, err := tx.Exec("DELETE FROM models WHERE id=?", id)
 	if err != nil {
 		problem(w, 500, "删除模型失败")

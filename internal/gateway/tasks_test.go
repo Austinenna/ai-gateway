@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -229,9 +230,9 @@ func TestTasksExcludeUngroupedCallsWithoutHidingRequests(t *testing.T) {
 		h.want(h.request("GET", "/api/admin/request-tasks/"+id, nil, "", true), 404)
 		h.want(h.request("GET", "/api/admin/requests/"+id, nil, "", true), 200)
 	}
-	requestsBefore := h.request("GET", "/api/admin/requests", nil, "", true)
+	requestsBefore := h.request("GET", "/api/admin/requests?limit=200", nil, "", true)
 	h.want(requestsBefore, 200)
-	if len(parse[[]Record](t, requestsBefore)) != 200 || !strings.Contains(requestsBefore.Body.String(), "ungrouped-204") {
+	if len(listPage(t, requestsBefore)) != 200 || !strings.Contains(requestsBefore.Body.String(), "ungrouped-204") {
 		t.Fatal("ungrouped calls missing from request list")
 	}
 	// One identified call is already a task, even if older than ungrouped traffic.
@@ -250,7 +251,8 @@ func TestTasksExcludeUngroupedCallsWithoutHidingRequests(t *testing.T) {
 	if tasks := list(); len(tasks) != 2 {
 		t.Fatalf("active identified task missing: %+v", tasks)
 	}
-	if after := h.request("GET", "/api/admin/requests", nil, "", true); after.Body.String() != requestsBefore.Body.String() {
+	// The total grows with the new summary; the visible page must not change.
+	if after := h.request("GET", "/api/admin/requests?limit=200", nil, "", true); !reflect.DeepEqual(listPage(t, after), listPage(t, requestsBefore)) {
 		t.Fatal("task filtering changed the request list")
 	}
 	if after := h.request("GET", "/api/admin/requests/"+legacy.ID, nil, "", true); parse[Record](t, after).Input != legacy.Input {

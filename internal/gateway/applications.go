@@ -221,7 +221,7 @@ func (g *Gateway) applyProject(w http.ResponseWriter, r *http.Request) {
 		}
 		a = ProjectApplication{ID: id("app_"), ProjectID: id("prj_"), Client: in.Client, Protocol: in.Protocol, Note: in.Note, Created: time.Now().UnixMilli(), Status: "pending", Models: []string{}}
 		token = newToken()
-		if _, err = tx.Exec(`INSERT INTO projects(id,name,enabled,token_digest,token_prefix) VALUES(?,?,0,?,?)`, a.ProjectID, in.Name, digest(token), token[:11]); err != nil {
+		if _, err = tx.Exec(`INSERT INTO projects(id,name,enabled,token_digest,token_prefix,rate_rpm,max_concurrent) VALUES(?,?,0,?,?,?,?)`, a.ProjectID, in.Name, digest(token), token[:11], g.currentSettings().DefaultRPM, g.currentSettings().DefaultConcurrent); err != nil {
 			problem(w, 500, "创建待批准项目失败")
 			return
 		}

@@ -87,5 +87,5 @@ func (g *Gateway) adminChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	body["messages"], _ = json.Marshal(in.Messages)
-	g.forward(w, r, identity, m, c, encrypted, body)
+	g.forward(w, r, identity, m, c, encrypted, body, nil)
 }

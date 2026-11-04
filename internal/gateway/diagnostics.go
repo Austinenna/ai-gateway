@@ -33,6 +33,8 @@ func diagnosticCode(errorType string) string {
 		return "client_canceled"
 	case "budget_exceeded":
 		return "budget_exceeded"
+	case "project_rate_limit", "project_concurrency":
+		return errorType
 	default:
 		return "gateway_error"
 	}
@@ -46,6 +48,8 @@ func diagnosticPhase(code string) string {
 		return "authentication"
 	case "permission_denied", "budget_exceeded":
 		return "authorization"
+	case "project_rate_limit", "project_concurrency":
+		return "admission"
 	case "invalid_request":
 		return "validation"
 	case "upstream_connection", "upstream_timeout":
@@ -84,6 +88,8 @@ func diagnosticAction(code string) string {
 		return "check_model_access"
 	case "budget_exceeded":
 		return "raise_budget_or_wait"
+	case "project_rate_limit", "project_concurrency":
+		return "slow_down_or_raise_limit"
 	case "invalid_request":
 		return "fix_request"
 	case "upstream_connection", "upstream_timeout", "upstream_protocol", "upstream_error":
@@ -103,7 +109,7 @@ func diagnosticAction(code string) string {
 
 func diagnosticRetryable(code string, status int) bool {
 	switch code {
-	case "gateway_locked", "upstream_connection", "upstream_timeout", "upstream_rate_limit", "stream_interrupted", "gateway_restart":
+	case "gateway_locked", "upstream_connection", "upstream_timeout", "upstream_rate_limit", "stream_interrupted", "gateway_restart", "project_rate_limit", "project_concurrency":
 		return true
 	case "upstream_error":
 		return status >= 500 || status == 429
@@ -142,6 +148,10 @@ func diagnosticMessage(rec *Record, code, problemMessage string) string {
 		return "项目未获模型授权，或模型／连接已停用"
 	case "budget_exceeded":
 		return "项目本月预算已用完"
+	case "project_rate_limit":
+		return "项目请求过于频繁，超过每分钟上限"
+	case "project_concurrency":
+		return "项目同时进行的请求已达上限"
 	case "invalid_request":
 		return "请求未通过网关校验"
 	default:

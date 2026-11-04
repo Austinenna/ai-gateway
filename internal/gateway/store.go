@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -46,6 +47,9 @@ type Model struct {
 	Defaults      map[string]json.RawMessage `json:"defaults"`
 	Enabled       bool                       `json:"enabled"`
 	Prices        []ModelPrice               `json:"prices"`
+	// FallbackModelID is tried once when this model fails before any byte
+	// reached the caller. Empty means no fallback.
+	FallbackModelID string `json:"fallback_model_id"`
 }
 type Project struct {
 	ID            string   `json:"id"`
@@ -55,6 +59,7 @@ type Project struct {
 	HasSavedToken bool     `json:"has_saved_token"`
 	ModelIDs      []string `json:"model_ids"`
 	MonthlyBudget *float64 `json:"monthly_budget"`
+	ProjectLimits
 }
 type RequestDiagnostic struct {
 	Code              string `json:"code"`
@@ -94,6 +99,26 @@ type Record struct {
 	Cost *RecordCost `json:"cost,omitempty"`
 
 	Adaptations []RequestAdaptation `json:"adaptations,omitempty"`
+
+	// Fallback: the alias the caller asked for when another model served it,
+	// and every upstream attempt in order.
+	FallbackFrom string    `json:"fallback_from,omitempty"`
+	Attempts     []Attempt `json:"attempts,omitempty"`
+	// BodyPurged is derived on read: the body expired under the retention policy.
+	BodyPurged bool `json:"body_purged,omitempty"`
+}
+
+// Attempt is one upstream try within a call that used a fallback model.
+type Attempt struct {
+	ModelID        string `json:"model_id"`
+	Alias          string `json:"alias"`
+	ConnectionID   string `json:"connection_id"`
+	ConnectionName string `json:"connection_name"`
+	Provider       string `json:"provider"`
+	Status         int    `json:"status"`
+	ErrorType      string `json:"error_type,omitempty"`
+	DurationMS     int64  `json:"duration_ms"`
+	Outcome        string `json:"outcome"` // served | failed | skipped_breaker | not_granted | unavailable
 }
 type session struct{ Expires time.Time }
 type Gateway struct {
@@ -121,6 +146,18 @@ type Gateway struct {
 	client            HTTPDoer
 	outboundProxy     atomic.Pointer[url.URL]
 	spend             map[string]monthSpend
+
+	startedAt  time.Time
+	settingsMu sync.RWMutex
+	settings   Settings
+	limitMu    sync.Mutex
+	limiters   map[string]*projectLimiter
+	healthMu   sync.Mutex
+	health     map[string]*connHealth
+	cleanupMu  sync.Mutex
+	maintWake  chan struct{}
+	stopBG     context.CancelFunc
+	bg         sync.WaitGroup
 }
 
 func randomBytes(n int) []byte {
@@ -256,6 +293,7 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 			return fail(e)
 		}
 	}
+
 	g := &Gateway{db: db, dataDir: dataDir, origin: origin, secure: len(origin) >= 8 && origin[:8] == "https://", allowSetup: allowSetup, sessions: map[string]session{}, records: make(chan Record, 32), writerDone: make(chan struct{}), client: newHTTPClient(), spend: map[string]monthSpend{}}
 	if e = g.loadOutboundProxy(); e != nil {
 		return fail(e)
@@ -266,6 +304,32 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	if e = g.initTasks(); e != nil {
 		return fail(e)
 	}
+	// Extensions need request_metrics, which initMetrics creates.
+	if e = migrateExtensions(db); e != nil {
+		return fail(e)
+	}
+	vacuumStart := time.Now()
+	sizeBefore := dbFileSizeAt(dataDir)
+	vacuumed, e := enableIncrementalVacuum(db)
+	if e != nil {
+		return fail(e)
+	}
+	settings, e := loadSettings(db)
+	if e != nil {
+		return fail(e)
+	}
+	g.startedAt, g.settings = time.Now(), settings
+	g.limiters, g.health, g.maintWake = map[string]*projectLimiter{}, map[string]*connHealth{}, make(chan struct{}, 1)
+	if e = g.loadHealth(); e != nil {
+		return fail(e)
+	}
+	if vacuumed {
+		g.logMaintenance("vacuum", vacuumStart, maintenanceDetail{Trigger: "migration", SizeBeforeBytes: sizeBefore, SizeAfterBytes: g.dbFileSize(), ReclaimedBytes: max(0, sizeBefore-g.dbFileSize()), DurationMS: time.Since(vacuumStart).Milliseconds(), Status: "ok"})
+	}
+	bgCtx, stop := context.WithCancel(context.Background())
+	g.stopBG = stop
+	g.bg.Add(1)
+	go g.background(bgCtx)
 	go func() {
 		defer close(g.writerDone)
 		for rec := range g.records {
@@ -284,6 +348,10 @@ func Open(dataDir, origin string, allowSetup bool) (*Gateway, error) {
 	return g, nil
 }
 func (g *Gateway) Close() error {
+	if g.stopBG != nil {
+		g.stopBG()
+		g.bg.Wait()
+	}
 	g.active.Wait()
 	close(g.records)
 	<-g.writerDone
@@ -390,7 +458,7 @@ func (g *Gateway) models() ([]Model, error) {
 	if e != nil {
 		return nil, e
 	}
-	rows, e := g.db.Query("SELECT id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,context_window FROM models ORDER BY rowid")
+	rows, e := g.db.Query("SELECT id,name,alias,connection_id,upstream_model,defaults_json,enabled,protocols_json,context_window,fallback_model_id FROM models ORDER BY rowid")
 	if e != nil {
 		return nil, e
 	}
@@ -399,7 +467,7 @@ func (g *Gateway) models() ([]Model, error) {
 	for rows.Next() {
 		var m Model
 		var d, protocols string
-		if e = rows.Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &d, &m.Enabled, &protocols, &m.ContextWindow); e != nil {
+		if e = rows.Scan(&m.ID, &m.Name, &m.Alias, &m.ConnectionID, &m.UpstreamModel, &d, &m.Enabled, &protocols, &m.ContextWindow, &m.FallbackModelID); e != nil {
 			return nil, e
 		}
 		if e = json.Unmarshal([]byte(protocols), &m.Protocols); e != nil {
@@ -417,7 +485,7 @@ func (g *Gateway) models() ([]Model, error) {
 	return out, rows.Err()
 }
 func (g *Gateway) projects() ([]Project, error) {
-	rows, e := g.db.Query("SELECT id,name,enabled,token_prefix,EXISTS(SELECT 1 FROM project_credentials pc WHERE pc.project_id=projects.id),monthly_budget FROM projects ORDER BY rowid")
+	rows, e := g.db.Query("SELECT id,name,enabled,token_prefix,EXISTS(SELECT 1 FROM project_credentials pc WHERE pc.project_id=projects.id),monthly_budget,rate_rpm,rate_burst,max_concurrent FROM projects ORDER BY rowid")
 	if e != nil {
 		return nil, e
 	}
@@ -425,7 +493,7 @@ func (g *Gateway) projects() ([]Project, error) {
 	for rows.Next() {
 		var p Project
 		p.ModelIDs = []string{}
-		if e = rows.Scan(&p.ID, &p.Name, &p.Enabled, &p.TokenPrefix, &p.HasSavedToken, &p.MonthlyBudget); e != nil {
+		if e = rows.Scan(&p.ID, &p.Name, &p.Enabled, &p.TokenPrefix, &p.HasSavedToken, &p.MonthlyBudget, &p.RateRPM, &p.RateBurst, &p.MaxConcurrent); e != nil {
 			rows.Close()
 			return nil, e
 		}

@@ -91,7 +91,7 @@ func TestMinimaxHistoricalUsageVisibleWithoutDatabaseRewrite(t *testing.T) {
 	}
 	list := h.request("GET", "/api/admin/requests", nil, "", true)
 	h.want(list, 200)
-	check(parse[[]Record](t, list)[0])
+	check(listPage(t, list)[0])
 	detail := h.request("GET", "/api/admin/requests/"+r.ID, nil, "", true)
 	h.want(detail, 200)
 	got := parse[Record](t, detail)

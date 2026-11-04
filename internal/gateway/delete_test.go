@@ -124,7 +124,7 @@ func TestDeleteProjectRevokesCredentialAndPreservesOthersAndHistory(t *testing.T
 	}
 	filtered := h.request("GET", "/api/admin/requests?project_id="+a.Project.ID, nil, "", true)
 	h.want(filtered, 200)
-	if len(parse[[]Record](t, filtered)) != 1 {
+	if len(listPage(t, filtered)) != 1 {
 		t.Fatal("deleted project history cannot be queried")
 	}
 }

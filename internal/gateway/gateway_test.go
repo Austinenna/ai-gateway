@@ -135,13 +135,24 @@ func (f doerFunc) Do(r *http.Request) (*http.Response, error) { return f(r) }
 func response(body, contentType string, status int) *http.Response {
 	return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": []string{contentType}}, Body: io.NopCloser(strings.NewReader(body))}
 }
+func listPage(t *testing.T, rr *httptest.ResponseRecorder) []Record {
+	t.Helper()
+	return parse[requestPage](t, rr).Items
+}
+
 func (h *harness) records(n int) []Record {
 	h.t.Helper()
 	until := time.Now().Add(3 * time.Second)
 	for time.Now().Before(until) {
-		rr := h.request("GET", "/api/admin/requests", nil, "", true)
+		rr := h.request("GET", "/api/admin/requests?limit=200", nil, "", true)
 		h.want(rr, 200)
-		list := parse[[]Record](h.t, rr)
+		// Summaries appear when a call starts; wait until the bodies are written too.
+		list := []Record{}
+		for _, rec := range listPage(h.t, rr) {
+			if !rec.RecordMissing {
+				list = append(list, rec)
+			}
+		}
 		if len(list) >= n {
 			return list
 		}

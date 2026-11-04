@@ -313,9 +313,13 @@ func (g *Gateway) initTasks() error {
 
 // Metrics survive body-log drops. Only calls with explicit task IDs belong here;
 // ungrouped calls remain available through the request APIs.
-func (g *Gateway) taskRecords(keys []string) ([]Record, error) {
+func (g *Gateway) taskRecords(keys []string, before int64) ([]Record, error) {
 	where := " WHERE COALESCE(json_extract(summary,'$.task_id'),'')<>''"
 	args := []any{}
+	if len(keys) == 0 && before > 0 {
+		where += " AND started<?"
+		args = append(args, before)
+	}
 	if len(keys) > 0 {
 		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(keys)), ",")
 		where += " AND " + taskKeySQL + " IN (" + placeholders + ")"
@@ -323,12 +327,9 @@ func (g *Gateway) taskRecords(keys []string) ([]Record, error) {
 			args = append(args, key)
 		}
 	}
-	query := "SELECT id,started,summary,NOT EXISTS(SELECT 1 FROM requests r WHERE r.id=m.id) AS missing FROM request_metrics m" + where + " UNION ALL SELECT id,started,summary,0 AS missing FROM requests" + where
-	query += " AND NOT EXISTS(SELECT 1 FROM request_metrics m WHERE m.id=requests.id) ORDER BY started DESC,id DESC"
+	query := "SELECT id,started,summary,NOT EXISTS(SELECT 1 FROM requests r WHERE r.id=m.id) AS missing FROM request_metrics m" + where + " ORDER BY started DESC,rowid DESC"
 	if len(keys) == 0 {
 		query += " LIMIT 200"
-	} else {
-		args = append(args, args...)
 	}
 	rows, err := g.db.Query(query, args...)
 	if err != nil {
@@ -506,7 +507,15 @@ func (g *Gateway) presentTask(records []Record, fullQuestion bool) (RequestTask,
 	return task, "", nil
 }
 func (g *Gateway) listTasks(w http.ResponseWriter, r *http.Request) {
-	seeds, err := g.taskRecords(nil)
+	var before int64
+	if v := r.URL.Query().Get("before"); v != "" {
+		var err error
+		if before, err = strconv.ParseInt(v, 10, 64); err != nil || before <= 0 {
+			problem(w, 400, "before 必须为毫秒时间戳")
+			return
+		}
+	}
+	seeds, err := g.taskRecords(nil, before)
 	if err != nil {
 		problem(w, 500, "读取任务失败")
 		return
@@ -527,7 +536,7 @@ func (g *Gateway) listTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(keys) > 0 {
-		records, e := g.taskRecords(keys)
+		records, e := g.taskRecords(keys, 0)
 		if e != nil {
 			problem(w, 500, "读取任务失败")
 			return
@@ -553,7 +562,15 @@ func (g *Gateway) listTasks(w http.ResponseWriter, r *http.Request) {
 			return tasks[i].Updated > tasks[j].Updated
 		})
 	}
-	writeJSON(w, 200, map[string]any{"tasks": tasks, "recent_call_limit": 200})
+	// The next page continues below the oldest call seen; the client merges by task ID.
+	var nextBefore int64
+	if len(seeds) >= 200 {
+		nextBefore = seeds[0].Started
+		for _, rec := range seeds {
+			nextBefore = min(nextBefore, rec.Started)
+		}
+	}
+	writeJSON(w, 200, map[string]any{"tasks": tasks, "recent_call_limit": 200, "next_before": nextBefore})
 }
 func (g *Gateway) getTask(w http.ResponseWriter, r *http.Request) {
 	offset := 0
@@ -565,7 +582,7 @@ func (g *Gateway) getTask(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "分页参数无效")
 		return
 	}
-	records, err := g.taskRecords([]string{r.PathValue("id")})
+	records, err := g.taskRecords([]string{r.PathValue("id")}, 0)
 	if err != nil {
 		problem(w, 500, "读取任务失败")
 		return
