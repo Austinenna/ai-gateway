@@ -349,7 +349,7 @@ func TestHeaderTaskDetailShowsQuery(t *testing.T) {
 	}
 	rec.Question, rec.QuestionVersion = questionExcerpt(rec.Input), 1
 	task, question, err := h.g.presentTask([]Record{rec}, true)
-	if err != nil || question != "【本轮】\n用户：你好" || task.Title != question || task.QuestionRecordID != rec.ID || task.Category != "memory" {
+	if err != nil || question != "【本轮】\n用户：你好" || task.Title != "你好" || task.QuestionRecordID != rec.ID || task.Category != "memory" {
 		t.Fatalf("header task lost its query: %+v %q %v", task, question, err)
 	}
 	// A caller that ends on its own tool call (structured output) is finished, not waiting.
@@ -362,5 +362,33 @@ func TestHeaderTaskDetailShowsQuery(t *testing.T) {
 	captureWorkBuddy(&buddy, buddyHeaders("root", "session", "turn", "main"), "")
 	if task := summarizeTask([]Record{buddy}); task.State != "waiting" {
 		t.Fatalf("WorkBuddy agent ending on a tool call should still wait: %+v", task)
+	}
+}
+
+func TestTaskHeadlineNamesDataAndTranscripts(t *testing.T) {
+	cases := []struct{ question, title, subtitle, kind string }{
+		{`{"title":"#卡点舞","author":"小P","duration_s":10.934,"media_type":"video"}`, "#卡点舞", "小P · 10.9s · video", "record"},
+		{`{"id":7,"label":"无标题字段"}`, "7", "无标题字段", "record"},
+		{"【之前】\n用户：看看吧\n助手：好的\n\n【本轮】\n用户：帮我找一下最近的活动\n助手：查到了", "帮我找一下最近的活动", "", "transcript"},
+		{"普通提问", "普通提问", "", ""},
+		{"{不是 JSON", "{不是 JSON", "", ""},
+	}
+	for _, c := range cases {
+		title, subtitle, kind := taskHeadline(c.question)
+		if title != c.title || subtitle != c.subtitle || kind != c.kind {
+			t.Fatalf("%q => %q %q %q", c.question, title, subtitle, kind)
+		}
+	}
+}
+
+func TestTaskTitleFindsTranscriptTurnBeyondExcerpt(t *testing.T) {
+	h := newHarness(t)
+	content := "【之前】\n用户：" + strings.Repeat("旧内容", 600) + "\n\n【本轮】\n用户：当前这一轮的问题\n助手：回答"
+	input, _ := json.Marshal(map[string]any{"messages": []any{map[string]any{"role": "user", "content": content}}})
+	rec := Record{ID: "transcript", ProjectID: "p", Started: 1, State: "complete", Alias: "memory", Input: string(input), TaskFields: TaskFields{TaskID: "job-1", QuestionVersion: 1}}
+	rec.Question = questionExcerpt(rec.Input)
+	task, question, err := h.g.presentTask([]Record{rec}, false)
+	if err != nil || task.Title != "当前这一轮的问题" || task.TitleKind != "transcript" || question != content {
+		t.Fatalf("title %q kind %q err %v", task.Title, task.TitleKind, err)
 	}
 }

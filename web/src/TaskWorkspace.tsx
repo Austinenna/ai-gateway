@@ -175,7 +175,11 @@ export function TaskWorkspace({ tasks: allTasks, api, refresh, renderRecord, fro
               >
                 <span className={'led ' + taskLed(task)} />
                 <div>
-                  <div className="a zh task-title">{task.title}</div>
+                  <div className="a zh task-title">
+                    <TitleTag task={task} />
+                    {task.title}
+                  </div>
+                  {task.subtitle && <div className="task-sub zh">{task.subtitle}</div>}
                   <div className="pj2">
                     {task.project_name} · {task.grouping ? 'WorkBuddy' : task.category || '调用方任务'} · {task.calls} 次调用
                     {task.failed > 0 && <span className="task-failure"> · {task.failed} 次调用失败</span>}
@@ -207,7 +211,11 @@ export function TaskWorkspace({ tasks: allTasks, api, refresh, renderRecord, fro
                   <span>·</span>
                   <span className="zh">{t.grouping ? 'WorkBuddy · 一次提问' : '调用方任务 · X-Gateway-Task-ID'}</span>
                 </div>
-                <h2 className="zh">{t.title}</h2>
+                <h2 className="zh" title={t.title}>
+                  <TitleTag task={t} />
+                  {t.title}
+                </h2>
+                {t.subtitle && <div className="task-sub zh">{t.subtitle}</div>}
                 <div className="facts">
                   <span>
                     PROJECT <b className="zh">{t.project_name}</b>
@@ -412,4 +420,13 @@ export function TaskWorkspace({ tasks: allTasks, api, refresh, renderRecord, fro
       )}
     </>
   );
+}
+
+// Transcript titles come from the 【本轮】 turn of data a program sent, not from a direct question.
+function TitleTag({ task }: { task: RequestTask }) {
+  return task.title_kind === 'transcript' ? (
+    <span className="title-tag" title="取自对话记录中的【本轮】">
+      转录
+    </span>
+  ) : null;
 }

@@ -17,6 +17,8 @@ export type RequestTask = {
   project_name: string;
   grouped: boolean;
   title: string;
+  subtitle?: string;
+  title_kind?: 'record' | 'transcript';
   state: string;
   started: number;
   updated: number;

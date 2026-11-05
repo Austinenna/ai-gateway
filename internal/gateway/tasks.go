@@ -188,6 +188,97 @@ func excerpt(value string) string {
 
 func questionExcerpt(input string) string { return excerpt(questionText(input, true)) }
 
+// Program callers often send data rather than a question: a JSON record or a
+// transcript whose current turn follows 【本轮】. The headline names the task
+// from that content; the question itself is still shown unchanged.
+var titleKeys = []string{"title", "name", "query", "question", "prompt", "text", "content"}
+
+func taskHeadline(question string) (title, subtitle, kind string) {
+	text := strings.TrimSpace(question)
+	if strings.HasPrefix(text, "{") {
+		if fields := objectScalars(text); len(fields) > 0 {
+			pick := -1
+			for _, key := range titleKeys {
+				for i, f := range fields {
+					if pick < 0 && strings.EqualFold(f[0], key) && f[1] != "" {
+						pick = i
+					}
+				}
+			}
+			if pick < 0 {
+				pick = 0
+			}
+			rest := []string{}
+			for i, f := range fields {
+				if i != pick && f[1] != "" && len([]rune(f[1])) <= 40 {
+					rest = append(rest, f[1])
+				}
+			}
+			return shortTitle(fields[pick][1]), strings.Join(rest, " · "), "record"
+		}
+	}
+	if at := strings.LastIndex(text, "【本轮】"); at >= 0 {
+		turn := strings.TrimSpace(text[at+len("【本轮】"):])
+		for _, prefix := range []string{"用户：", "用户:"} {
+			if i := strings.Index(turn, prefix); i >= 0 {
+				turn = strings.TrimSpace(turn[i+len(prefix):])
+				break
+			}
+		}
+		for _, stop := range []string{"助手：", "助手:", "\n"} {
+			if i := strings.Index(turn, stop); i > 0 {
+				turn = turn[:i]
+			}
+		}
+		if turn = strings.TrimSpace(turn); turn != "" {
+			return shortTitle(turn), "", "transcript"
+		}
+	}
+	return excerpt(question), "", ""
+}
+
+// objectScalars lists a JSON object's top-level scalar values in order.
+func objectScalars(text string) [][2]string {
+	dec := json.NewDecoder(strings.NewReader(text))
+	dec.UseNumber()
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return nil
+	}
+	out := [][2]string{}
+	for dec.More() {
+		t, err := dec.Token()
+		key, ok := t.(string)
+		if err != nil || !ok {
+			return nil
+		}
+		var v any
+		if dec.Decode(&v) != nil {
+			return nil
+		}
+		switch x := v.(type) {
+		case string:
+			out = append(out, [2]string{key, strings.Join(strings.Fields(x), " ")})
+		case json.Number:
+			value := x.String()
+			if strings.HasSuffix(key, "_s") {
+				if f, err := x.Float64(); err == nil {
+					value = strconv.FormatFloat(f, 'f', 1, 64) + "s"
+				}
+			}
+			out = append(out, [2]string{key, value})
+		}
+	}
+	return out
+}
+
+func shortTitle(value string) string {
+	r := []rune(value)
+	if len(r) > 200 {
+		return string(r[:200]) + "…"
+	}
+	return value
+}
+
 // A normal textual stop is evidence of a reply, not proof that the agent task has ended.
 func taskReplyKind(rec Record) string {
 	if rec.State != "complete" || rec.Truncated {
@@ -267,6 +358,8 @@ type RequestTask struct {
 	ProjectName      string             `json:"project_name"`
 	Grouped          bool               `json:"grouped"`
 	Title            string             `json:"title"`
+	Subtitle         string             `json:"subtitle,omitempty"`
+	TitleKind        string             `json:"title_kind,omitempty"`
 	State            string             `json:"state"`
 	Started          int64              `json:"started"`
 	Updated          int64              `json:"updated"`
@@ -483,7 +576,9 @@ func (g *Gateway) presentTask(records []Record, fullQuestion bool) (RequestTask,
 		if task.Grouped && rec.QuestionVersion == 0 {
 			question = workBuddyQuestion(question)
 		}
-		if fullQuestion || task.Grouped && rec.QuestionVersion == 0 {
+		// The saved excerpt stops at 1024 runes; a transcript's current turn may lie beyond it.
+		cut := strings.HasSuffix(question, "…") && strings.Contains(question, "【") && !strings.Contains(question, "【本轮】")
+		if fullQuestion || task.Grouped && (rec.QuestionVersion == 0 || cut) {
 			input := rec.Input
 			if input == "" {
 				err := g.db.QueryRow("SELECT COALESCE(json_extract(record,'$.input'),'') FROM requests WHERE id=?", rec.ID).Scan(&input)
@@ -497,7 +592,7 @@ func (g *Gateway) presentTask(records []Record, fullQuestion bool) (RequestTask,
 		}
 		if task.Grouped {
 			task.QuestionRecordID = rec.ID
-			task.Title = excerpt(question)
+			task.Title, task.Subtitle, task.TitleKind = taskHeadline(question)
 			if task.Title == "" {
 				task.Title = "未记录提问"
 			}
