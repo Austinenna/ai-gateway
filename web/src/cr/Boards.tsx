@@ -218,7 +218,9 @@ export function CostBoard({ api, projects, connectionOf }: { api: Api; projects:
   const spent = data?.month.cost || 0;
   const eom = (spent / elapsed) * monthDays;
   const budget = projects.reduce((a, p) => a + (p.monthly_budget || 0), 0);
-  const cache = data && data.month.input_tokens ? data.month.cache_read_tokens / data.month.input_tokens : null;
+  // Cost input_tokens are the uncached, input-priced tokens; cache reads are counted separately.
+  const cacheBase = data ? data.month.input_tokens + data.month.cache_read_tokens : 0;
+  const cache = data && cacheBase ? data.month.cache_read_tokens / cacheBase : null;
   const daily = Array.from({ length: monthDays }, (_, i) => {
     const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
     return { key, day: i + 1, cost: data?.days.find((d) => d.key === key)?.cost ?? null };
