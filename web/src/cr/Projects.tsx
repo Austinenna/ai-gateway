@@ -412,19 +412,19 @@ export function Projects({
               <div className="row zh">
                 Base URL、Token 与各协议的完整接入配置
                 <button type="button" className="kb" onClick={() => onAccess(selected)}>
-                  接入信息
+                  ACCESS
                 </button>
               </div>
               <div className="row zh">
                 以项目身份发一次真实调用
                 <button type="button" className="kb" onClick={() => onTest(selected)}>
-                  试调用
+                  TEST
                 </button>
               </div>
               <div className="row zh">
                 名称、启用状态与授权明细
                 <button type="button" className="kb" onClick={() => onEdit(selected)}>
-                  编辑权限
+                  EDIT
                 </button>
               </div>
               <div className="row zh">
@@ -432,7 +432,7 @@ export function Projects({
                 {confirmRotate ? (
                   <span className="confirm-pair">
                     <button type="button" className="kb" onClick={() => setConfirmRotate(false)}>
-                      取消
+                      CANCEL
                     </button>
                     <button
                       type="button"
@@ -443,12 +443,12 @@ export function Projects({
                         onRotate(selected);
                       }}
                     >
-                      确认轮换
+                      CONFIRM
                     </button>
                   </span>
                 ) : (
                   <button type="button" className="kb am" onClick={() => setConfirmRotate(true)}>
-                    轮换 Token
+                    ROTATE
                   </button>
                 )}
               </div>
@@ -460,13 +460,13 @@ export function Projects({
                   disabled={busy}
                   onClick={() => onSave({ ...selected, enabled: !selected.enabled }, selected.enabled ? '项目已停用' : '项目已启用')}
                 >
-                  {selected.enabled ? '停用' : '启用'}
+                  {selected.enabled ? 'DISABLE' : 'ENABLE'}
                 </button>
               </div>
               <div className="row zh">
                 删除项目：移除授权，历史请求保留
                 <button type="button" className="kb rd" onClick={() => onDelete(selected)}>
-                  删除
+                  DELETE
                 </button>
               </div>
             </div>

@@ -28,7 +28,7 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
   const openAccess = async () => {
     await page.locator('nav').getByRole('button', { name: /^项目与权限/ }).click();
     await page.locator('.project-card').filter({ hasText: '代码助手 · 开发环境' }).locator('td.pjn').click();
-    await page.locator('.project-ops').getByRole('button', { name: '接入信息', exact: true }).click();
+    await page.locator('.project-ops').getByRole('button', { name: 'ACCESS', exact: true }).click();
   };
   const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
   let credentialReads = 0;
@@ -130,10 +130,10 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     await expect(panel.locator('.acc-code')).toContainText('BASE_URL=http://127.0.0.1:18318');
     await expect(panel.locator('.acc-code')).toContainText('MODEL=writing');
     const ops = page.locator('.project-ops');
-    await ops.getByRole('button', { name: '轮换 Token', exact: true }).click();
-    await expect(ops.getByRole('button', { name: '确认轮换', exact: true })).toBeVisible();
-    await ops.getByRole('button', { name: '取消', exact: true }).click();
-    await expect(ops.getByRole('button', { name: '轮换 Token', exact: true })).toBeVisible();
+    await ops.getByRole('button', { name: 'ROTATE', exact: true }).click();
+    await expect(ops.getByRole('button', { name: 'CONFIRM', exact: true })).toBeVisible();
+    await ops.getByRole('button', { name: 'CANCEL', exact: true }).click();
+    await expect(ops.getByRole('button', { name: 'ROTATE', exact: true })).toBeVisible();
     expect(credentialReads).toBeGreaterThan(0);
     const state = await (await page.request.get('/api/admin/state', { headers })).json();
     expect(state.projects.find((p: { id: string }) => p.id === projectID).token_prefix).toBe(original.slice(0, state.projects.find((p: { id: string }) => p.id === projectID).token_prefix.length));

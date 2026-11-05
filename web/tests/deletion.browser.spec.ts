@@ -71,7 +71,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
   await test.step('删除项目清除暂存凭证，旧凭证失效，历史请求仍可筛选查看', async () => {
     await navigate('项目与权限');
     await projectCard.locator('td.pjn').click();
-    await page.locator('.project-ops').getByRole('button', { name: '编辑权限', exact: true }).click();
+    await page.locator('.project-ops').getByRole('button', { name: 'EDIT', exact: true }).click();
     await dialog('编辑项目权限').getByRole('button', { name: '删除项目', exact: true }).click();
     await expect(dialog('删除项目')).toContainText('项目凭证立即失效');
     await page.screenshot({ path: testInfo.outputPath('project-confirmation.png') });

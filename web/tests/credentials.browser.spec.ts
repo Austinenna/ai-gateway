@@ -92,7 +92,7 @@ test('项目试调用的凭证填入、校验、加密取回与退出管理', as
     await page.reload();
     await page.locator('nav').getByRole('button', { name: /^项目与权限/ }).click();
     await page.locator('.project-card td.pjn').first().click();
-    await page.locator('.project-ops').getByRole('button', { name: '试调用', exact: true }).click();
+    await page.locator('.project-ops').getByRole('button', { name: 'TEST', exact: true }).click();
     await expect(guide).toContainText('此项目已停用');
     await expect(guide.getByRole('button', { name: '重置凭证并填入', exact: true })).toHaveCount(0);
     await guide.getByRole('button', { name: '查看项目权限', exact: true }).click();

@@ -119,7 +119,7 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
   await nav('项目与权限');
   await expect.poll(() => workspace.evaluate(el => el.scrollTop)).toBe(0);
   await page.locator('.project-row').filter({ hasText: '滚动演示项目' }).first().locator('td.pjn').click();
-  await page.locator('.project-ops').getByRole('button', { name: '编辑权限', exact: true }).click();
+  await page.locator('.project-ops').getByRole('button', { name: 'EDIT', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
   await nav('请求');
