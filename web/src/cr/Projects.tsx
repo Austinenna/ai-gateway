@@ -56,8 +56,10 @@ export function Projects({
   onTest,
   onDelete,
   onAccess,
+  onRotate,
   accessContent,
 }: {
+  onRotate: (p: Project) => void;
   onAccess: (p: Project) => void;
   api: Api;
   projects: Project[];
@@ -76,6 +78,8 @@ export function Projects({
 }) {
   const [selectedId, setSelectedId] = useState(projects[0]?.id || '');
   const [spend, setSpend] = useState<Record<string, number>>({});
+  const [confirmRotate, setConfirmRotate] = useState(false);
+  useEffect(() => setConfirmRotate(false), [selectedId]);
   const selected = projects.find((p) => p.id === selectedId) || projects[0];
   const [draft, setDraft] = useState<Project | null>(null);
   useEffect(
@@ -422,6 +426,31 @@ export function Projects({
                 <button type="button" className="kb" onClick={() => onEdit(selected)}>
                   编辑权限
                 </button>
+              </div>
+              <div className="row zh">
+                {confirmRotate ? '确认轮换？旧 Token 立即失效' : '轮换 Token：旧 Token 立即失效'}
+                {confirmRotate ? (
+                  <span className="confirm-pair">
+                    <button type="button" className="kb" onClick={() => setConfirmRotate(false)}>
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="kb am"
+                      disabled={busy}
+                      onClick={() => {
+                        setConfirmRotate(false);
+                        onRotate(selected);
+                      }}
+                    >
+                      确认轮换
+                    </button>
+                  </span>
+                ) : (
+                  <button type="button" className="kb am" onClick={() => setConfirmRotate(true)}>
+                    轮换 Token
+                  </button>
+                )}
               </div>
               <div className="row zh">
                 {selected.enabled ? '停用：调用立即被拒绝，记录保留' : '启用：恢复此项目的调用'}

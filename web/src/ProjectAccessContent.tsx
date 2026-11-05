@@ -5,7 +5,7 @@ import { ttsExample } from './tts.mjs';
 import { protocolName } from './connection-protocols';
 import { isWebTool, webToolExample, webToolPath } from './web-tools.mjs';
 
-type Protocol = 'chat' | 'messages' | 'dashscope-asr' | 'dashscope-tts' | 'deepseek-search' | 'deepseek-fetch';
+export type Protocol = 'chat' | 'messages' | 'dashscope-asr' | 'dashscope-tts' | 'deepseek-search' | 'deepseek-fetch';
 type Model = { id: string; alias: string; name?: string; protocols: string[]; enabled: boolean };
 
 type Props = {
@@ -17,7 +17,35 @@ type Props = {
   rotateToken: () => Promise<void>;
 };
 
-const protocolOrder: Protocol[] = ['chat', 'messages', 'dashscope-asr', 'dashscope-tts', 'deepseek-search', 'deepseek-fetch'];
+export const protocolOrder: Protocol[] = ['chat', 'messages', 'dashscope-asr', 'dashscope-tts', 'deepseek-search', 'deepseek-fetch'];
+
+/** accessURLs gives the SDK base URL and request endpoint a client uses for one protocol. */
+export function accessURLs(baseURL: string, target: Protocol) {
+  const gatewayBaseURL = baseURL.replace(/\/+$/, '');
+  const origin = gatewayBaseURL.replace(/\/v1$/, '');
+  const base = target === 'messages' ? origin : gatewayBaseURL;
+  const endpoint =
+    target === 'dashscope-asr'
+      ? `${gatewayBaseURL}/asr/transcriptions`
+      : target === 'dashscope-tts'
+        ? `${gatewayBaseURL}/tts/speech`
+        : isWebTool(target)
+          ? `${gatewayBaseURL}${webToolPath(target)}`
+          : `${origin}/v1/${target === 'messages' ? 'messages' : 'chat/completions'}`;
+  return { base, endpoint };
+}
+
+/** accessBlock is the paste-ready configuration for one model under one protocol. */
+export function accessBlock(baseURL: string, protocol: Protocol, alias: string, token: string) {
+  const { base, endpoint } = accessURLs(baseURL, protocol);
+  if (protocol === 'dashscope-asr')
+    return `# ${protocolName(protocol)} · ${alias}\nASR_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${asrExample(alias)}`;
+  if (protocol === 'dashscope-tts')
+    return `# ${protocolName(protocol)} · ${alias}\nTTS_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${ttsExample(alias)}`;
+  if (isWebTool(protocol))
+    return `# ${protocolName(protocol)} · ${alias}\nURL=${endpoint}\nAPI_KEY=${token}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${webToolExample(protocol)}`;
+  return `# ${protocolName(protocol)} · ${alias}\nBASE_URL=${base}\nAPI_KEY=${token}\nMODEL=${alias}`;
+}
 
 export function ProjectAccessContent({ project, baseURL, models, resolveToken, saveToken, rotateToken }: Props) {
   const protocolOptions = protocolOrder.filter((protocol) => models.some((model) => model.enabled && model.protocols.includes(protocol)));
@@ -128,22 +156,7 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
   async function copyConfiguration(scope: 'current' | 'all') {
     await action(async () => {
       const token = await resolveToken();
-      const blocks = modelsForCopy(protocol, scope).map((model) => {
-        if (protocol === 'dashscope-asr') {
-          const endpoint = endpointFor(protocol);
-          return `# ${protocolName(protocol)} · ${model.alias}\nASR_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${model.alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${asrExample(model.alias)}`;
-        }
-        if (protocol === 'dashscope-tts') {
-          const endpoint = endpointFor(protocol);
-          return `# ${protocolName(protocol)} · ${model.alias}\nTTS_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${model.alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${ttsExample(model.alias)}`;
-        }
-        if (isWebTool(protocol)) {
-          const endpoint = endpointFor(protocol);
-          return `# ${protocolName(protocol)} · ${model.alias}\nURL=${endpoint}\nAPI_KEY=${token}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${webToolExample(protocol)}`;
-        }
-        const title = `${protocolName(protocol)} · ${model.alias}`;
-        return `# ${title}\nBASE_URL=${baseURLFor(protocol)}\nAPI_KEY=${token}\nMODEL=${model.alias}`;
-      });
+      const blocks = modelsForCopy(protocol, scope).map((model) => accessBlock(baseURL, protocol, model.alias, token));
       const value = blocks.join('\n\n');
       if (!value) throw new Error('当前没有可复制的模型');
       try {

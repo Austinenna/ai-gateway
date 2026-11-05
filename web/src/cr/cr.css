@@ -793,3 +793,17 @@
 .cr .gm td.st .seg{width:112px}
 .cr .gm th.gap,.cr .gm td.gap{width:96px;min-width:96px}
 .cr .project-ops .row .kb{width:92px;text-align:center;justify-content:center;flex:none;padding:4px 0}
+/* Access summary: fixed-height config block instead of the full access card list. */
+.cr .acc-sum{display:flex;flex-direction:column;gap:10px}
+.cr .acc-sum .proto button{border:1px solid var(--line-2);background:none;padding:2px 9px;font-size:11px;color:var(--tx-2);cursor:pointer}
+.cr .acc-sum .proto button.on{border-color:var(--go);color:var(--go)}
+.cr .acc-model{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+.cr .acc-model span{font-size:10px;letter-spacing:.16em;color:var(--dim)}
+.cr .acc-model select{background:#000;border:1px solid var(--line-2);border-radius:0;color:var(--tx);font-family:var(--mono);font-size:12px;padding:5px 8px;height:auto}
+.cr .acc-model em{font-style:normal;color:var(--dim);font-size:11px;font-family:var(--sans)}
+.cr .acc-code{margin:0;height:150px;overflow:auto;background:#000;border:1px solid var(--line);padding:12px 14px;color:var(--cyan);font-family:var(--mono);font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all}
+.cr .acc-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.cr .acc-note{color:var(--dim);font-size:11px;margin-left:4px}
+.cr .acc-empty{color:var(--dim);font-size:12px}
+.cr .project-ops .confirm-pair{display:inline-flex;gap:6px}
+.cr .project-ops .confirm-pair .kb{width:auto;padding:4px 10px}

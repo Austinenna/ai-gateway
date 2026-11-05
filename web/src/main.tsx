@@ -74,6 +74,7 @@ import { RequestHeader, RequestTiming } from './RequestMetrics';
 import { type RequestRecord, recordStatus } from './monitoring';
 import { TopBar, Rail, ViewHead, DetailToggle, type CrPage, type RailBadge } from './cr/Shell';
 import { Overview, overviewWindows } from './cr/Overview';
+import { AccessSummary } from './cr/AccessSummary';
 import { Inspector, RequestList } from './cr/Requests';
 import { Routing } from './cr/Routing';
 import { Projects } from './cr/Projects';
@@ -1326,7 +1327,7 @@ function App() {
                 onDelete={(p) => askDelete('projects', p)}
                 onAccess={(p) => setConfig(p as Project)}
                 accessContent={(p) => (
-                  <ProjectAccessContent
+                  <AccessSummary
                     key={p.id}
                     project={p as Project}
                     baseURL={state.base_url}
@@ -1341,18 +1342,17 @@ function App() {
                       const out = await api('/admin/projects/' + p.id + '/credential', 'POST', {});
                       return out.token;
                     }}
-                    saveToken={async (token) => {
-                      await api('/admin/projects/' + p.id + '/credential/save', 'POST', { token });
-                      await load();
-                    }}
-                    rotateToken={async () => {
-                      const out = await api('/admin/projects/' + p.id + '/rotate', 'POST', {});
-                      credentialMemory.current.remember(p.id, out.token);
-                      if (callProjectId === p.id) setCallToken('');
-                      await load();
-                    }}
                   />
                 )}
+                onRotate={(p) =>
+                  run(async () => {
+                    const out = await api('/admin/projects/' + p.id + '/rotate', 'POST', {});
+                    credentialMemory.current.remember(p.id, out.token);
+                    if (callProjectId === p.id) setCallToken('');
+                    await load();
+                    setNotice('已轮换 ' + p.name + ' 的 Token：旧 Token 立即失效，新 Token 可在接入信息里复制');
+                  })
+                }
               />
             )}
             {recordsPage && (

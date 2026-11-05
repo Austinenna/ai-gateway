@@ -114,6 +114,31 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
   });
 
+  await test.step('项目页内嵌接入面板：固定配置块、掩码 Token、复制当前与全部、轮换需确认', async () => {
+    if (await modal.count()) await modal.getByRole('button', { name: '关闭', exact: true }).last().click();
+    const panel = page.locator('.acc-sum');
+    await expect(panel.locator('.acc-code')).toContainText('BASE_URL=http://127.0.0.1:18318/v1');
+    await expect(panel.locator('.acc-code')).toContainText('MODEL=coding');
+    expect(await page.locator('body').evaluate((body, token) => body.textContent!.includes(token), original)).toBe(false);
+    await panel.getByRole('button', { name: '复制当前配置', exact: true }).click();
+    await expect(panel.getByRole('status')).toHaveText('已复制当前配置');
+    expect(await clipboard()).toBe(`# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1\nAPI_KEY=${original}\nMODEL=coding`);
+    await panel.getByRole('button', { name: /^复制全部/ }).click();
+    await expect(panel.getByRole('status')).toHaveText('已复制 2 个模型的配置');
+    expect(await clipboard()).toContain('MODEL=coding-fast');
+    await panel.getByRole('button', { name: 'Anthropic Messages', exact: true }).click();
+    await expect(panel.locator('.acc-code')).toContainText('BASE_URL=http://127.0.0.1:18318');
+    await expect(panel.locator('.acc-code')).toContainText('MODEL=writing');
+    const ops = page.locator('.project-ops');
+    await ops.getByRole('button', { name: '轮换 Token', exact: true }).click();
+    await expect(ops.getByRole('button', { name: '确认轮换', exact: true })).toBeVisible();
+    await ops.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(ops.getByRole('button', { name: '轮换 Token', exact: true })).toBeVisible();
+    expect(credentialReads).toBeGreaterThan(0);
+    const state = await (await page.request.get('/api/admin/state', { headers })).json();
+    expect(state.projects.find((p: { id: string }) => p.id === projectID).token_prefix).toBe(original.slice(0, state.projects.find((p: { id: string }) => p.id === projectID).token_prefix.length));
+  });
+
   await test.step('旧版状态显示保存入口，拒绝不匹配凭证，保存原 Token 不轮换', async () => {
     // Only simulate the legacy list flag; verification and saving use the real API.
     // Actual v2 database upgrade and missing encrypted rows are covered by Go tests.
