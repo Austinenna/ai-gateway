@@ -58,6 +58,8 @@ function level(code: string) {
   return ['info', 'INFO'];
 }
 
+const budgetShown = 5;
+
 export function Overview({
   api,
   projects,
@@ -159,6 +161,13 @@ export function Overview({
   const histTotal = histogram.reduce((a, b) => a + b, 0);
   const slow = histogram.at(-1) || 0;
   const budgetTotal = projects.reduce((a, p) => a + (p.monthly_budget || 0), 0);
+  // Projects near their budget come first, then by spend; the rest fold into one line.
+  const budgetRows = projects
+    .map((p) => {
+      const used = spend?.byProject[p.id] || 0;
+      return { p, used, ratio: p.monthly_budget ? used / p.monthly_budget : 0 };
+    })
+    .sort((a, b) => Number(b.ratio >= 0.8) - Number(a.ratio >= 0.8) || b.used - a.used || a.p.name.localeCompare(b.p.name));
   const monthDays = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const eom = spend ? (spend.total / Math.max(1, new Date().getDate() - 1 + new Date().getHours() / 24)) * monthDays : 0;
   const pending = applications.filter((a) => a.status === 'pending');
@@ -436,9 +445,7 @@ export function Overview({
             BUDGET<span className="zh">项目预算 · 本月</span>
           </div>
           <div className="bud">
-            {projects.map((p) => {
-              const used = spend?.byProject[p.id] || 0;
-              const ratio = p.monthly_budget ? used / p.monthly_budget : 0;
+            {budgetRows.slice(0, budgetShown).map(({ p, used, ratio }) => {
               return (
                 <div key={p.id}>
                   <div className="row">
@@ -451,6 +458,12 @@ export function Overview({
                 </div>
               );
             })}
+            {budgetRows.length > budgetShown && (
+              <button type="button" className="bud-more zh" onClick={() => onNavigate('costs')}>
+                其余 {budgetRows.length - budgetShown} 个项目 · {yuan(budgetRows.slice(budgetShown).reduce((a, r) => a + r.used, 0))} ·
+                查看全部 →
+              </button>
+            )}
           </div>
         </div>
       </section>
