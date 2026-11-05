@@ -4,6 +4,7 @@ import { diagnosticActionName, errorName } from '../monitoring';
 import { bucketClass, type ConnectionHealth } from '../health';
 import { windowFrom } from './Overview';
 import { Segments, useWidth } from './charts';
+import { rangeName, SignalPanels, type Signals } from './Signals';
 
 type Api = (path: string, method?: string, body?: unknown) => Promise<any>;
 type Group = { code: string; source: string; count: number; recommended_action?: string; last_started: number };
@@ -46,20 +47,14 @@ export function DiagnosticsBoard({
 }) {
   const data = usePoll(
     async () => {
-      const from = windowFrom(win);
-      const [d, fb] = await Promise.all([
-        api('/admin/diagnostics?window=' + win),
-        api(`/admin/requests?state=fallback&limit=200&from=${from}`),
-      ]);
-      return {
-        groups: (d.groups || []) as Group[],
-        fallback: (fb.items || []) as { state: string }[],
-        fallbackTotal: (fb.total as number) ?? 0,
-      };
+      const d = await api('/admin/diagnostics?window=' + win);
+      return { groups: (d.groups || []) as Group[] };
     },
     10000,
     [win],
   );
+  // Signals scan a week of records, so they refresh less often than the error list.
+  const signals = usePoll<Signals>(() => api('/admin/diagnostics/signals?window=' + win), 60000, [win]);
   const byCode = new Map<string, Group>();
   for (const g of data?.groups || []) {
     const cur = byCode.get(g.code);
@@ -70,9 +65,10 @@ export function DiagnosticsBoard({
   const breakers = connections.filter((c) => (health[c.id]?.breaker_until || 0) > Date.now());
   return (
     <section className="board cr-v diag-board">
+      <SignalPanels signals={signals} win={win} />
       <div className="p c7">
         <div className="h">
-          CATEGORIES<span className="zh">按来源分类 · 近 24 小时</span>
+          CATEGORIES<span className="zh">按来源分类 · {rangeName[win]}</span>
         </div>
         <table className="dg">
           <thead>
@@ -80,7 +76,7 @@ export function DiagnosticsBoard({
               <th>CATEGORY</th>
               <th>SOURCE</th>
               <th className="n">{win.toUpperCase()}</th>
-              <th>TREND</th>
+              <th>SHARE</th>
               <th>ACTION</th>
             </tr>
           </thead>
@@ -107,7 +103,7 @@ export function DiagnosticsBoard({
             {!cats.length && (
               <tr>
                 <td colSpan={5} className="zh dim2">
-                  近 24 小时没有异常。
+                  {rangeName[win]}没有异常。
                 </td>
               </tr>
             )}
@@ -142,7 +138,7 @@ export function DiagnosticsBoard({
         <div className="kvs">
           <span>fallback {win}</span>
           <b>
-            {data?.fallbackTotal ?? '—'} 次 · 救回 {(data?.fallback || []).filter((r) => r.state === 'complete').length}
+            {signals?.fallback ? `${signals.fallback.total} 次 · 救回 ${signals.fallback.served}` : '—'}
           </b>
           <span>mid-stream</span>
           <b className="zh">流式开始后不回退</b>

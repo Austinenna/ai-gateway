@@ -205,6 +205,18 @@ func finalizeUsage(rec *Record) {
 	}
 }
 
+// A short reply that arrives as one burst divides by a few milliseconds and
+// reports tens of thousands of tokens per second, which says nothing about the
+// model. The per-call value stays; only the statistics skip it.
+const minSpeedSpanMS = 250
+
+func speedMeasurable(rec Record) bool {
+	if rec.OutputTPS == nil {
+		return false
+	}
+	return rec.FirstToken == nil || rec.LastToken == nil || *rec.LastToken-*rec.FirstToken >= minSpeedSpanMS
+}
+
 type metricDistribution struct {
 	Count int      `json:"count"`
 	P50   *float64 `json:"p50"`
@@ -310,7 +322,7 @@ func (a *metricAggregate) add(rec Record) {
 		if rec.FirstText != nil {
 			a.ttfc = append(a.ttfc, float64(*rec.FirstText))
 		}
-		if rec.OutputTPS != nil {
+		if speedMeasurable(rec) {
 			a.speed = append(a.speed, *rec.OutputTPS)
 		}
 	}
@@ -487,7 +499,7 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 		if rec.State == "complete" && rec.FirstToken != nil {
 			bucketTTFT[index] = append(bucketTTFT[index], *rec.FirstToken)
 		}
-		if rec.State == "complete" && rec.OutputTPS != nil {
+		if rec.State == "complete" && speedMeasurable(rec) {
 			bucketSpeed[index] = append(bucketSpeed[index], *rec.OutputTPS)
 		}
 		recent = append(recent, rec)
