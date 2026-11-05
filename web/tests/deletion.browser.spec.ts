@@ -33,6 +33,7 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
     token = await page.getByLabel('网关项目凭证').inputValue();
     await page.getByRole('button', { name: '发送请求', exact: true }).click();
     await expect(page.locator('.call-output')).toContainText('模型授权已通过');
+    await navigate('请求');
     await expect(page.locator('.request-item').filter({ hasText: '删除测试项目' })).toBeVisible();
     const state = await (await page.request.get('/api/admin/state')).json();
     projectID = state.projects.find((p: { name: string }) => p.name === '删除测试项目').id;
@@ -79,8 +80,9 @@ test('配置删除的关联提示、确认取消、错误恢复与历史记录',
     await expect(projectCard).toHaveCount(0);
     const old = await page.request.get('/v1/models', { headers: { Authorization: 'Bearer ' + token } });
     expect(old.status()).toBe(401);
-    await navigate('请求');
+    await navigate('调试台');
     await expect(page.getByLabel('网关项目凭证')).toHaveValue('');
+    await navigate('请求');
     await page.getByRole('combobox', { name: '按项目筛选' }).click();
     await page.getByRole('option', { name: '删除测试项目（已删除）', exact: true }).click();
     await expect(page.getByRole('combobox', { name: '按项目筛选' })).toHaveText('删除测试项目（已删除）');

@@ -827,3 +827,26 @@
 .cr .fld .in em{align-self:center;white-space:nowrap}
 .cr input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .cr input[type=number]::-webkit-inner-spin-button,.cr input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.cr .identity{display:inline-flex;gap:6px;align-items:center}
+.cr .identity-label{font-size:10px;letter-spacing:.18em;color:var(--dim);margin-right:4px}
+/* Console in project-token mode: the trial form becomes the REQUEST column, its output the RESPONSE column. */
+.cr .panel.tester{display:grid;grid-template-columns:420px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:0 1px;background:var(--line);border:0;border-radius:0;margin:0;padding:0;height:calc(100vh - 44px - 49px);min-height:520px;box-shadow:none}
+.cr .panel.tester *{border-radius:0}
+.cr .panel.tester>.panel-head{grid-column:1;grid-row:1;background:var(--panel);padding:16px 20px 4px;border:0;display:flex;align-items:center}
+.cr .panel.tester>.panel-head h2{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--dim);font-weight:400;display:flex;gap:8px;align-items:center}
+.cr .panel.tester>.panel-head h2::before{content:"REQUEST";color:var(--dim)}
+.cr .panel.tester>.panel-head h2 svg{display:none}
+.cr .panel.tester>.panel-head .icon-btn{margin-left:auto;border:1px solid var(--line-2);background:none;color:var(--tx-2);padding:2px 6px;min-height:0}
+.cr .panel.tester>form{grid-column:1;grid-row:2;background:var(--panel);padding:8px 20px 20px;overflow-y:auto;margin:0;border:0}
+.cr .panel.tester .form-grid{display:block}
+.cr .panel.tester .field{margin:10px 0 0}
+.cr .panel.tester .field>span,.cr .panel.tester label>span:first-child{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--dim)}
+.cr .panel.tester input,.cr .panel.tester select,.cr .panel.tester textarea{background:#000;border:1px solid var(--line-2);color:var(--tx);font-family:var(--mono);font-size:12px}
+.cr .panel.tester textarea{min-height:120px;font-family:var(--sans);font-size:13px}
+.cr .panel.tester small,.cr .panel.tester .hint{color:var(--dim);font-family:var(--sans)}
+.cr .panel.tester button.primary,.cr .panel.tester button[type=submit]{background:var(--go);border-color:var(--go);color:#000;font-family:var(--mono);letter-spacing:.08em;margin-top:14px}
+.cr .panel.tester .link{color:var(--go);font-size:11.5px}
+.cr .tester-out{grid-column:2;grid-row:1/-1;background:var(--panel);padding:16px 20px;display:flex;flex-direction:column;min-height:0;min-width:0}
+.cr .tester-out .call-output{flex:1;min-height:0;overflow-y:auto;margin-top:12px;background:#000;border:1px solid var(--line-2);padding:14px 16px;font-family:var(--sans);font-size:13.5px;line-height:1.8;color:var(--tx)}
+.cr .tester-empty{margin-top:12px;flex:1;background:#000;border:1px solid var(--line-2);padding:14px 16px;color:var(--dim);font-size:12px}
+@media (max-width:900px){.cr .panel.tester{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;height:auto}.cr .tester-out{grid-column:1;grid-row:3;min-height:260px}}

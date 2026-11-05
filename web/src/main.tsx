@@ -704,7 +704,7 @@ function App() {
     );
     setCallAlias(allowed.find((m) => m.alias === callAlias)?.alias || allowed[0]?.alias || '');
     setTester(true);
-    setPage(taskView ? 'tasks' : 'requests');
+    setPage('chat');
     setCredentialGuide(false);
   }
   function showCredentialGuide(p?: Project) {
@@ -726,6 +726,7 @@ function App() {
       return;
     }
     setTester(true);
+    setPage('chat');
     setError('');
     if (!callToken) {
       const known = state.projects.find((x) => x.enabled && credentialMemory.current.get(x.id));
@@ -752,7 +753,7 @@ function App() {
       setCallAlias(result.alias);
       setCredentialError('');
       setTester(true);
-      setPage('requests');
+      setPage('chat');
       await load();
       setNotice('演示凭证已自动填入，可以直接发送请求。');
     });
@@ -903,6 +904,16 @@ function App() {
       <button className="kb go" onClick={newProject}>
         + 项目
       </button>
+    ) : page === 'chat' ? (
+      <span className="identity" role="group" aria-label="调用身份">
+        <span className="identity-label">IDENTITY</span>
+        <button type="button" className={'kb' + (!tester ? ' go' : '')} aria-pressed={!tester} onClick={() => tester && closeTester()}>
+          管理员测试
+        </button>
+        <button type="button" className={'kb' + (tester ? ' go' : '')} aria-pressed={tester} onClick={() => !tester && openTester()}>
+          项目 Token
+        </button>
+      </span>
     ) : recordsPage ? (
       <>
         {!taskView && (
@@ -917,8 +928,8 @@ function App() {
             </button>
           </>
         )}
-        <button className="kb go" onClick={() => (tester ? closeTester() : openTester())}>
-          <span aria-hidden="true">▶ </span>试调用
+        <button className="kb go" onClick={() => navigate('chat')}>
+          <span aria-hidden="true">▶ </span>调试台
         </button>
       </>
     ) : null;
@@ -1093,7 +1104,7 @@ function App() {
           }
         />
         <div
-          className={'workspace' + (recordsPage && !tester ? ' requests-workspace' : page === 'chat' ? ' chat-workspace' : '')}
+          className={'workspace' + (recordsPage ? ' requests-workspace' : page === 'chat' ? ' chat-workspace' : '')}
           ref={workspace}
           tabIndex={0}
           role="region"
@@ -1129,8 +1140,119 @@ function App() {
                 <ArrowRight size={16} />
               </button>
             )}
+            {page === 'chat' && tester && (
+              <section className="panel tester">
+                <div className="panel-head">
+                  <h2>
+                    <Terminal size={17} />
+                    以项目身份试调用
+                  </h2>
+                  <button className="icon-btn" onClick={closeTester} aria-label="关闭试调用">
+                    <X size={18} />
+                  </button>
+                </div>
+                <form onSubmit={call}>
+                  <div className="form-grid">
+                    <div className="credential-field">
+                      <Field label="网关项目凭证" hint="填写完整的 gw_ 开头凭证；管理密码和厂商 Token 用在各自的配置页面。">
+                        <input
+                          type="password"
+                          autoComplete="off"
+                          spellCheck={false}
+                          aria-invalid={!!credentialError}
+                          aria-describedby={credentialError ? 'project-credential-error' : undefined}
+                          value={callToken}
+                          onChange={(e) => {
+                            setCallToken(e.target.value);
+                            setCallProjectId('');
+                            setCredentialError('');
+                          }}
+                          placeholder="粘贴完整项目凭证（gw_ 开头）"
+                        />
+                      </Field>
+                      {credentialError && (
+                        <p id="project-credential-error" className="credential-error" role="alert">
+                          {credentialError}
+                        </p>
+                      )}
+                      <button type="button" className="link" disabled={calling} onClick={() => showCredentialGuide()}>
+                        <KeyRound size={14} />
+                        选择项目并填入
+                      </button>
+                    </div>
+                    <Field label="模型别名">
+                      <select value={callAlias} onChange={(e) => setCallAlias(e.target.value)} required>
+                        <option value="">选择模型</option>
+                        {state.models.map((m) => (
+                          <option key={m.id} value={m.alias}>
+                            {m.alias} · {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                  <Field label="调用协议">
+                    <select
+                      value={selectedCallProtocol}
+                      onChange={(e) => setCallProtocol(e.target.value)}
+                      disabled={calling || !callProtocols.length}
+                    >
+                      {!callProtocols.length && <option value="">无可用协议</option>}
+                      {callProtocols.map((p) => (
+                        <option key={p} value={p}>
+                          {protocolName(p)}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  {selectedCallProtocol === 'dashscope-asr' ? (
+                    <AsrAudioFields
+                      audio={callAudio}
+                      onAudio={setCallAudio}
+                      hotwords={callHotwords}
+                      onHotwords={setCallHotwords}
+                      disabled={calling}
+                    />
+                  ) : (
+                    <>
+                      {selectedCallProtocol === 'dashscope-tts' && (
+                        <Field label="音色 ID" hint="百炼控制台的音色 ID，例如 anmingyuan_v3.1。">
+                          <input required value={callVoice} onChange={(e) => setCallVoice(e.target.value)} />
+                        </Field>
+                      )}
+                      <Field label={selectedCallProtocol === 'dashscope-tts' ? '要合成的文字' : '消息'}>
+                        <textarea required rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+                      </Field>
+                    </>
+                  )}
+                  <div className="actions">
+                    <button className="primary" disabled={calling || (selectedCallProtocol === 'dashscope-asr' && !callAudio)}>
+                      <Send size={15} />
+                      {calling ? (selectedCallProtocol === 'dashscope-asr' ? '正在转写…' : '正在接收…') : '发送请求'}
+                    </button>
+                    {calling && (
+                      <button type="button" onClick={() => abort.current?.abort()}>
+                        停止
+                      </button>
+                    )}
+                  </div>
+                </form>
+                <div className="tester-out">
+                  <div className="h">
+                    RESPONSE<span className="zh">以项目身份调用 · 经过鉴权、限速、预算与备用模型</span>
+                  </div>
+                  {callOutput && (
+                    <div className="call-output" aria-live="polite">
+                      {callOutput}
+                    </div>
+                  )}
+                  {callSpeech && <audio controls src={callSpeech} aria-label="合成的语音" />}
+                  {!callOutput && !callSpeech && <p className="tester-empty zh">填入凭证并发送后，响应显示在这里。</p>}
+                </div>
+              </section>
+            )}
             <ChatPage
-              active={page === 'chat'}
+              active={page === 'chat' && !tester}
               models={state.models}
               connections={state.connections}
               api={api}
@@ -1357,111 +1479,6 @@ function App() {
             )}
             {recordsPage && (
               <>
-                {tester && (
-                  <section className="panel tester">
-                    <div className="panel-head">
-                      <h2>
-                        <Terminal size={17} />
-                        以项目身份试调用
-                      </h2>
-                      <button className="icon-btn" onClick={closeTester} aria-label="关闭试调用">
-                        <X size={18} />
-                      </button>
-                    </div>
-                    <form onSubmit={call}>
-                      <div className="form-grid">
-                        <div className="credential-field">
-                          <Field label="网关项目凭证" hint="填写完整的 gw_ 开头凭证；管理密码和厂商 Token 用在各自的配置页面。">
-                            <input
-                              type="password"
-                              autoComplete="off"
-                              spellCheck={false}
-                              aria-invalid={!!credentialError}
-                              aria-describedby={credentialError ? 'project-credential-error' : undefined}
-                              value={callToken}
-                              onChange={(e) => {
-                                setCallToken(e.target.value);
-                                setCallProjectId('');
-                                setCredentialError('');
-                              }}
-                              placeholder="粘贴完整项目凭证（gw_ 开头）"
-                            />
-                          </Field>
-                          {credentialError && (
-                            <p id="project-credential-error" className="credential-error" role="alert">
-                              {credentialError}
-                            </p>
-                          )}
-                          <button type="button" className="link" disabled={calling} onClick={() => showCredentialGuide()}>
-                            <KeyRound size={14} />
-                            选择项目并填入
-                          </button>
-                        </div>
-                        <Field label="模型别名">
-                          <select value={callAlias} onChange={(e) => setCallAlias(e.target.value)} required>
-                            <option value="">选择模型</option>
-                            {state.models.map((m) => (
-                              <option key={m.id} value={m.alias}>
-                                {m.alias} · {m.name}
-                              </option>
-                            ))}
-                          </select>
-                        </Field>
-                      </div>
-                      <Field label="调用协议">
-                        <select
-                          value={selectedCallProtocol}
-                          onChange={(e) => setCallProtocol(e.target.value)}
-                          disabled={calling || !callProtocols.length}
-                        >
-                          {!callProtocols.length && <option value="">无可用协议</option>}
-                          {callProtocols.map((p) => (
-                            <option key={p} value={p}>
-                              {protocolName(p)}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      {selectedCallProtocol === 'dashscope-asr' ? (
-                        <AsrAudioFields
-                          audio={callAudio}
-                          onAudio={setCallAudio}
-                          hotwords={callHotwords}
-                          onHotwords={setCallHotwords}
-                          disabled={calling}
-                        />
-                      ) : (
-                        <>
-                          {selectedCallProtocol === 'dashscope-tts' && (
-                            <Field label="音色 ID" hint="百炼控制台的音色 ID，例如 anmingyuan_v3.1。">
-                              <input required value={callVoice} onChange={(e) => setCallVoice(e.target.value)} />
-                            </Field>
-                          )}
-                          <Field label={selectedCallProtocol === 'dashscope-tts' ? '要合成的文字' : '消息'}>
-                            <textarea required rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-                          </Field>
-                        </>
-                      )}
-                      <div className="actions">
-                        <button className="primary" disabled={calling || (selectedCallProtocol === 'dashscope-asr' && !callAudio)}>
-                          <Send size={15} />
-                          {calling ? (selectedCallProtocol === 'dashscope-asr' ? '正在转写…' : '正在接收…') : '发送请求'}
-                        </button>
-                        {calling && (
-                          <button type="button" onClick={() => abort.current?.abort()}>
-                            停止
-                          </button>
-                        )}
-                      </div>
-                      {callOutput && (
-                        <div className="call-output" aria-live="polite">
-                          {callOutput}
-                        </div>
-                      )}
-                      {callSpeech && <audio controls src={callSpeech} aria-label="合成的语音" />}
-                    </form>
-                  </section>
-                )}
                 {taskView ? (
                   <TaskWorkspace
                     tasks={tasks}

@@ -119,6 +119,7 @@ test('百炼 ASR 配置、原生音频调用、项目授权与转写详情', asy
     await expect(page.locator('.call-output')).toHaveText(transcript);
     expect(upstreamCalls).toHaveLength(2); expect(upstreamCalls[1].body.input.messages).toHaveLength(1);
     await page.getByRole('button', { name: '关闭试调用', exact: true }).click();
+    await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
     await expect(page.locator('.request-item').filter({ hasText: 'ASR 授权验证' })).toBeVisible();
     await page.locator('.request-item').filter({ hasText: 'ASR 授权验证' }).click();
     const detail = page.getByRole('region', { name: '请求详情' });

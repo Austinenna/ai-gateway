@@ -21,12 +21,14 @@ test('项目试调用的凭证填入、校验、加密取回与退出管理', as
     await expect(key).toHaveValue(/^gw_[A-Za-z0-9_-]{43}$/);
     originalKey = await key.inputValue();
     await page.getByRole('button', { name: '关闭试调用', exact: true }).click();
-    await page.getByRole('button', { name: '试调用', exact: true }).click();
+    await page.getByRole('button', { name: '项目 Token', exact: true }).click();
     await expect.poll(async () => (await key.inputValue()) === originalKey).toBe(true);
     await send();
     await expect(page.locator('.call-output')).toContainText('不会消耗真实额度');
     await expect(page.getByRole('button', { name: '发送请求', exact: true })).toBeEnabled();
+    await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
     await expect(page.locator('.request-item').first()).toBeVisible();
+    await page.locator('nav').getByRole('button', { name: /^调试台/ }).click();
     await page.screenshot({ path: testInfo.outputPath('trial-success.png'), fullPage: true });
     const state = await (await page.request.get('/api/admin/state')).json();
     projectID = state.projects[0].id;
@@ -52,8 +54,8 @@ test('项目试调用的凭证填入、校验、加密取回与退出管理', as
 
   await test.step('刷新清除暂存，取回加密凭证不会更换正在使用的 Token', async () => {
     await page.reload();
-    await page.locator('nav').getByRole('button', { name: /^请求/ }).click();
-    await page.getByRole('button', { name: '试调用', exact: true }).click();
+    await page.locator('nav').getByRole('button', { name: /^调试台/ }).click();
+    await page.getByRole('button', { name: '项目 Token', exact: true }).click();
     await expect(key).toHaveValue('');
     await openGuide();
     await expect(guide).toContainText('Token 已加密保管');

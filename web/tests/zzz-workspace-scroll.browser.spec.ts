@@ -112,9 +112,11 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
   await expect.poll(scrollTop).toBe(0);
   expect(await list.evaluate(el => el.scrollTop)).toBe(listPosition);
 
-  await page.getByRole('button', { name: '试调用', exact: true }).click();
+  await page.locator('.vh').getByRole('button', { name: '调试台', exact: true }).click();
+  await page.getByRole('button', { name: '项目 Token', exact: true }).click();
   await expect(page.locator('.tester form')).toBeVisible();
   await page.getByRole('button', { name: '关闭试调用', exact: true }).click();
+  await nav('请求');
   await expect(page.locator('.requests-workspace')).toBeVisible();
   await nav('项目与权限');
   await expect.poll(() => workspace.evaluate(el => el.scrollTop)).toBe(0);

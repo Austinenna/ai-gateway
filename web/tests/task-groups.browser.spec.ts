@@ -78,10 +78,10 @@ test('独立导航进入任务汇总与逐次请求，保留子代理与原始�
   await expect(taskEntry).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: '任务记录', level: 1 })).toBeVisible();
   await expect(page.locator('.task-item')).toHaveCount(2);
-  await page.getByRole('button', { name: '试调用', exact: true }).click();
-  await expect(page.locator('.tester')).toBeVisible();
+  await page.locator('.vh').getByRole('button', { name: '调试台', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '调试台', level: 1 })).toBeVisible();
+  await taskEntry.click();
   await expect(taskEntry).toHaveAttribute('aria-current', 'page');
-  await page.getByRole('button', { name: '关闭试调用', exact: true }).click();
   await expect(page.locator('.workspace')).toHaveClass(/requests-workspace/);
   await page.screenshot({ path: info.outputPath('tasks-sidebar-collapsed.png'), animations: 'disabled' });
 });
