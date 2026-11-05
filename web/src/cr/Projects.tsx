@@ -37,7 +37,8 @@ const shortProto: Record<string, string> = {
   'deepseek-fetch': 'FETCH',
 };
 // Small amounts keep four decimals so a few cheap calls do not read as ¥0.00.
-const yuan = (v: number) => '¥' + (v >= 100 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v.toFixed(4));
+// Budgets read in yuan with cents; sub-cent spend shows as ¥0.00.
+const money = (v: number) => '¥' + (v >= 100 ? v.toFixed(1) : v.toFixed(2));
 
 /** Projects is the grant matrix plus limits, access and token panels for one project. */
 export function Projects({
@@ -153,13 +154,19 @@ export function Projects({
                   </th>
                 ))}
                 <th className="gap" aria-hidden="true" />
-                <th className="opsh">OPS</th>
+                <th className="st">RATE · NOW</th>
+                <th className="st">CONCURRENCY · NOW</th>
+                <th className="st">BUDGET · 本月</th>
               </tr>
             </thead>
             <tbody>
               {projects.map((p) => {
                 const app = byProject.get(p.id);
                 const isPending = app?.status === 'pending';
+                const u = usage[p.id];
+                const rpm = p.rate_rpm || 0,
+                  conc = p.max_concurrent || 0;
+                const used = spend[p.id] || 0;
                 const fb = new Set(missingFallback(p));
                 return (
                   <tr
@@ -171,12 +178,21 @@ export function Projects({
                     <td className="pjn">
                       <span className="zh">{p.name}</span>{' '}
                       <small style={isPending ? { color: 'var(--amber)' } : undefined}>
-                        {p.token_prefix}… ·{' '}
                         <span className="zh">
                           {isPending ? '待批准' : app?.status === 'rejected' ? '已拒绝' : p.enabled ? '启用' : '停用'}
                         </span>
                         {isPending && <span className="zh"> · 申请 {protocolName(app!.protocol)}</span>}
                       </small>
+                      {isPending && (
+                        <span className="pend-ops" onClick={(e) => e.stopPropagation()}>
+                          <button type="button" className="kb rd" disabled={busy} onClick={() => onDecision(app!, 'reject')}>
+                            拒绝
+                          </button>
+                          <button type="button" className="kb go" disabled={busy} onClick={() => onDecision(app!, 'approve')}>
+                            批准
+                          </button>
+                        </span>
+                      )}
                     </td>
                     {models.map((m) => {
                       const on = p.model_ids.includes(m.id);
@@ -200,29 +216,30 @@ export function Projects({
                       );
                     })}
                     <td className="gap" aria-hidden="true" />
-                    <td className="ops" onClick={(e) => e.stopPropagation()}>
-                      {isPending ? (
-                        <>
-                          <button type="button" className="kb rd" disabled={busy} onClick={() => onDecision(app!, 'reject')}>
-                            拒绝
-                          </button>
-                          <button type="button" className="kb go" disabled={busy} onClick={() => onDecision(app!, 'approve')}>
-                            批准
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button type="button" className="kb" onClick={() => onAccess(p)}>
-                            接入信息
-                          </button>
-                          <button type="button" className="kb" onClick={() => onTest(p)}>
-                            试调用
-                          </button>
-                          <button type="button" className="kb" onClick={() => onEdit(p)}>
-                            编辑权限
-                          </button>
-                        </>
-                      )}
+                    <td className="st">
+                      {rpm ? rpm + '/min' : <span className="dim2">不限</span>}
+                      {rpm > 0 && <Segments ratio={(u?.last_minute || 0) / rpm} tone={(u?.last_minute || 0) >= rpm * 0.8 ? 'am' : 'on'} />}
+                      <small>
+                        {u?.last_minute || 0}
+                        {rpm ? '/' + rpm : ''}
+                        {u?.limited_since_start ? ' · 限速 ' + u.limited_since_start + ' 次' : ''}
+                      </small>
+                    </td>
+                    <td className="st">
+                      {conc ? conc : <span className="dim2">不限</span>}
+                      {conc > 0 && <Segments ratio={(u?.inflight || 0) / conc} tone={(u?.inflight || 0) >= conc ? 'am' : 'on'} />}
+                      <small>
+                        {u?.inflight || 0}
+                        {conc ? '/' + conc : ''}
+                        {conc && (u?.inflight || 0) >= conc ? ' · 排满' : ''}
+                      </small>
+                    </td>
+                    <td className="st">
+                      {money(used)} / {p.monthly_budget ? '¥' + p.monthly_budget : '∞'}
+                      <Segments
+                        ratio={p.monthly_budget ? used / p.monthly_budget : 0}
+                        tone={p.monthly_budget && used / p.monthly_budget >= 0.8 ? 'am' : 'on'}
+                      />
                     </td>
                   </tr>
                 );
@@ -307,7 +324,7 @@ export function Projects({
                   <div>
                     <label>BUDGET · 本月</label>
                     <b>
-                      {yuan(used)}
+                      {money(used)}
                       <small>{budget ? ' / ¥' + budget : ' / ∞'}</small>
                     </b>
                     <Segments ratio={budget ? used / budget : 0} tone={budget && used / budget >= 0.8 ? 'am' : 'on'} />
@@ -387,17 +404,23 @@ export function Projects({
             <div className="h">
               PROJECT<span className="zh">项目操作</span>
             </div>
-            <div className="danger">
+            <div className="danger project-ops">
+              <div className="row zh">
+                Base URL、Token 与各协议的完整接入配置
+                <button type="button" className="kb" onClick={() => onAccess(selected)}>
+                  接入信息
+                </button>
+              </div>
               <div className="row zh">
                 以项目身份发一次真实调用
                 <button type="button" className="kb" onClick={() => onTest(selected)}>
-                  TEST
+                  试调用
                 </button>
               </div>
               <div className="row zh">
                 名称、启用状态与授权明细
                 <button type="button" className="kb" onClick={() => onEdit(selected)}>
-                  EDIT
+                  编辑权限
                 </button>
               </div>
               <div className="row zh">

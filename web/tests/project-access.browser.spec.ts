@@ -27,7 +27,8 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
   const modal = page.getByRole('dialog');
   const openAccess = async () => {
     await page.locator('nav').getByRole('button', { name: /^项目与权限/ }).click();
-    await page.locator('.project-card').filter({ hasText: '代码助手 · 开发环境' }).getByRole('button', { name: '接入信息', exact: true }).click();
+    await page.locator('.project-card').filter({ hasText: '代码助手 · 开发环境' }).locator('td.pjn').click();
+    await page.locator('.project-ops').getByRole('button', { name: '接入信息', exact: true }).click();
   };
   const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
   let credentialReads = 0;

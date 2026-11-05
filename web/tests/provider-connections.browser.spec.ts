@@ -145,7 +145,8 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       await page.reload();
       await page.locator('nav').getByRole('button',{name:/^项目与权限/}).click();
       const projectRow=page.locator('.project-card').filter({hasText:'双协议项目验证'});
-      await projectRow.getByRole('button',{name:'接入信息',exact:true}).click();
+      await projectRow.locator('td.pjn').click();
+      await page.locator('.project-ops').getByRole('button',{name:'接入信息',exact:true}).click();
       for (const p of ['chat','messages']) {
         await modal.getByRole('tab',{name:p==='chat'?'Chat Completions':'Anthropic Messages',exact:true}).click();
         await expect(modal.getByRole('radio',{name:'默认模型 dual-protocol-ui',exact:true})).toBeChecked();
@@ -155,7 +156,8 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
         expect(value).toBe(`# ${p==='chat'?'Chat Completions':'Anthropic Messages'} · dual-protocol-ui\nBASE_URL=http://127.0.0.1:18318${p==='chat'?'/v1':''}\nAPI_KEY=${project.token}\nMODEL=dual-protocol-ui`);
       }
       await modal.getByRole('button',{name:'关闭',exact:true}).click();
-      await projectRow.getByRole('button',{name:'试调用',exact:true}).click();
+      await projectRow.locator('td.pjn').click();
+      await page.locator('.project-ops').getByRole('button',{name:'试调用',exact:true}).click();
       await modal.getByRole('button',{name:'填入这个项目的凭证',exact:true}).click();
       let trialProtocol='';
       await page.route('**/v1/messages',async route=>{

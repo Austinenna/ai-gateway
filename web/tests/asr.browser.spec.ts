@@ -96,7 +96,8 @@ test('百炼 ASR 配置、原生音频调用、项目授权与转写详情', asy
     await page.reload();
     await page.locator('nav').getByRole('button', { name: /^项目与权限/ }).click();
     const row = page.locator('.project-card').filter({ hasText: 'ASR 授权验证' });
-    await row.getByRole('button', { name: '接入信息', exact: true }).click();
+    await row.locator('td.pjn').click();
+    await page.locator('.project-ops').getByRole('button', { name: '接入信息', exact: true }).click();
     await expect(modal.getByRole('tab', { name: '百炼 ASR', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(modal.locator('.access-copy-row code').nth(1)).toHaveText('http://127.0.0.1:18318/v1/asr/transcriptions');
     await expect(modal).toContainText('http://127.0.0.1:18318/v1/asr/transcriptions');
@@ -109,7 +110,8 @@ test('百炼 ASR 配置、原生音频调用、项目授权与转写详情', asy
     expect(copied).toContain('"audio": "data:audio/mp3;base64,');
     await page.screenshot({ path: resolve(output, 'asr-access-mobile.png') });
     await modal.getByRole('button', { name: '关闭', exact: true }).last().click();
-    await row.getByRole('button', { name: '试调用', exact: true }).click();
+    await row.locator('td.pjn').click();
+    await page.locator('.project-ops').getByRole('button', { name: '试调用', exact: true }).click();
     await modal.getByRole('button', { name: '填入这个项目的凭证', exact: true }).click();
     await page.getByLabel('音频文件', { exact: true }).setInputFiles({ name: 'sample.wav', mimeType: 'audio/wav', buffer: audio });
     await expect(page.getByLabel('消息', { exact: true })).toHaveCount(0);
