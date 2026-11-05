@@ -112,8 +112,11 @@ function GroupDetail({ group, onSelect }: { group: DiagnosticGroup; onSelect: (i
   );
 }
 
-export function DiagnosticsPage({ onSelect }: Props) {
-  const [window, setWindow] = useState('24h');
+export function DiagnosticsPage({ onSelect, range }: Props & { range?: string }) {
+  const [window, setWindow] = useState(range || '24h');
+  useEffect(() => {
+    if (range) setWindow(range);
+  }, [range]);
   const [code, setCode] = useState('');
   const [provider, setProvider] = useState('');
   const [protocol, setProtocol] = useState('');
@@ -171,7 +174,7 @@ export function DiagnosticsPage({ onSelect }: Props) {
   return (
     <div className="diagnostics-page">
       <div className="diagnostics-toolbar">
-        <div className="monitor-range" aria-label="诊断时间范围">
+        <div className="monitor-range" aria-label="诊断时间范围" hidden={!!range}>
           {ranges.map(([value, label]) => (
             <button key={value} aria-pressed={window === value} onClick={() => setWindow(value)}>
               {label}

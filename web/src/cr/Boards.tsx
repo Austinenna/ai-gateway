@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { diagnosticActionName, errorName } from '../monitoring';
 import { bucketClass, type ConnectionHealth } from '../health';
+import { windowFrom } from './Overview';
 import { Segments, useWidth } from './charts';
 
 type Api = (path: string, method?: string, body?: unknown) => Promise<any>;
@@ -35,20 +36,29 @@ export function DiagnosticsBoard({
   api,
   connections,
   health,
+  win,
 }: {
   api: Api;
   connections: Conn[];
   health: Record<string, ConnectionHealth>;
+  win: string;
 }) {
-  const data = usePoll(async () => {
-    const from = Date.now() - 86400e3;
-    const [d, fb] = await Promise.all([api('/admin/diagnostics?window=24h'), api(`/admin/requests?state=fallback&limit=200&from=${from}`)]);
-    return {
-      groups: (d.groups || []) as Group[],
-      fallback: (fb.items || []) as { state: string }[],
-      fallbackTotal: (fb.total as number) ?? 0,
-    };
-  }, 10000);
+  const data = usePoll(
+    async () => {
+      const from = windowFrom(win);
+      const [d, fb] = await Promise.all([
+        api('/admin/diagnostics?window=' + win),
+        api(`/admin/requests?state=fallback&limit=200&from=${from}`),
+      ]);
+      return {
+        groups: (d.groups || []) as Group[],
+        fallback: (fb.items || []) as { state: string }[],
+        fallbackTotal: (fb.total as number) ?? 0,
+      };
+    },
+    10000,
+    [win],
+  );
   const byCode = new Map<string, Group>();
   for (const g of data?.groups || []) {
     const cur = byCode.get(g.code);
@@ -68,7 +78,7 @@ export function DiagnosticsBoard({
             <tr>
               <th>CATEGORY</th>
               <th>SOURCE</th>
-              <th className="n">24H</th>
+              <th className="n">{win.toUpperCase()}</th>
               <th>TREND</th>
               <th>ACTION</th>
             </tr>
@@ -129,7 +139,7 @@ export function DiagnosticsBoard({
           </div>
         )}
         <div className="kvs">
-          <span>fallback 24h</span>
+          <span>fallback {win}</span>
           <b>
             {data?.fallbackTotal ?? '—'} 次 · 救回 {(data?.fallback || []).filter((r) => r.state === 'complete').length}
           </b>
@@ -183,34 +193,54 @@ type UsageGroup = {
   audio_seconds: number;
 };
 const stackColors = ['var(--red)', 'var(--cyan)', 'var(--go)', 'var(--amber)', '#c77dff', 'var(--tx-2)'];
+const fmt = (v: number) => (v < 1 ? v.toFixed(4) : v.toFixed(1));
 const compact = (v: number) => (v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : String(v));
 
-export function CostBoard({ api, projects, connectionOf }: { api: Api; projects: Proj[]; connectionOf: (modelID: string) => string }) {
-  const data = usePoll(async () => {
-    const [month, today, days, byProject, byModel] = await Promise.all([
-      api('/admin/usage?period=month'),
-      api('/admin/usage?period=today'),
-      api('/admin/usage?period=month&group_by=day'),
-      api('/admin/usage?period=month&group_by=project'),
-      api('/admin/usage?period=month&group_by=model'),
-    ]);
-    const projectGroups = ((byProject.groups || []) as UsageGroup[]).filter((g) => g.cost > 0).slice(0, stackColors.length - 1);
-    // Per-project daily series feed the stacked bars; the remainder is grouped as "其他".
-    const perProject = await Promise.all(
-      projectGroups.map(async (g) => {
-        const r = await api('/admin/usage?period=month&group_by=day&project_id=' + encodeURIComponent(g.key));
-        return { key: g.key, label: g.label, days: Object.fromEntries(((r.groups || []) as UsageGroup[]).map((d) => [d.key, d.cost])) };
-      }),
-    );
-    return {
-      month: month.total as { cost: number; input_tokens: number; cache_read_tokens: number },
-      today: today.total as { cost: number },
-      days: (days.groups || []) as UsageGroup[],
-      byProject: Object.fromEntries(((byProject.groups || []) as UsageGroup[]).map((g) => [g.key, g.cost])),
-      byModel: (byModel.groups || []) as UsageGroup[],
-      series: perProject,
-    };
-  }, 15000);
+export function CostBoard({
+  api,
+  projects,
+  connectionOf,
+  win,
+}: {
+  api: Api;
+  projects: Proj[];
+  connectionOf: (modelID: string) => string;
+  win: string;
+}) {
+  const range = win === 'all' ? 'period=all' : 'from=' + windowFrom(win);
+  const data = usePoll(
+    async () => {
+      const [month, today, days, byProject, byModel, inRange, rangeProject] = await Promise.all([
+        api('/admin/usage?period=month'),
+        api('/admin/usage?period=today'),
+        api('/admin/usage?period=month&group_by=day'),
+        api('/admin/usage?period=month&group_by=project'),
+        api('/admin/usage?' + range + '&group_by=model'),
+        api('/admin/usage?' + range),
+        api('/admin/usage?' + range + '&group_by=project'),
+      ]);
+      const projectGroups = ((byProject.groups || []) as UsageGroup[]).filter((g) => g.cost > 0).slice(0, stackColors.length - 1);
+      // Per-project daily series feed the stacked bars; the remainder is grouped as "其他".
+      const perProject = await Promise.all(
+        projectGroups.map(async (g) => {
+          const r = await api('/admin/usage?period=month&group_by=day&project_id=' + encodeURIComponent(g.key));
+          return { key: g.key, label: g.label, days: Object.fromEntries(((r.groups || []) as UsageGroup[]).map((d) => [d.key, d.cost])) };
+        }),
+      );
+      return {
+        month: month.total as { cost: number; input_tokens: number; cache_read_tokens: number },
+        today: today.total as { cost: number },
+        days: (days.groups || []) as UsageGroup[],
+        byProject: Object.fromEntries(((byProject.groups || []) as UsageGroup[]).map((g) => [g.key, g.cost])),
+        byModel: (byModel.groups || []) as UsageGroup[],
+        range: inRange.total as { cost: number; input_tokens: number; cache_read_tokens: number },
+        rangeProject: Object.fromEntries(((rangeProject.groups || []) as UsageGroup[]).map((g) => [g.key, g.cost])),
+        series: perProject,
+      };
+    },
+    15000,
+    [win],
+  );
   const [ref, W] = useWidth<SVGSVGElement>();
   const now = new Date();
   const monthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -219,8 +249,9 @@ export function CostBoard({ api, projects, connectionOf }: { api: Api; projects:
   const eom = (spent / elapsed) * monthDays;
   const budget = projects.reduce((a, p) => a + (p.monthly_budget || 0), 0);
   // Cost input_tokens are the uncached, input-priced tokens; cache reads are counted separately.
-  const cacheBase = data ? data.month.input_tokens + data.month.cache_read_tokens : 0;
-  const cache = data && cacheBase ? data.month.cache_read_tokens / cacheBase : null;
+  const cacheBase = data ? data.range.input_tokens + data.range.cache_read_tokens : 0;
+  const cache = data && cacheBase ? data.range.cache_read_tokens / cacheBase : null;
+  const rangeSpent = data?.range.cost || 0;
   const daily = Array.from({ length: monthDays }, (_, i) => {
     const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
     return { key, day: i + 1, cost: data?.days.find((d) => d.key === key)?.cost ?? null };
@@ -239,10 +270,15 @@ export function CostBoard({ api, projects, connectionOf }: { api: Api; projects:
   return (
     <section className="board cr-v cost-board">
       <div className="p c3">
-        <div className="h">MONTH</div>
-        <div className="kv amber">{data ? yuan(spent) : '—'}</div>
+        <div className="h">
+          SPEND<span className="r">{win.toUpperCase()}</span>
+        </div>
+        <div className="kv amber">{data ? yuan(rangeSpent) : '—'}</div>
         <div className="sub">
-          <span>{budget ? '/ ¥' + budget + ' 总预算' : '未设预算'}</span>
+          <span>
+            本月 {yuan(spent)}
+            {budget ? ' / ¥' + budget : ' · 未设预算'}
+          </span>
         </div>
         <Segments ratio={budget ? spent / budget : 0} tone="am" />
       </div>
@@ -277,7 +313,7 @@ export function CostBoard({ api, projects, connectionOf }: { api: Api; projects:
       </div>
       <div className="p c8">
         <div className="h">
-          DAILY<span className="zh">每日费用 · 按项目堆叠</span>
+          DAILY<span className="zh">每日费用 · 本月 · 按项目堆叠</span>
           <span className="r legend zh">
             {(data?.series || []).map((sr, k) => (
               <span key={sr.key}>
@@ -350,13 +386,14 @@ export function CostBoard({ api, projects, connectionOf }: { api: Api; projects:
       </div>
       <div className="p c4">
         <div className="h">
-          BY PROJECT<span className="zh">项目 · 本月</span>
+          BY PROJECT<span className="zh">项目 · 所选范围与本月</span>
         </div>
         <table>
           <thead>
             <tr>
               <th>PROJECT</th>
-              <th className="n">SPENT</th>
+              <th className="n">{win.toUpperCase()}</th>
+              <th className="n">本月</th>
               <th className="n">BUDGET</th>
               <th className="n">EOM</th>
             </tr>
@@ -368,7 +405,8 @@ export function CostBoard({ api, projects, connectionOf }: { api: Api; projects:
               return (
                 <tr key={p.id}>
                   <td className="zh">{p.name}</td>
-                  <td className="n">{s < 1 ? s.toFixed(4) : s.toFixed(1)}</td>
+                  <td className="n">{fmt(data?.rangeProject[p.id] || 0)}</td>
+                  <td className="n">{fmt(s)}</td>
                   <td className="n">{p.monthly_budget ?? '∞'}</td>
                   <td className="n" style={{ color: p.monthly_budget && e > p.monthly_budget ? 'var(--red)' : 'var(--tx-2)' }}>
                     {e.toFixed(1)}
@@ -382,7 +420,7 @@ export function CostBoard({ api, projects, connectionOf }: { api: Api; projects:
       </div>
       <div className="p c12">
         <div className="h">
-          BY MODEL<span className="zh">模型 · 本月</span>
+          BY MODEL<span className="zh">模型 · {win === 'all' ? '全部' : win.toUpperCase()}</span>
         </div>
         <table className="by-model">
           <thead>
@@ -399,7 +437,7 @@ export function CostBoard({ api, projects, connectionOf }: { api: Api; projects:
           </thead>
           <tbody>
             {(data?.byModel || []).map((m) => {
-              const share = spent ? m.cost / spent : 0;
+              const share = rangeSpent ? m.cost / rangeSpent : 0;
               return (
                 <tr key={m.key}>
                   <td>{m.label}</td>

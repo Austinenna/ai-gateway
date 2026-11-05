@@ -25,7 +25,9 @@ export const overviewWindows = [
   ['7d', '7D'],
   ['all', 'ALL'],
 ] as const;
-const windowMs: Record<string, number> = { '1h': 3600e3, '24h': 86400e3, '7d': 7 * 86400e3 };
+export const windowMs: Record<string, number> = { '1h': 3600e3, '24h': 86400e3, '7d': 7 * 86400e3 };
+/** windowFrom turns a range key into the start timestamp; 0 means all time. */
+export const windowFrom = (win: string) => (win === 'all' ? 0 : Date.now() - windowMs[win]);
 const hhmm = (t: number) => new Date(t).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
 const hms = (t: number) => new Date(t).toLocaleTimeString('zh-CN', { hour12: false });
 // Older entries carry their date so yesterday's calls are not read as today's.

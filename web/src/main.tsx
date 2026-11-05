@@ -73,7 +73,7 @@ import { ChatPage } from './ChatPage';
 import { RequestHeader, RequestTiming } from './RequestMetrics';
 import { type RequestRecord, recordStatus } from './monitoring';
 import { TopBar, Rail, ViewHead, DetailToggle, type CrPage, type RailBadge } from './cr/Shell';
-import { Overview, overviewWindows } from './cr/Overview';
+import { Overview, overviewWindows, windowFrom } from './cr/Overview';
 import { AccessSummary } from './cr/AccessSummary';
 import { JsonText } from './JsonText';
 import { Inspector, RequestList } from './cr/Requests';
@@ -346,6 +346,7 @@ function App() {
       q.set('q', search.trim());
       if (bodySearch) q.set('body', '1');
     }
+    if (overviewWin !== 'all') q.set('from', String(windowFrom(overviewWin)));
     if (cursor) q.set('cursor', cursor);
     return '/admin/requests?' + q.toString();
   }
@@ -418,7 +419,7 @@ function App() {
       clearTimeout(t);
       clearInterval(poll);
     };
-  }, [status?.authenticated, page, search, filter, projectFilter, modelFilter, providerFilter, bodySearch]);
+  }, [status?.authenticated, page, search, filter, projectFilter, modelFilter, providerFilter, bodySearch, overviewWin]);
   useEffect(() => {
     if (!status?.authenticated) return;
     let disposed = false;
@@ -927,7 +928,7 @@ function App() {
             <span className="vh-meta">
               {reqTotal === null
                 ? `${records.length} LOADED`
-                : `${reqTotal.toLocaleString()} RECORDS · 已载入 ${records.length}${hasFilters ? ' · 已筛选' : ''}`}
+                : `${overviewWin.toUpperCase()} · ${reqTotal.toLocaleString()} RECORDS · 已载入 ${records.length}${hasFilters ? ' · 已筛选' : ''}`}
             </span>
             <button type="button" className="kb" aria-label="刷新请求" onClick={() => run(refreshRequests)}>
               ↻
@@ -1059,7 +1060,7 @@ function App() {
         mode={status.passwordless_enabled ? '本机 · 自动解锁' : '密码登录'}
         host={new URL(state.base_url || location.origin).host}
         extra={
-          page === 'overview' && (
+          ['overview', 'requests', 'tasks', 'diagnostics', 'costs'].includes(page) && (
             <span className="keys" role="group" aria-label="总览时间范围">
               {overviewWindows.map(([k, l]) => (
                 <button
@@ -1307,7 +1308,7 @@ function App() {
             )}
             {page === 'diagnostics' && (
               <>
-                <DiagnosticsBoard api={api} connections={state.connections} health={health} />
+                <DiagnosticsBoard api={api} connections={state.connections} health={health} win={overviewWin} />
                 <DetailToggle
                   label="错误明细"
                   open={!!detailOpen.diagnostics}
@@ -1321,6 +1322,7 @@ function App() {
 
                 {detailOpen.diagnostics && (
                   <DiagnosticsPage
+                    range={overviewWin}
                     onSelect={(id) => {
                       navigate('requests');
                       selectRecord(id);
@@ -1334,6 +1336,7 @@ function App() {
                 <CostBoard
                   api={api}
                   projects={state.projects}
+                  win={overviewWin}
                   connectionOf={(id) => connectionsByID.get(state.models.find((m) => m.id === id)?.connection_id || '')?.name || ''}
                 />
                 <DetailToggle
@@ -1488,6 +1491,7 @@ function App() {
                 {taskView ? (
                   <TaskWorkspace
                     tasks={tasks}
+                    from={windowFrom(overviewWin)}
                     api={api}
                     refresh={() => run(load)}
                     renderRecord={(record, callTab, setCallTab, callCopy) => (

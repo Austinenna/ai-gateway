@@ -13,6 +13,8 @@ type Props = {
   tasks: RequestTask[];
   api: (path: string) => Promise<any>;
   refresh: () => void;
+  /** Only tasks active at or after this timestamp are listed; 0 lists all. */
+  from?: number;
   renderRecord: (record: RequestRecord, tab: string, setTab: (tab: string) => void, copy: (value: string) => void) => ReactNode;
 };
 const clock = (t: number) => {
@@ -23,7 +25,8 @@ const clock = (t: number) => {
 };
 const taskLed = (t: RequestTask) => (t.state === 'running' ? 'c' : t.state === 'error' ? 'r' : t.state === 'waiting' ? 'a' : '');
 const taskTone = (t: RequestTask) => (t.state === 'running' ? 'run' : t.state === 'error' ? 'rd' : t.state === 'waiting' ? 'am' : 'ok');
-export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
+export function TaskWorkspace({ tasks: allTasks, api, refresh, renderRecord, from = 0 }: Props) {
+  const tasks = from ? allTasks.filter((t) => (t.updated || t.started + (t.duration_ms || 0)) >= from) : allTasks;
   const [id, setID] = useState(tasks[0]?.id || ''),
     [detail, setDetail] = useState<TaskDetail | null>(null);
   const [search, setSearch] = useState(''),
