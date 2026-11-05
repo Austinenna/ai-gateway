@@ -408,12 +408,7 @@ export function Overview({
         </div>
         <div className="p c4 lat-p">
           <div className="h">
-            LATENCY<span className="zh">首个 token 耗时分布 · {s?.ttft.count ?? 0} 次流式成功</span>
-            <span className="r legend zh">
-              <i style={{ background: 'var(--go)' }} />
-              中位数所在格 <i style={{ background: 'var(--amber)' }} />
-              慢于 p95
-            </span>
+            LATENCY<span className="zh">TTFT 分布 · {s?.ttft.count ?? 0} 次</span>
           </div>
           <TtftHistogram counts={histogram} p50={s?.ttft.p50 ?? null} p95={s?.ttft.p95 ?? null} />
           <div className="lat-stats">
@@ -426,6 +421,11 @@ export function Overview({
             <span>
               ≥5s <b style={{ color: slow ? 'var(--amber)' : undefined }}>{slow}</b> 次
               {histTotal ? `（${Math.round((slow / histTotal) * 100)}%）` : ''}
+            </span>
+            <span className="legend zh">
+              <i style={{ background: 'var(--go)' }} />
+              中位数 <i style={{ background: 'var(--amber)' }} />
+              慢于 p95
             </span>
           </div>
         </div>

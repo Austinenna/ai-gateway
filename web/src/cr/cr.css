@@ -751,3 +751,4 @@
 .cr .lat-p .legend i{display:inline-block;width:8px;height:8px}
 .cr .lat-p .lat-stats{display:flex;gap:18px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--dim);font-size:11px}
 .cr .lat-p .lat-stats b{color:var(--tx);font-weight:400}
+.cr .lat-p .lat-stats .legend{margin-left:auto}
