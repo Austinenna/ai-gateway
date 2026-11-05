@@ -876,3 +876,10 @@
 .cr .response-part-tool{border-left-color:var(--amber-2)}
 .cr .response-part-text{border-left-color:var(--go-2)}
 .cr .trn .message.system .message-label,.cr .trn .message.system .message-role{color:var(--tx)}
+/* Stats columns keep a fixed width; the spacer column absorbs spare width when there are few models. */
+.cr .gm{width:100%}
+.cr .gm th.gap,.cr .gm td.gap{width:auto;min-width:96px}
+.cr .gm th.st,.cr .gm td.st{width:150px;min-width:150px;max-width:150px;box-sizing:border-box}
+.cr .gm td.st .seg{width:120px}
+.cr .gm th.pjh,.cr .gm td.pjn{width:200px;min-width:200px}
+.cr .gm td.pjn:has(.pend-ops){width:auto}
