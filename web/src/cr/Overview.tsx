@@ -123,7 +123,7 @@ export function Overview({
   useEffect(() => {
     let disposed = false;
     const load = () =>
-      api('/admin/requests?limit=16')
+      api('/admin/requests?limit=40')
         .then((p) => {
           if (!disposed) setTail(p.items || []);
         })
@@ -149,6 +149,10 @@ export function Overview({
       })),
     [metrics],
   );
+  // Groups are per model and connection, so one alias can appear once per connection.
+  const modelRows = [...(metrics?.models || [])].sort((a, b) => b.requests - a.requests);
+  const aliasCount = new Map<string, number>();
+  modelRows.forEach((m) => aliasCount.set(m.alias, (aliasCount.get(m.alias) || 0) + 1));
   const budgetTotal = projects.reduce((a, p) => a + (p.monthly_budget || 0), 0);
   const monthDays = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const eom = spend ? (spend.total / Math.max(1, new Date().getDate() - 1 + new Date().getHours() / 24)) * monthDays : 0;
@@ -262,7 +266,7 @@ export function Overview({
         </div>
 
         <div className="col c8">
-          <div className="p thru-p grow">
+          <div className="p thru-p">
             <div className="h">
               THROUGHPUT<span className="zh">请求吞吐 · {metrics ? buckets.length + ' 个时段' : ''}</span>
               <span className="r">
@@ -272,7 +276,7 @@ export function Overview({
             </div>
             <Throughput buckets={buckets} onHover={(text, x, y) => setTip(text ? { text, x, y } : null)} />
           </div>
-          <div className="p tail-p">
+          <div className="p tail-p grow">
             <div className="h">
               LIVE TAIL<span className="zh">实时请求流</span>
               <span className="r" style={{ color: 'var(--go)' }}>
@@ -362,7 +366,7 @@ export function Overview({
           <div className="h">
             MODELS<span className="zh">模型表现</span>
           </div>
-          <table>
+          <table className="mdl">
             <thead>
               <tr>
                 <th>ALIAS</th>
@@ -373,11 +377,14 @@ export function Overview({
               </tr>
             </thead>
             <tbody>
-              {(metrics?.models || []).slice(0, 8).map((m) => {
-                const top = Math.max(1, ...(metrics?.models || []).map((x) => x.requests));
+              {modelRows.slice(0, 8).map((m) => {
+                const top = Math.max(1, ...modelRows.map((x) => x.requests));
                 return (
-                  <tr key={m.model_id + m.alias}>
-                    <td style={{ color: m.alias ? 'var(--tx)' : 'var(--dim)' }}>{m.alias || '未路由（前置拒绝）'}</td>
+                  <tr key={m.model_id + '/' + m.connection_id}>
+                    <td style={{ color: m.alias ? 'var(--tx)' : 'var(--dim)' }}>
+                      {m.alias || '未路由（前置拒绝）'}
+                      {m.alias && aliasCount.get(m.alias)! > 1 && <small className="zh">{m.connection_name || '已删除连接'}</small>}
+                    </td>
                     <td className="n">
                       <span className="b" style={{ width: (m.requests / top) * 40 }} />
                       {m.requests}

@@ -277,3 +277,28 @@ test('总览在矮窗口中可用滚轮滚到底部看板', async ({ page }) => 
   }).toBe(true);
   await expect(page.getByText('项目预算 · 本月')).toBeInViewport();
 });
+
+test('总览模型表现按模型与连接区分同名别名，刷新后不重复', async ({ page }) => {
+  const group = (connection: string, name: string, requests: number) => ({
+    ...summary, model_id: 'm1', alias: 'coding', connection_id: connection, connection_name: name, requests,
+    success_rate: 100, ttft: distribution(900, 900), ttfc: distribution(900, 900), speed: distribution(50, 50),
+  });
+  let calls = 0;
+  await page.route('**/api/admin/metrics?*', route => {
+    const models = Array.from({ length: 10 }, (_, i) => group('c' + i, i ? '旧连接 ' + i : '研发模型连接', 20 - i));
+    const shift = calls++ % 10;
+    return route.fulfill({ json: {
+      from, to: now, monitoring_since: from, summary, models: [...models.slice(shift), ...models.slice(0, shift)],
+      buckets: [], recent: [], options: { projects: [], models: [], connections: [] }, metrics_errors: 0, dropped_records: 0,
+    } });
+  });
+  await page.reload();
+  const rows = page.locator('table.mdl tbody tr');
+  await expect(rows).toHaveCount(8);
+  for (const range of ['1H', '24H', '7D', 'ALL', '1H']) {
+    await page.getByRole('group', { name: '总览时间范围' }).getByRole('button', { name: range, exact: true }).click();
+    await expect(rows).toHaveCount(8);
+  }
+  await expect(rows.first()).toContainText('研发模型连接');
+  await expect(rows.last()).toContainText('旧连接 7');
+});
