@@ -752,3 +752,31 @@
 .cr .lat-p .lat-stats{display:flex;gap:18px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--dim);font-size:11px}
 .cr .lat-p .lat-stats b{color:var(--tx);font-weight:400}
 .cr .lat-p .lat-stats .legend{margin-left:auto}
+/* Grant matrix, compact: sticky project and ops columns, slanted model headers, 40px rows. */
+.cr .gm{min-width:0;width:auto;border-collapse:separate;border-spacing:0}
+.cr .gm-wrap{position:relative}
+.cr .gm th.pjh,.cr .gm td.pjn{position:sticky;left:0;z-index:2;background:var(--panel);min-width:230px;max-width:280px;box-shadow:1px 0 var(--line)}
+.cr .gm th.opsh,.cr .gm td.ops{position:sticky;right:0;z-index:2;background:var(--panel);box-shadow:-1px 0 var(--line);width:1%}
+.cr .gm tbody tr:hover td.pjn,.cr .gm tbody tr:hover td.ops{background:var(--panel-2)}
+.cr .gm tr.selp td.pjn,.cr .gm tr.selp td.ops{background:#0f1613}
+.cr .gm th.m{height:118px;width:40px;min-width:40px;max-width:40px;padding:0 0 8px;vertical-align:bottom;position:relative;white-space:nowrap}
+.cr .gm th.m>div{position:absolute;left:14px;bottom:10px;transform:rotate(-45deg);transform-origin:left bottom;text-align:left;color:var(--tx-2);font-size:10.5px;letter-spacing:0}
+.cr .gm th.m>div small{display:inline;margin-left:6px;color:var(--dim);font-size:9px;letter-spacing:.06em}
+.cr .gm td{padding:7px 10px}
+.cr .gm td.c{padding:7px 0;width:40px;min-width:40px;max-width:40px}
+.cr .gm td.pjn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr .gm td.pjn small{display:inline;margin:0 0 0 6px}
+.cr .gm td.ops .kb{padding:2px 8px;font-size:10.5px}
+.cr .gm .cl{width:16px;height:16px;vertical-align:middle}
+.cr .lim-now{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:6px 0 12px;border-bottom:1px dashed var(--line);margin-bottom:4px}
+.cr .lim-now label{display:block;font-size:10px;letter-spacing:.16em;color:var(--dim)}
+.cr .lim-now b{display:block;font-weight:400;font-size:16px;color:var(--tx);margin:2px 0 4px}
+.cr .lim-now b small{font-size:11px;color:var(--dim)}
+.cr .lim-now .seg{width:100%}
+.cr .lim-now>div>small{display:block;color:var(--dim);font-size:10.5px;margin-top:3px;font-family:var(--sans)}
+.cr .gm thead tr{background:var(--panel)}
+.cr .gm th.m{background:transparent!important}
+.cr .gm th.m>div{z-index:1}
+.cr .gm th.m{height:150px}
+.cr .gm th.gap,.cr .gm td.gap{width:120px;min-width:120px;padding:0}
+.cr .gm th.gap{background:transparent!important}

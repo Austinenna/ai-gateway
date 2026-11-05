@@ -139,31 +139,27 @@ export function Projects({
           <table className="gm">
             <thead>
               <tr>
-                <th>PROJECT</th>
+                <th className="pjh">PROJECT</th>
                 {models.map((m) => (
-                  <th className="m" key={m.id}>
-                    {m.alias}
-                    <small>
-                      {m.fallback_model_id
-                        ? '⇢ ' + (aliases.get(m.fallback_model_id) || '?')
-                        : m.protocols.map((p) => shortProto[p] || p).join('·')}
-                    </small>
+                  <th className="m" key={m.id} title={m.alias + ' · ' + m.protocols.map(protocolName).join(' / ')}>
+                    <div>
+                      {m.alias}
+                      <small>
+                        {m.fallback_model_id
+                          ? '⇢ ' + (aliases.get(m.fallback_model_id) || '?')
+                          : m.protocols.map((p) => shortProto[p] || p).join('·')}
+                      </small>
+                    </div>
                   </th>
                 ))}
-                <th>RATE · NOW</th>
-                <th>CONCURRENCY · NOW</th>
-                <th>BUDGET · 本月</th>
-                <th>OPS</th>
+                <th className="gap" aria-hidden="true" />
+                <th className="opsh">OPS</th>
               </tr>
             </thead>
             <tbody>
               {projects.map((p) => {
                 const app = byProject.get(p.id);
                 const isPending = app?.status === 'pending';
-                const u = usage[p.id];
-                const rpm = p.rate_rpm || 0,
-                  conc = p.max_concurrent || 0;
-                const used = spend[p.id] || 0;
                 const fb = new Set(missingFallback(p));
                 return (
                   <tr
@@ -173,7 +169,7 @@ export function Projects({
                     aria-selected={selected?.id === p.id}
                   >
                     <td className="pjn">
-                      <span className="zh">{p.name}</span>
+                      <span className="zh">{p.name}</span>{' '}
                       <small style={isPending ? { color: 'var(--amber)' } : undefined}>
                         {p.token_prefix}… ·{' '}
                         <span className="zh">
@@ -203,29 +199,7 @@ export function Projects({
                         </td>
                       );
                     })}
-                    <td>
-                      {rpm ? rpm + '/min' : <span className="dim2">不限</span>}
-                      {rpm > 0 && <Segments ratio={(u?.last_minute || 0) / rpm} tone={(u?.last_minute || 0) >= rpm * 0.8 ? 'am' : 'on'} />}
-                      <small>
-                        {u?.last_minute || 0}
-                        {rpm ? '/' + rpm : ''} 近 1 分钟{u?.limited_since_start ? ' · 已限流 ' + u.limited_since_start : ''}
-                      </small>
-                    </td>
-                    <td>
-                      {conc ? conc : <span className="dim2">不限</span>}
-                      {conc > 0 && <Segments ratio={(u?.inflight || 0) / conc} tone={(u?.inflight || 0) >= conc ? 'am' : 'on'} />}
-                      <small>
-                        {u?.inflight || 0}
-                        {conc ? '/' + conc : ''} 进行中
-                      </small>
-                    </td>
-                    <td>
-                      {yuan(used)} / {p.monthly_budget ? '¥' + p.monthly_budget : '∞'}
-                      <Segments
-                        ratio={p.monthly_budget ? used / p.monthly_budget : 0}
-                        tone={p.monthly_budget && used / p.monthly_budget >= 0.8 ? 'am' : 'on'}
-                      />
-                    </td>
+                    <td className="gap" aria-hidden="true" />
                     <td className="ops" onClick={(e) => e.stopPropagation()}>
                       {isPending ? (
                         <>
@@ -279,7 +253,7 @@ export function Projects({
         <div className="acc acc3">
           <div>
             <div className="h">
-              LIMITS<span className="zh">限速 · {selected.name}</span>
+              LIMITS<span className="zh">限速与预算 · {selected.name}</span>
               <span className="r">
                 <button
                   type="button"
@@ -301,6 +275,47 @@ export function Projects({
                 </button>
               </span>
             </div>
+            {(() => {
+              const u = usage[selected.id];
+              const rpm = selected.rate_rpm || 0,
+                conc = selected.max_concurrent || 0,
+                used = spend[selected.id] || 0,
+                budget = selected.monthly_budget || 0;
+              return (
+                <div className="lim-now">
+                  <div>
+                    <label>RATE · NOW</label>
+                    <b>
+                      {u?.last_minute || 0}
+                      <small>{rpm ? ' / ' + rpm : ' / 不限'}</small>
+                    </b>
+                    <Segments
+                      ratio={rpm ? (u?.last_minute || 0) / rpm : 0}
+                      tone={rpm && (u?.last_minute || 0) >= rpm * 0.8 ? 'am' : 'on'}
+                    />
+                    <small>近 1 分钟{u?.limited_since_start ? ' · 已限流 ' + u.limited_since_start : ''}</small>
+                  </div>
+                  <div>
+                    <label>CONCURRENCY</label>
+                    <b>
+                      {u?.inflight || 0}
+                      <small>{conc ? ' / ' + conc : ' / 不限'}</small>
+                    </b>
+                    <Segments ratio={conc ? (u?.inflight || 0) / conc : 0} tone={conc && (u?.inflight || 0) >= conc ? 'am' : 'on'} />
+                    <small>进行中</small>
+                  </div>
+                  <div>
+                    <label>BUDGET · 本月</label>
+                    <b>
+                      {yuan(used)}
+                      <small>{budget ? ' / ¥' + budget : ' / ∞'}</small>
+                    </b>
+                    <Segments ratio={budget ? used / budget : 0} tone={budget && used / budget >= 0.8 ? 'am' : 'on'} />
+                    <small>超出后拒绝请求</small>
+                  </div>
+                </div>
+              );
+            })()}
             <div className="fld">
               <label>RPM · 每分钟请求数</label>
               <div className="in">
