@@ -60,8 +60,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       await page.emulateMedia({colorScheme:'light'});
       await save(names[0]);
       await expect(row(names[0]).getByRole('button', {name:'测试',exact:true})).toHaveCount(0);
-      await expect(row(names[0])).toContainText('Chat Completions');
-      await expect(row(names[0])).toContainText('Anthropic Messages');
+      await expect(row(names[0]).locator('.pl .on')).toHaveText(['chat', 'messages']);
     });
     await test.step('只配 Messages 也能保存，空协议不能保存', async () => {
       await openNew();
@@ -87,7 +86,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       await save(names[2]);
       await page.reload();
       await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
-      await expect(row(names[2]).locator('.rack-h .ep')).toContainText('DeepSeek');
+      await expect(row(names[2]).locator('.rack-h .sq')).toHaveAttribute('title', 'DeepSeek');
       await expect(row(names[2])).toContainText('https://api.deepseek.com/anthropic/v1');
       await row(names[2]).getByRole('button', { name: '编辑', exact: true }).click();
       await expect(modal.getByRole('combobox', { name: '厂商', exact: true })).toHaveValue('deepseek');

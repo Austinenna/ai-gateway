@@ -91,7 +91,7 @@ test('模型、厂商与项目及状态搜索交叉筛选，保留历史和缺�
   await choose('厂商', 'MiniMax'); await count(3);
   await choose('项目', '研发助手'); await count(2);
   await choose('模型', /mini.*写作助手/); await count(1);
-  await expect(page.locator('.rail-head')).toContainText('1 / 1 条');
+  await expect(page.locator('.vh-meta')).toContainText('1 RECORDS · 已载入 1 · 已筛选');
   await page.getByRole('button', { name: '完成', exact: true }).click(); await count(0);
   await expect(page.locator('.rail-empty')).toHaveText('没有匹配的请求');
   await page.getByRole('button', { name: '未完成', exact: true }).click(); await count(1);

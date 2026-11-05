@@ -72,7 +72,7 @@ import { DiagnosticsPage } from './DiagnosticsPage';
 import { ChatPage } from './ChatPage';
 import { RequestHeader, RequestTiming } from './RequestMetrics';
 import { type RequestRecord, recordStatus } from './monitoring';
-import { TopBar, Rail, ViewHead, type CrPage, type RailBadge } from './cr/Shell';
+import { TopBar, Rail, ViewHead, DetailToggle, type CrPage, type RailBadge } from './cr/Shell';
 import { Overview, overviewWindows } from './cr/Overview';
 import { Inspector, RequestList } from './cr/Requests';
 import { Routing } from './cr/Routing';
@@ -307,6 +307,7 @@ function App() {
     [callProtocol, setCallProtocol] = useState('chat');
   const [overviewWin, setOverviewWin] = useState('24h');
   const [monitorDetail, setMonitorDetail] = useState(false);
+  const [detailOpen, setDetailOpen] = useState<Record<string, boolean>>({});
   const [tester, setTester] = useState(false),
     [callToken, setCallToken] = useState(''),
     [callAlias, setCallAlias] = useState(''),
@@ -902,9 +903,23 @@ function App() {
         + 项目
       </button>
     ) : recordsPage ? (
-      <button className="kb go" onClick={() => (tester ? closeTester() : openTester())}>
-        <span aria-hidden="true">▶ </span>试调用
-      </button>
+      <>
+        {!taskView && (
+          <>
+            <span className="vh-meta">
+              {reqTotal === null
+                ? `${records.length} LOADED`
+                : `${reqTotal.toLocaleString()} RECORDS · 已载入 ${records.length}${hasFilters ? ' · 已筛选' : ''}`}
+            </span>
+            <button type="button" className="kb" aria-label="刷新请求" onClick={() => run(refreshRequests)}>
+              ↻
+            </button>
+          </>
+        )}
+        <button className="kb go" onClick={() => (tester ? closeTester() : openTester())}>
+          <span aria-hidden="true">▶ </span>试调用
+        </button>
+      </>
     ) : null;
   const showMonitorDetail = monitorDetail || !state.models.length;
   const errorView = error && (
@@ -1083,7 +1098,9 @@ function App() {
           role="region"
           aria-label="工作区"
         >
-          {page !== 'overview' && crPage !== 'models' && page !== 'projects' && <ViewHead page={crPage}>{headActions}</ViewHead>}
+          {page !== 'overview' && crPage !== 'models' && page !== 'projects' && page !== 'system' && (
+            <ViewHead page={crPage}>{headActions}</ViewHead>
+          )}
           <main
             className={
               'main ' +
@@ -1162,30 +1179,58 @@ function App() {
             {page === 'diagnostics' && (
               <>
                 <DiagnosticsBoard api={api} connections={state.connections} health={health} />
-
-                <DiagnosticsPage
-                  onSelect={(id) => {
-                    navigate('requests');
-                    selectRecord(id);
-                  }}
+                <DetailToggle
+                  label="错误明细"
+                  open={!!detailOpen.diagnostics}
+                  onToggle={() => setDetailOpen((d) => ({ ...d, diagnostics: !d.diagnostics }))}
+                  note={
+                    <>
+                      DIAGNOSTICS · <span className="zh">按错误特征聚合，可跳转代表请求</span>
+                    </>
+                  }
                 />
+
+                {detailOpen.diagnostics && (
+                  <DiagnosticsPage
+                    onSelect={(id) => {
+                      navigate('requests');
+                      selectRecord(id);
+                    }}
+                  />
+                )}
               </>
             )}
             {page === 'costs' && (
               <>
-                <CostBoard api={api} projects={state.projects} />
-
-                <CostPage
+                <CostBoard
+                  api={api}
                   projects={state.projects}
-                  onSelect={(id) => {
-                    navigate('requests');
-                    selectRecord(id);
-                  }}
-                  onEditProject={(id) => {
-                    const p = state.projects.find((x) => x.id === id);
-                    if (p) setProject({ ...p, model_ids: [...p.model_ids] });
-                  }}
+                  connectionOf={(id) => connectionsByID.get(state.models.find((m) => m.id === id)?.connection_id || '')?.name || ''}
                 />
+                <DetailToggle
+                  label="费用明细"
+                  open={!!detailOpen.costs}
+                  onToggle={() => setDetailOpen((d) => ({ ...d, costs: !d.costs }))}
+                  note={
+                    <>
+                      COSTS · <span className="zh">按项目、模型、用途、任务和单次调用拆分</span>
+                    </>
+                  }
+                />
+
+                {detailOpen.costs && (
+                  <CostPage
+                    projects={state.projects}
+                    onSelect={(id) => {
+                      navigate('requests');
+                      selectRecord(id);
+                    }}
+                    onEditProject={(id) => {
+                      const p = state.projects.find((x) => x.id === id);
+                      if (p) setProject({ ...p, model_ids: [...p.model_ids] });
+                    }}
+                  />
+                )}
               </>
             )}
             {(page === 'connections' || page === 'models') && (
@@ -1430,24 +1475,17 @@ function App() {
                   <div className="rq">
                     <div className="rq-list request-rail">
                       <div className="rq-tools rail-head">
-                        <div className="rq-count">
-                          <span>
-                            {reqTotal === null
-                              ? `已载入 ${records.length} 条`
-                              : `${records.length} / ${reqTotal.toLocaleString()} 条${hasFilters ? '（已筛选）' : ''}`}
-                          </span>
-                          <button type="button" className="kb" aria-label="刷新请求" onClick={() => run(refreshRequests)}>
-                            ↻
-                          </button>
-                        </div>
                         <label className="cmd">
                           ›
                           <input
                             aria-label="搜索请求"
-                            placeholder="搜索别名、项目、请求 ID、错误、提问…"
+                            placeholder="别名 / 项目 / 请求 ID / 错误 / 提问…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                           />
+                          <span className="kbd" aria-hidden="true">
+                            /
+                          </span>
                         </label>
                         <div className="fk filter-tabs">
                           {[
@@ -1467,13 +1505,6 @@ function App() {
                               {t}
                             </button>
                           ))}
-                          {hasFilters && (
-                            <button type="button" className="request-reset" onClick={clearRequestFilters} aria-label="清除请求筛选">
-                              ✕ 清除
-                            </button>
-                          )}
-                        </div>
-                        <div className="request-filters rq-selects">
                           <FilterSelect
                             label="按项目筛选"
                             value={projectFilter}
@@ -1493,6 +1524,11 @@ function App() {
                             onChange={setProviderFilter}
                             options={filterOptions.providers}
                           />
+                          {hasFilters && (
+                            <button type="button" className="request-reset" onClick={clearRequestFilters} aria-label="清除请求筛选">
+                              ✕ 清除
+                            </button>
+                          )}
                         </div>
                         <label className="chk2 body-search">
                           <input type="checkbox" checked={bodySearch} onChange={(e) => setBodySearch(e.target.checked)} />

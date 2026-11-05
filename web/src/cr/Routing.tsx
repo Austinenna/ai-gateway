@@ -159,13 +159,13 @@ export function Routing({
             <div className="rack" key={c.id}>
               <div className="connection-row">
                 <div className="rack-h">
-                  <span className={'sq ' + (tone === 'am' || tone === 'rd' ? 'am' : '')}>
+                  <span className={'sq ' + (tone === 'am' || tone === 'rd' ? 'am' : '')} title={providerName[c.provider] || c.provider}>
                     {(providerName[c.provider] || c.name).slice(0, 1)}
                   </span>
                   <div>
                     <div className="zh">{c.name}</div>
                     <div className="ep">
-                      {providerName[c.provider] || c.provider}
+                      {[...new Set(protos.map((p) => c.endpoints[p]).filter(Boolean))].join(' · ')}
                       {c.use_proxy ? ' · 走代理' : ''}
                     </div>
                   </div>
@@ -207,7 +207,7 @@ export function Routing({
                   {allProtocols
                     .filter((p) => protos.includes(p))
                     .map((p) => (
-                      <span className="on" key={p} title={c.endpoints[p]}>
+                      <span className="on" key={p} title={protocolName(p) + ' · ' + c.endpoints[p]}>
                         {shortProto[p]}
                       </span>
                     ))}
@@ -219,13 +219,6 @@ export function Routing({
                       </button>
                     )}
                   </span>
-                </div>
-                <div className="eps">
-                  {protos.map((p) => (
-                    <div key={p}>
-                      <em>{protocolName(p)}</em> {c.endpoints[p]}
-                    </div>
-                  ))}
                 </div>
                 <div className="blocks" aria-label="近 24 小时健康">
                   {(h?.buckets || Array.from({ length: 48 }, () => null)).map((b, i) => (
@@ -278,11 +271,14 @@ export function Routing({
                           <td className="n">{priceText(m)}</td>
                           <td className="n">{st?.requests ?? 0}</td>
                           <td className="n">{st?.ttft.p50 == null ? '—' : (st.ttft.p50 / 1000).toFixed(2) + 's'}</td>
-                          <td style={{ color: m.fallback_model_id ? 'var(--amber)' : 'var(--dim)' }}>
+                          <td
+                            style={{ color: m.fallback_model_id ? 'var(--amber)' : 'var(--dim)' }}
+                            title={usedAsFallback(m.id) ? `被 ${usedAsFallback(m.id)} 个模型用作备用` : undefined}
+                          >
                             {m.fallback_model_id
                               ? '⇢ ' + (aliasByID.get(m.fallback_model_id) || '已删除')
                               : usedAsFallback(m.id)
-                                ? `— (被 ${usedAsFallback(m.id)} 个用作备用)`
+                                ? `⇠ ×${usedAsFallback(m.id)}`
                                 : '—'}
                           </td>
                           <td className="row-actions">

@@ -93,11 +93,11 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.mouse.move(0, 0);
     await page.emulateMedia({ colorScheme: 'dark' });
-    await expect(modal.getByRole('button', { name: '复制端点', exact: true })).toHaveCSS('background-color', 'rgb(18, 23, 24)');
+    await expect(modal.getByRole('button', { name: '复制端点', exact: true })).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await page.screenshot({ path: testInfo.outputPath('project-access-dark.png') });
     // The console uses one dark control-room palette regardless of the system scheme.
     await page.emulateMedia({ colorScheme: 'light' });
-    await expect(modal.getByRole('button', { name: '复制端点', exact: true })).toHaveCSS('background-color', 'rgb(18, 23, 24)');
+    await expect(modal.getByRole('button', { name: '复制端点', exact: true })).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await page.evaluate(() => document.documentElement.style.fontSize = '200%');
     await checkLayout();
     await page.screenshot({ path: testInfo.outputPath('project-access-text-200.png') });

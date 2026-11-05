@@ -172,19 +172,43 @@ type Proj = { id: string; name: string; monthly_budget?: number | null };
 const yuan = (v: number) => '¥' + (v >= 100 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v.toFixed(4));
 
 /** CostBoard: month, today, forecast and cache, the daily chart and project budgets. */
-export function CostBoard({ api, projects }: { api: Api; projects: Proj[] }) {
+type UsageGroup = {
+  key: string;
+  label: string;
+  cost: number;
+  requests: number;
+  input_tokens: number;
+  cache_read_tokens: number;
+  output_tokens: number;
+  audio_seconds: number;
+};
+const stackColors = ['var(--red)', 'var(--cyan)', 'var(--go)', 'var(--amber)', '#c77dff', 'var(--tx-2)'];
+const compact = (v: number) => (v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : String(v));
+
+export function CostBoard({ api, projects, connectionOf }: { api: Api; projects: Proj[]; connectionOf: (modelID: string) => string }) {
   const data = usePoll(async () => {
-    const [month, today, days, byProject] = await Promise.all([
+    const [month, today, days, byProject, byModel] = await Promise.all([
       api('/admin/usage?period=month'),
       api('/admin/usage?period=today'),
       api('/admin/usage?period=month&group_by=day'),
       api('/admin/usage?period=month&group_by=project'),
+      api('/admin/usage?period=month&group_by=model'),
     ]);
+    const projectGroups = ((byProject.groups || []) as UsageGroup[]).filter((g) => g.cost > 0).slice(0, stackColors.length - 1);
+    // Per-project daily series feed the stacked bars; the remainder is grouped as "其他".
+    const perProject = await Promise.all(
+      projectGroups.map(async (g) => {
+        const r = await api('/admin/usage?period=month&group_by=day&project_id=' + encodeURIComponent(g.key));
+        return { key: g.key, label: g.label, days: Object.fromEntries(((r.groups || []) as UsageGroup[]).map((d) => [d.key, d.cost])) };
+      }),
+    );
     return {
       month: month.total as { cost: number; input_tokens: number; cache_read_tokens: number },
       today: today.total as { cost: number },
-      days: (days.groups || []) as { key: string; cost: number }[],
-      byProject: Object.fromEntries(((byProject.groups || []) as { key: string; cost: number }[]).map((g) => [g.key, g.cost])),
+      days: (days.groups || []) as UsageGroup[],
+      byProject: Object.fromEntries(((byProject.groups || []) as UsageGroup[]).map((g) => [g.key, g.cost])),
+      byModel: (byModel.groups || []) as UsageGroup[],
+      series: perProject,
     };
   }, 15000);
   const [ref, W] = useWidth<SVGSVGElement>();
@@ -251,12 +275,16 @@ export function CostBoard({ api, projects }: { api: Api; projects: Proj[] }) {
       </div>
       <div className="p c8">
         <div className="h">
-          DAILY<span className="zh">每日费用 · 本月</span>
-          {budget > 0 && (
-            <span className="r" style={{ color: 'var(--amber)' }}>
-              --- 预算日均 {yuan(budget / monthDays)}
-            </span>
-          )}
+          DAILY<span className="zh">每日费用 · 按项目堆叠</span>
+          <span className="r legend zh">
+            {(data?.series || []).map((sr, k) => (
+              <span key={sr.key}>
+                <i style={{ background: stackColors[k] }} />
+                {sr.label}
+              </span>
+            ))}
+            {budget > 0 && <span style={{ color: 'var(--amber)' }}>--- 预算日均 {yuan(budget / monthDays)}</span>}
+          </span>
         </div>
         <svg ref={ref} id="cost" viewBox={`0 0 ${W || 1} ${H}`} role="img" aria-label="本月每日费用">
           {W > 0 &&
@@ -278,23 +306,35 @@ export function CostBoard({ api, projects }: { api: Api; projects: Proj[] }) {
               const future = d.day > now.getDate();
               return (
                 <g key={d.key}>
-                  {future ? (
-                    avg7 > 0 && (
-                      <rect
-                        x={x}
-                        y={y(avg7)}
-                        width={w}
-                        height={H - pb - y(avg7)}
-                        fill="none"
-                        stroke="var(--line-2)"
-                        strokeDasharray="2 2"
-                      />
-                    )
-                  ) : (
-                    <rect x={x} y={y(d.cost || 0)} width={w} height={H - pb - y(d.cost || 0)} fill="var(--go)" opacity={0.85}>
-                      <title>{`${d.key} · ${yuan(d.cost || 0)}`}</title>
-                    </rect>
-                  )}
+                  {future
+                    ? avg7 > 0 && (
+                        <rect
+                          x={x}
+                          y={y(avg7)}
+                          width={w}
+                          height={H - pb - y(avg7)}
+                          fill="none"
+                          stroke="var(--line-2)"
+                          strokeDasharray="2 2"
+                        />
+                      )
+                    : (() => {
+                        let base = 0;
+                        const parts = (data?.series || []).map((sr, k) => ({ v: sr.days[d.key] || 0, c: stackColors[k], n: sr.label }));
+                        const rest = Math.max(0, (d.cost || 0) - parts.reduce((a, p) => a + p.v, 0));
+                        if (rest > 1e-9) parts.push({ v: rest, c: stackColors[stackColors.length - 1], n: '其他' });
+                        return parts.map((p, k) => {
+                          if (!p.v) return null;
+                          const top = y(base + p.v),
+                            bottom = y(base);
+                          base += p.v;
+                          return (
+                            <rect key={k} x={x} y={top} width={w} height={Math.max(1, bottom - top)} fill={p.c} opacity={0.85}>
+                              <title>{`${d.key} · ${p.n} ${yuan(p.v)}`}</title>
+                            </rect>
+                          );
+                        });
+                      })()}
                   {i % 5 === 0 && (
                     <text x={x} y={H - 6} fontSize={9.5} fill="var(--dim)">
                       {d.key.slice(5)}
@@ -326,7 +366,7 @@ export function CostBoard({ api, projects }: { api: Api; projects: Proj[] }) {
               return (
                 <tr key={p.id}>
                   <td className="zh">{p.name}</td>
-                  <td className="n">{s.toFixed(2)}</td>
+                  <td className="n">{s < 1 ? s.toFixed(4) : s.toFixed(1)}</td>
                   <td className="n">{p.monthly_budget ?? '∞'}</td>
                   <td className="n" style={{ color: p.monthly_budget && e > p.monthly_budget ? 'var(--red)' : 'var(--tx-2)' }}>
                     {e.toFixed(1)}
@@ -337,6 +377,54 @@ export function CostBoard({ api, projects }: { api: Api; projects: Proj[] }) {
           </tbody>
         </table>
         <div className="dimnote zh">超出月预算后网关拒绝该项目的请求（402），下月 1 日恢复。</div>
+      </div>
+      <div className="p c12">
+        <div className="h">
+          BY MODEL<span className="zh">模型 · 本月</span>
+        </div>
+        <table className="by-model">
+          <thead>
+            <tr>
+              <th>ALIAS</th>
+              <th>CONNECTION</th>
+              <th className="n">REQ</th>
+              <th className="n">IN</th>
+              <th className="n">CACHE</th>
+              <th className="n">OUT</th>
+              <th className="n">¥</th>
+              <th className="n">SHARE</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.byModel || []).map((m) => {
+              const share = spent ? m.cost / spent : 0;
+              return (
+                <tr key={m.key}>
+                  <td>{m.label}</td>
+                  <td className="zh">{connectionOf(m.key) || '—'}</td>
+                  <td className="n">{m.requests.toLocaleString()}</td>
+                  <td className="n">{m.audio_seconds ? Math.round(m.audio_seconds) + ' s' : compact(m.input_tokens)}</td>
+                  <td className="n">{m.cache_read_tokens ? compact(m.cache_read_tokens) : '—'}</td>
+                  <td className="n">{m.output_tokens ? compact(m.output_tokens) : '—'}</td>
+                  <td className="n" style={{ color: 'var(--amber)' }}>
+                    {m.cost < 1 ? m.cost.toFixed(4) : m.cost.toFixed(1)}
+                  </td>
+                  <td className="n share">
+                    <span className="b" style={{ width: Math.max(2, share * 60) }} />
+                    {Math.round(share * 100)}%
+                  </td>
+                </tr>
+              );
+            })}
+            {data && !data.byModel.length && (
+              <tr>
+                <td colSpan={8} className="zh dim2">
+                  本月还没有计费调用。
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </section>
   );

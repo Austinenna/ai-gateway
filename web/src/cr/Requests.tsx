@@ -21,6 +21,18 @@ const day = (t: number) => {
   const label = d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
   return d.toDateString() === today.toDateString() ? label + ' · TODAY' : label;
 };
+// Metric values render as a large number with a small unit, as in the preview.
+function Num({ text }: { text: string }) {
+  const m = /^([\d.,]+)\s*([a-zA-Z]+)$/.exec(text);
+  return m ? (
+    <>
+      {m[1]}
+      <small>{m[2]}</small>
+    </>
+  ) : (
+    <>{text}</>
+  );
+}
 const secs = (ms?: number | null) => (ms == null ? '—' : ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's');
 
 function led(r: RequestRecord) {
@@ -312,7 +324,9 @@ export function Inspector({
             <>
               <div>
                 <label>TOTAL</label>
-                <div className="v">{secs(r.duration_ms)}</div>
+                <div className="v">
+                  <Num text={secs(r.duration_ms)} />
+                </div>
                 <div className="s">同步转写</div>
               </div>
               <div>
@@ -328,17 +342,23 @@ export function Inspector({
             <>
               <div>
                 <label>TTFT</label>
-                <div className="v">{firstTiming(r)}</div>
-                <div className="s">首个 token（含思考）</div>
+                <div className="v">
+                  <Num text={firstTiming(r)} />
+                </div>
+                <div className="s">首个 token</div>
               </div>
               <div>
                 <label>TTFC</label>
-                <div className="v">{firstTiming(r, true)}</div>
+                <div className="v">
+                  <Num text={firstTiming(r, true)} />
+                </div>
                 <div className="s">首段正文</div>
               </div>
               <div>
                 <label>TOTAL</label>
-                <div className="v">{r.state === 'running' ? '…' : secs(r.duration_ms)}</div>
+                <div className="v">
+                  <Num text={r.state === 'running' ? '…' : secs(r.duration_ms)} />
+                </div>
                 <div className="s">网关 +{r.forward_offset_ms ?? 0}ms</div>
               </div>
               <div>

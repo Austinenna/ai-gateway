@@ -119,8 +119,8 @@ test('六组监控支持筛选、跳转详情与桌面手机布局', async ({ pa
   response = waitQuery('model_id', 'm1'); await page.locator('.monitor-models').getByRole('button', { name: 'coding', exact: true }).click(); await response;
   await expect(page.getByLabel('监控连接', { exact: true })).toHaveValue('c1');
   await page.getByRole('button', { name: '查看请求 monitor-complete', exact: true }).click();
-  await expect(page.locator('.detail-head')).toContainText('TTFT1 s');
-  await expect(page.locator('.detail-head')).toContainText('TTFC3.5 s');
+  await expect(page.locator('.detail-head')).toContainText('TTFT1s');
+  await expect(page.locator('.detail-head')).toContainText('TTFC3.5s');
   for (const width of [1920, 1440, 1280, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.screenshot({ path: info.outputPath(`request-messages-${width}.png`), fullPage: width === 390, animations: 'disabled' });

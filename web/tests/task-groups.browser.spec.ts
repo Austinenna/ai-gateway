@@ -197,7 +197,7 @@ test('调用浮层跨分页切换，保留详情页签、背景位置和键盘�
   await dialog.getByRole('button', { name: '原始数据', exact: true }).click();
   await dialog.getByRole('button', { name: '下一个调用', exact: true }).click();
   await expect(dialog.locator('.detail-request-id')).toHaveText('r-100');
-  await expect(dialog.getByRole('button', { name: '原始数据', exact: true })).toHaveClass('active');
+  await expect(dialog.getByRole('button', { name: '原始数据', exact: true })).toHaveClass(/\bactive\b/);
   await expect(dialog.getByRole('button', { name: '复制项目请求原始数据' })).toBeVisible();
   await dialog.getByRole('button', { name: '上一个调用', exact: true }).click();
   await expect(dialog.locator('.detail-request-id')).toHaveText('r-99');
@@ -244,7 +244,7 @@ test('调用浮层首尾边界、窄屏与深色布局及关闭', async ({ page 
   await page.screenshot({ path: info.outputPath('call-dialog-dark.png'), animations: 'disabled' });
   await dialog.getByRole('button', { name: '关闭调用详情', exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '调用过程 · 4' })).toHaveClass('active');
+  await expect(page.getByRole('button', { name: '调用过程 · 4' })).toHaveClass(/\bactive\b/);
 });
 
 test('浮层读取失败可重试，快速切换时延迟响应不覆盖当前调用', async ({ page }) => {

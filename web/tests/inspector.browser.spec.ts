@@ -69,8 +69,8 @@ test('无正文响应提示实际返回内容，详情合并思考与多个工�
 });
 
 test('请求检查器区分首个 token、正文首字及旧记录未采集状态', async ({ page }, testInfo) => {
-  await expect(page.locator('.detail-head')).toContainText('TTFT1.2 s');
-  await expect(page.locator('.detail-head')).toContainText('TTFC25.12 s');
+  await expect(page.locator('.detail-head')).toContainText('TTFT1.2s');
+  await expect(page.locator('.detail-head')).toContainText('TTFC25.12s');
   await page.getByRole('button', { name: '性能与用量', exact: true }).click();
   await expect(page.locator('.timeline')).toContainText('1.2 s');
   await expect(page.locator('.timeline')).toContainText('25.12 s');
@@ -79,7 +79,7 @@ test('请求检查器区分首个 token、正文首字及旧记录未采集状�
   await page.screenshot({ path: testInfo.outputPath('timing-mobile.png'), fullPage: true });
   await page.locator('.request-item').filter({ hasText: '旧记录' }).click();
   await expect(page.locator('.detail-head')).toContainText('TTFT未记录');
-  await expect(page.locator('.detail-head')).toContainText('TTFC25.12 s');
+  await expect(page.locator('.detail-head')).toContainText('TTFC25.12s');
   await page.locator('.request-item').filter({ hasText: '空响应' }).click();
   await expect(page.locator('.detail-head')).toContainText('TTFT未收到');
 });
@@ -134,7 +134,8 @@ test('长消息预览和全文都随页面滚动，支持键盘展开及切换�
   await expect(page.locator('.message').nth(1).locator('.text-preview-toggle')).toHaveCount(0);
 
   const wheelOverText = async () => {
-    await preview.evaluate(el => el.scrollIntoView({ block: 'start', behavior: 'instant' }));
+    await detail.evaluate(el => { el.scrollTop = 0; });
+    await preview.evaluate(el => el.scrollIntoView({ block: 'nearest', behavior: 'instant' }));
     const before = await detail.evaluate(el => el.scrollTop);
     const rect = (await preview.boundingBox())!;
     await page.mouse.move(rect.x + rect.width / 2, Math.max(20, rect.y + 65));

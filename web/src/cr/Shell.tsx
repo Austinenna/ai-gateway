@@ -140,3 +140,15 @@ export function ViewHead({ page, sub, children }: { page: CrPage; sub?: ReactNod
     </div>
   );
 }
+
+/** DetailToggle is the board footer that expands the legacy detail tables below a board. */
+export function DetailToggle({ label, open, onToggle, note }: { label: string; open: boolean; onToggle: () => void; note: ReactNode }) {
+  return (
+    <div className="foot-line cr-v">
+      <span>{note}</span>
+      <button type="button" className="kb" aria-expanded={open} onClick={onToggle}>
+        <span className="zh">{label}</span> {open ? '▴' : '▾'}
+      </button>
+    </div>
+  );
+}

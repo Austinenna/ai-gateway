@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Check, Copy, KeyRound, RefreshCw, ShieldCheck } from 'lucide-react';
 import { asrExample } from './asr.mjs';
 import { ttsExample } from './tts.mjs';
@@ -21,6 +21,7 @@ const protocolOrder: Protocol[] = ['chat', 'messages', 'dashscope-asr', 'dashsco
 
 export function ProjectAccessContent({ project, baseURL, models, resolveToken, saveToken, rotateToken }: Props) {
   const protocolOptions = protocolOrder.filter((protocol) => models.some((model) => model.enabled && model.protocols.includes(protocol)));
+  const existingID = useId();
   const visibleProtocols = protocolOptions.length ? protocolOptions : ['chat' as Protocol];
   const [protocol, setProtocol] = useState<Protocol>(visibleProtocols[0]);
   const [alias, setAlias] = useState(models.find((m) => m.enabled)?.alias || '');
@@ -269,10 +270,10 @@ export function ProjectAccessContent({ project, baseURL, models, resolveToken, s
                 });
               }}
             >
-              <label className="field" htmlFor="existing-project-token">
+              <label className="field" htmlFor={existingID}>
                 已有项目 Token
                 <input
-                  id="existing-project-token"
+                  id={existingID}
                   type="password"
                   autoComplete="off"
                   spellCheck={false}

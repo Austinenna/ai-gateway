@@ -518,12 +518,12 @@
 .cr .danger .row .kb{margin-left:auto}
 @media (max-width:1100px){.cr .acc3{grid-template-columns:1fr}}
 /* ---- boards above legacy pages ---- */
-.cr .diag-board,.cr .cost-board{margin:-20px -24px 20px;border-top:1px solid var(--line)}
+.cr .diag-board,.cr .cost-board{margin:0;border-top:1px solid var(--line)}
 .cr .cb2.calm{border-color:var(--line-2);background:none}
 .cr .cb2 + .cb2{margin-top:10px}
 .cr .dg td small{color:var(--dim);font-size:10px;margin-left:4px}
 .cr .hh .r2 em{font-style:normal}
-@media (max-width:760px){.cr .diag-board,.cr .cost-board{margin:-14px -14px 16px}}
+
 .cr .vh .vh-sub{color:var(--tx-2);font-size:12px;margin-left:-8px}
 .cr .rack-h{grid-template-columns:auto minmax(0,1fr) auto auto}
 .cr .rack-actions{display:flex;gap:6px}
@@ -536,26 +536,7 @@
 /* Task workspace adopts the request page's two-pane rack. */
 .cr .task-inspector{display:grid;grid-template-columns:430px minmax(0,1fr);gap:1px;background:var(--line);border:0;border-top:1px solid var(--line);border-radius:0;height:calc(100vh - 44px - 49px);min-height:520px;overflow:hidden}
 .cr .task-inspector .request-rail{background:var(--panel);display:flex;flex-direction:column;min-height:0;min-width:0;border:0}
-.cr .task-inspector .rail-head{padding:12px;border-bottom:1px solid var(--line);gap:8px;background:none}
-.cr .task-inspector .rail-head h2{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--dim);font-weight:400}
-.cr .task-inspector .search{border:1px solid var(--line-2);border-radius:0;background:#000;color:var(--go)}
-.cr .task-inspector .search input{color:var(--tx);font-family:var(--mono)}
-.cr .task-inspector .filter-tabs button{border:1px solid var(--line-2);border-radius:0;color:var(--tx-2);font-size:11px;padding:2px 8px}
-.cr .task-inspector .filter-tabs .selected{border-color:var(--go);color:var(--go);background:none}
-.cr .task-inspector .task-scope{color:var(--dim);font-size:10.5px;line-height:1.6}
-.cr .task-inspector .request-items{flex:1;max-height:none;overflow-x:hidden;overflow-y:auto;overscroll-behavior-x:none}
-.cr .task-inspector .request-item{border:0;border-bottom:1px dashed var(--line);border-radius:0;background:none;padding:10px 12px 10px 14px;gap:6px}
-.cr .task-inspector .request-item:hover{background:var(--panel-2)}
-.cr .task-inspector .request-item.selected{background:linear-gradient(90deg,rgba(92,255,157,.09),transparent);box-shadow:inset 2px 0 var(--go)}
-.cr .task-inspector .request-item small{color:var(--dim);font-family:var(--mono);font-size:10.5px}
-.cr .task-inspector .task-title{color:var(--tx);font-weight:400;font-size:13px;line-height:1.5}
-.cr .task-inspector .task-tag{font-style:normal;border:1px solid var(--line-2);padding:0 6px;font-size:10px;color:var(--tx-2);font-family:var(--mono)}
-.cr .task-inspector .request-item small.good-text{color:var(--go)}
-.cr .task-inspector .request-item small.warning-text{color:var(--amber)}
-.cr .task-inspector .task-failure{color:var(--red);font-size:11px}
 .cr .task-inspector .request-detail{background:var(--panel);overflow-x:hidden;overflow-y:auto;overscroll-behavior-x:none;min-height:0;min-width:0}
-.cr .task-inspector .task-head{padding:16px 20px 14px;border-bottom:1px solid var(--line)}
-.cr .task-inspector .task-head h2{font-size:20px;line-height:1.5;font-weight:500;color:var(--tx)}
 
 .cr .mt td small{display:block;color:var(--dim);font-size:10.5px;margin-top:2px;white-space:normal}
 .cr .ri{grid-template-columns:8px minmax(0,1fr) auto}
@@ -599,3 +580,135 @@
 .cr .tail-p{display:flex;flex-direction:column}
 .cr .tail-p .tail{flex:1 1 0;height:auto;min-height:262px}
 .cr .mdl td small{display:block;color:var(--dim);font-size:10.5px;margin-top:2px}
+/* Request toolbar: command line, one chip row, checkbox — as in the preview. */
+.cr .cmd .kbd{color:var(--dim)}
+.cr .rq-tools .fk{align-items:center}
+.cr .rq-tools .fk button{border:1px solid var(--line-2);border-radius:0;background:none;padding:2px 8px;color:var(--tx-2);font-size:11px;min-height:0;line-height:1.5;cursor:pointer}
+.cr .rq-tools .fk button.on{border-color:var(--go);color:var(--go)}
+.cr .rq-tools .fk .filter-select-trigger{width:auto;max-width:150px;gap:4px;justify-content:flex-start}
+.cr .rq-tools .fk .filter-select-trigger svg{width:11px;height:11px;color:var(--dim)}
+.cr .rq-tools .fk .filter-select-trigger.has-value{border-color:var(--cyan);color:var(--cyan);background:none}
+.cr .rq-tools .fk .request-reset{border-color:transparent;color:var(--dim)}
+.cr .vh-meta{color:var(--dim);font-size:11px;letter-spacing:.06em;align-self:center}
+.cr .pill .result-label::before{display:none}
+.cr .mx .v small{font-size:13px;color:var(--dim);margin-left:2px}
+.filter-select-menu{border-radius:0;background:#0c0f10;border-color:#262e31;color:#cfd8d3;font-family:"JetBrains Mono","SF Mono",SFMono-Regular,Menlo,"PingFang SC",monospace}
+.filter-select-option{border-radius:0}
+/* Inspector: drop legacy paddings so the header, metrics and tabs sit flush like the preview. */
+.cr .ins.request-detail .detail-head{padding:0}
+.cr .ins.request-detail .detail-content{padding:6px 20px 20px}
+.cr .request-detail .tb.detail-tabs{gap:0;padding:0;background:var(--panel);border-top:0}
+.cr .request-detail .tb.detail-tabs button{padding:10px 16px;border-bottom:0;border-right:1px solid var(--line);font-size:11px}
+.cr .request-detail .tb.detail-tabs button.on{color:var(--go);box-shadow:inset 0 -2px var(--go)}
+/* Messages read as the preview's timeline: role column, then body. */
+.cr .trn .messages{display:block}
+.cr .trn .message{display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;margin:0;padding:12px 0;border:0;border-bottom:1px dashed var(--line);border-radius:0;background:none}
+.cr .trn .message-label{display:flex;flex-direction:column;align-items:flex-start;gap:3px;height:auto;min-height:0;margin:0;padding:2px 0 0;border:0;border-radius:0;background:none!important;color:var(--cyan);font-size:10.5px;letter-spacing:.16em;text-align:left}
+.cr .trn .message.assistant .message-label{color:var(--go)}
+.cr .trn .message-label svg{display:none}
+.cr .trn .message-toggle-hint{color:var(--dim);letter-spacing:0;font-size:10px}
+.cr .trn .message-content{padding:0;border:0;border-radius:0;background:none;font-family:var(--sans);font-size:13px;line-height:1.75;color:var(--tx)}
+.cr .trn *{border-radius:0}
+.cr .trn pre{background:#000;border:1px solid var(--line);font-family:var(--mono)}
+.cr .fk .filter-select-trigger>span{border:0;padding:0;color:inherit;cursor:inherit}
+/* Task page in the request page's structure (rq-tools, ti rows, ins-h, mx, tb, trn). */
+.cr .task-inspector .rail-head{padding:12px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line);background:none}
+.cr .task-inspector .task-scope{color:var(--dim);font-size:10.5px;line-height:1.6;margin:0}
+.cr .task-inspector .fk .task-refresh{margin-left:auto}
+.cr .task-inspector .ti{width:100%;border:0;border-bottom:1px dashed var(--line);border-radius:0;background:none;color:inherit;font:inherit;text-align:left;white-space:normal;grid-template-columns:8px minmax(0,1fr) auto;align-items:start;padding:11px 12px}
+.cr .task-inspector .ti.on{background:linear-gradient(90deg,rgba(92,255,157,.09),transparent);box-shadow:inset 2px 0 var(--go)}
+.cr .task-inspector .ti>div{min-width:0}
+.cr .task-inspector .ti .task-title{font-weight:400;font-size:13px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cr .task-inspector .ti .pj2{color:var(--dim);font-size:11px;margin-top:2px}
+.cr .task-inspector .ti .task-failure{color:var(--red);font-size:11px;font-weight:400}
+.cr .task-inspector .ti .r small{font-size:11px}
+.cr .task-inspector .task-head{padding:16px 20px 14px}
+.cr .task-inspector .task-head h2{font-size:22px;font-weight:400;line-height:1.5;margin:8px 0;max-height:none;overflow-wrap:anywhere}
+.cr .task-inspector .task-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;border:0;border-radius:0;background:var(--line);border-bottom:1px solid var(--line)}
+.cr .task-inspector .task-stats>div{display:block;border:0;padding:12px 16px;background:var(--panel)}
+.cr .task-inspector .task-stats label{font-size:10px}
+.cr .task-inspector .task-stats .v{display:block;font-size:26px;font-weight:300;color:var(--tx)}
+.cr .task-inspector .task-stats .s{display:block;font-size:10.5px;color:var(--dim)}
+.cr .task-inspector .task-content{display:grid;gap:0}
+.cr .task-inspector .task-explanation{color:var(--dim);font-size:11.5px;line-height:1.7;padding:10px 0;margin:0}
+.cr .task-inspector .task-message{display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;padding:12px 0;border:0;border-bottom:1px dashed var(--line);border-radius:0;background:none;--task-message-bg:var(--panel)}
+.cr .task-inspector .task-message-label{flex-direction:column;align-items:flex-start;justify-content:flex-start;margin:0;color:var(--cyan);font-size:10.5px;letter-spacing:.16em;font-family:var(--mono)}
+.cr .task-inspector .task-answer .task-message-label{color:var(--go)}
+.cr .task-inspector .task-message p{font-family:var(--sans);font-size:13px;line-height:1.75;color:var(--tx)}
+.cr .task-inspector .task-process-link{margin-top:12px;border:1px solid var(--line-2);border-radius:0;background:none;color:var(--tx-2);gap:8px}
+.cr .task-inspector .task-calls{border:0;border-radius:0;gap:0}
+.cr .task-inspector .task-call{border:0;border-bottom:1px dashed var(--line);border-radius:0;background:none;padding:10px 0;color:var(--tx)}
+.cr .task-inspector .task-call:hover{background:var(--panel-2)}
+.cr .task-inspector .task-call-index{border-radius:0;background:none;border-color:var(--line-2);color:var(--dim)}
+.cr .task-inspector .task-call small{color:var(--dim)}
+.cr .task-inspector .task-call b.good-text{color:var(--go)}
+.cr .task-inspector .task-call b.warning-text{color:var(--amber)}
+.cr .task-inspector .task-load-more{border:1px solid var(--line-2);border-radius:0;background:none;color:var(--tx-2);margin-top:10px}
+.cr .task-inspector .task-group-fields dt{color:var(--dim);font-size:10.5px;letter-spacing:.1em}
+.cr .task-inspector .tb.detail-tabs{gap:0;padding:0;background:var(--panel);border-top:0}
+.cr .task-inspector .tb.detail-tabs button{padding:10px 16px;border:0;border-right:1px solid var(--line);border-radius:0;background:none;color:var(--dim);font-size:11.5px}
+.cr .task-inspector .tb.detail-tabs button.on{color:var(--go);box-shadow:inset 0 -2px var(--go)}
+@media (max-width:900px){.cr .task-inspector .task-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cr .cost-board .legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;letter-spacing:0;font-size:11px;color:var(--tx-2)}
+.cr .cost-board .legend i{display:inline-block;width:8px;height:8px;margin-right:4px}
+.cr .cost-board .share .b{display:inline-block;height:4px;background:var(--go);margin-right:6px;vertical-align:middle}
+/* Boards sit flush under the view head on every page; legacy blocks carry their own gutter. */
+.cr .workspace .main,.cr .workspace .main.requests-main{padding:0}
+.cr .diagnostics-page,.cr .monitor-overview,.cr .cost-page,.cr .system-page,.cr .chat-page{padding:14px 20px 24px}
+.cr .main>.error,.cr .main>.notice,.cr .main>.application-banner{margin:12px 20px}
+.cr .routing-proxy{padding:0;border-top:1px solid var(--line)}
+.cr .routing-proxy .outbound-proxy{margin:0;border:0;border-radius:0;background:var(--panel);padding:14px 16px}
+.cr .routing-proxy .outbound-proxy svg{display:none}
+.cr .routing-proxy .outbound-proxy h2,.cr .routing-proxy .outbound-proxy h3{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--dim);font-weight:400}
+.cr .routing-proxy input{background:#000;border:1px solid var(--line-2);border-radius:0;color:var(--tx);font-family:var(--mono)}
+.cr .routing-proxy button{border-radius:0}
+.cr .racks::after{content:"";background:var(--panel)}
+/* Project access content in control-room form (embedded panel and drawer). */
+.cr .project-access-content{font-family:var(--mono);font-size:11.5px}
+.cr .project-access-content *{border-radius:0}
+.cr .project-access-content .access-tabs{display:flex;gap:4px;flex-wrap:wrap;border:0;margin:0 0 10px;padding:0}
+.cr .project-access-content .access-tabs button{border:1px solid var(--line-2);background:none;color:var(--tx-2);padding:2px 9px;font-size:11px;min-height:0;margin:0}
+.cr .project-access-content .access-tabs button.active,.cr .project-access-content .access-tabs button[aria-selected=true]{border-color:var(--go);color:var(--go);box-shadow:none}
+.cr .project-access-content .access-field{margin:0 0 10px;padding:0;border:0}
+.cr .project-access-content .access-field-heading{margin:0 0 4px}
+.cr .project-access-content .access-field-heading h3{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--dim);font-weight:400;margin:0}
+.cr .project-access-content .access-field-heading h3 span{letter-spacing:0;margin-left:6px;color:var(--dim)}
+.cr .project-access-content .access-copy-row{background:#000;border:1px solid var(--line);padding:6px 10px;min-height:0;gap:8px}
+.cr .project-access-content .access-copy-row code{color:var(--go);font-size:11.5px;font-family:var(--mono)}
+.cr .project-access-content .access-copy-row button{border:1px solid var(--line-2);background:none;color:var(--tx-2);font-size:10.5px;padding:2px 8px;min-height:0}
+.cr .project-access-content pre{background:#000;border:1px solid var(--line);color:var(--cyan);font-family:var(--mono);font-size:11.5px;line-height:1.7}
+.cr .project-access-content .access-hint,.cr .project-access-content .access-intro{color:var(--dim);font-size:10.5px;font-family:var(--sans);margin:4px 0 0}
+.cr .access-embed .access-intro,.cr .access-embed .access-hint{display:none}
+/* Grant matrix: keep names, status and model headers on one line. */
+.cr .gm th.m{white-space:nowrap}
+.cr .gm td.pjn small{white-space:nowrap}
+.cr .gm td.pjn{min-width:170px}
+.cr .access-embed .project-access-content{padding:0;margin:0}
+/* Console: request form on the left (model, protocol, params, composer), conversation on the right. */
+@media (min-width:901px){
+.cr .chat-page:not([hidden]){display:grid;grid-template-columns:minmax(340px,38%) minmax(0,1fr);grid-template-rows:auto auto auto 1fr;padding:0;gap:0;background:var(--line);column-gap:1px;height:calc(100vh - 44px - 49px)}
+.cr .chat-page .chat-body,.cr .chat-page .chat-conversation{display:contents}
+.cr .chat-page .chat-controls{grid-column:1;grid-row:1;background:var(--panel);padding:16px 20px 8px;align-items:stretch;flex-direction:column;flex-wrap:nowrap}
+.cr .chat-page .chat-route{grid-column:1;grid-row:2;background:var(--panel);padding:0 20px 10px;margin:0}
+.cr .chat-page .chat-notice{grid-column:1;grid-row:3;background:var(--panel);margin:0;padding:0 20px 10px}
+.cr .chat-page .chat-composer-area{grid-column:1;grid-row:4;background:var(--panel);padding:0 20px 20px;border-top:0}
+.cr .chat-page .chat-messages{grid-column:2;grid-row:1/-1;background:var(--panel);padding:20px 24px}
+.cr .chat-page .chat-panel{grid-column:2;grid-row:1/-1;width:auto;z-index:2;background:var(--panel);border:0;border-left:1px solid var(--line)}
+}
+.cr .chat-page{background:var(--panel)}
+.cr .chat-page *{border-radius:0}
+.cr .chat-controls label>span,.cr .chat-single-protocol>span{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+.cr .chat-controls select,.cr .chat-composer textarea,.cr .chat-page textarea{background:#000;border:1px solid var(--line-2);color:var(--tx);font-family:var(--mono)}
+.cr .chat-toolbar-actions{display:flex;gap:6px}
+.cr .chat-toolbar-actions button{border:1px solid var(--line-2);background:none;color:var(--tx-2);font-family:var(--mono);font-size:11px;padding:4px 10px;min-height:0}
+.cr .chat-route{color:var(--dim);font-size:11px}
+.cr .chat-composer button[type=submit],.cr .chat-composer .primary{background:var(--go);border-color:var(--go);color:#000;font-family:var(--mono);letter-spacing:.08em}
+.cr .chat-message-assistant .chat-message-text,.cr .chat-message .chat-message-text{font-family:var(--sans)}
+.cr .system-page-board .ret input.in{width:100%;font:inherit;outline:0}
+.cr .system-page-board .ret input.in:focus{border-color:var(--go)}
+.cr .system-page-board .h .r{display:flex;gap:6px;align-items:center}
+.cr .system-page-board table td.good-text{color:var(--go)}
+.cr .system-page-board table td.warning-text{color:var(--amber)}
+.cr .board{grid-template-columns:repeat(12,minmax(0,1fr))}
+.cr .board>.p{min-width:0}
+.cr .cost-board .p.c12{overflow-x:auto}

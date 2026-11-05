@@ -1,6 +1,6 @@
 import { uncertainText, yuan } from './costs';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowRight, GitBranch, Layers3, RefreshCw, Search } from 'lucide-react';
+import { ArrowRight, GitBranch } from 'lucide-react';
 import { TaskCallDialog } from './TaskCallDialog';
 import { FilterSelect } from './FilterSelect';
 import { TextPreview } from './TextPreview';
@@ -15,6 +15,14 @@ type Props = {
   refresh: () => void;
   renderRecord: (record: RequestRecord, tab: string, setTab: (tab: string) => void, copy: (value: string) => void) => ReactNode;
 };
+const clock = (t: number) => {
+  const d = new Date(t);
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }).replace('/', '-');
+};
+const taskLed = (t: RequestTask) => (t.state === 'running' ? 'c' : t.state === 'error' ? 'r' : t.state === 'waiting' ? 'a' : '');
+const taskTone = (t: RequestTask) => (t.state === 'running' ? 'run' : t.state === 'error' ? 'rd' : t.state === 'waiting' ? 'am' : 'ok');
 export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
   const [id, setID] = useState(tasks[0]?.id || ''),
     [detail, setDetail] = useState<TaskDetail | null>(null);
@@ -114,66 +122,66 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
   return (
     <>
       <div className="inspector task-inspector">
-        <section className="request-rail">
-          <div className="rail-head task-rail-head">
-            <div>
-              <h2>任务记录</h2>
-              <span className="muted small">
-                {visible.length} / {tasks.length} 项
-              </span>
-              <button className="icon-btn" aria-label="刷新任务" onClick={refresh}>
-                <RefreshCw size={15} />
-              </button>
-            </div>
-            <label className="search">
-              <Search size={15} />
+        <section className="request-rail rq-list">
+          <div className="rq-tools rail-head task-rail-head">
+            <label className="cmd">
+              ›
               <input
                 aria-label="搜索任务"
-                placeholder="搜索提问、项目、模型、ID"
+                placeholder="提问 / 项目 / 模型 / 任务 ID…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </label>
-            <FilterSelect
-              label="按任务项目筛选"
-              value={project}
-              onChange={setProject}
-              options={[{ value: 'all', label: '所有项目' }, ...projects.map(([value, label]) => ({ value, label }))]}
-            />
-            <div className="filter-tabs">
+            <div className="fk filter-tabs">
               {[
                 ['all', '全部'],
                 ['attention', '需关注'],
               ].map(([v, label]) => (
-                <button key={v} className={filter === v ? 'selected' : ''} aria-pressed={filter === v} onClick={() => setFilter(v)}>
+                <button
+                  key={v}
+                  type="button"
+                  className={filter === v ? 'on selected' : ''}
+                  aria-pressed={filter === v}
+                  onClick={() => setFilter(v)}
+                >
                   {label}
                 </button>
               ))}
+              <FilterSelect
+                label="按任务项目筛选"
+                value={project}
+                onChange={setProject}
+                options={[{ value: 'all', label: '所有项目' }, ...projects.map(([value, label]) => ({ value, label }))]}
+              />
+              <button type="button" className="task-refresh" aria-label="刷新任务" onClick={refresh}>
+                ↻
+              </button>
             </div>
             <p className="task-scope">
-              最近 200 次已分组调用涉及的任务
-              <br />
-              组内统计包含全部已记录调用
+              {visible.length} / {tasks.length} 项 · 最近 200 次已分组调用涉及的任务，组内统计包含全部已记录调用
             </p>
           </div>
-          <div className="request-items" ref={rail} role="region" aria-label="任务列表" tabIndex={0}>
+          <div className="rq-items request-items" ref={rail} role="region" aria-label="任务列表" tabIndex={0}>
             {visible.map((task) => (
-              <button key={task.id} className={'request-item task-item ' + (id === task.id ? 'selected' : '')} onClick={() => select(task)}>
-                <span>
-                  <small>{task.project_name}</small>
-                  <small>{dateTime(task.started)}</small>
-                </span>
-                <b className="task-title">{task.title}</b>
-                <span className="task-badges">
-                  <em className="task-tag">{task.grouping ? 'WorkBuddy' : task.category || '调用方任务'}</em>
-                  <small className={task.state === 'replied' || task.state === 'done' ? 'good-text' : 'warning-text'}>
-                    {taskState(task)}
-                  </small>
-                </span>
-                <span>
-                  <small>{task.calls} 次调用</small>
-                </span>
-                {task.failed > 0 && <span className="task-failure">{task.failed} 次调用失败</span>}
+              <button
+                key={task.id}
+                type="button"
+                className={'ti request-item task-item' + (id === task.id ? ' on selected' : '')}
+                onClick={() => select(task)}
+              >
+                <span className={'led ' + taskLed(task)} />
+                <div>
+                  <div className="a zh task-title">{task.title}</div>
+                  <div className="pj2">
+                    {task.project_name} · {task.grouping ? 'WorkBuddy' : task.category || '调用方任务'} · {task.calls} 次调用
+                    {task.failed > 0 && <span className="task-failure"> · {task.failed} 次调用失败</span>}
+                  </div>
+                </div>
+                <div className="r">
+                  <span className={'pill ' + taskTone(task)}>{taskState(task)}</span>
+                  <small>{clock(task.started)}</small>
+                </div>
               </button>
             ))}
             {!visible.length && (
@@ -181,7 +189,7 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
             )}
           </div>
         </section>
-        <section className="request-detail" ref={pane} aria-label="任务详情" tabIndex={0}>
+        <section className="ins request-detail" ref={pane} aria-label="任务详情" tabIndex={0}>
           {error && (
             <div className="error" role="alert">
               {error}
@@ -189,62 +197,73 @@ export function TaskWorkspace({ tasks, api, refresh, renderRecord }: Props) {
           )}
           {t ? (
             <>
-              <header className="task-head">
-                <div className="task-heading-meta">
-                  <span>
-                    <Layers3 size={14} />
-                    {t.grouping ? 'WorkBuddy · 一次提问' : '调用方任务'} · {t.project_name}
-                  </span>
-                  <span className={'task-state ' + t.state}>{taskState(t)}</span>
+              <header className="ins-h task-head">
+                <div className="l1">
+                  <span className={'pill ' + taskTone(t)}>{taskState(t)}</span>
+                  <code>{t.id}</code>
+                  <span>·</span>
+                  <span className="zh">{t.grouping ? 'WorkBuddy · 一次提问' : '调用方任务 · X-Gateway-Task-ID'}</span>
                 </div>
-                <h2>{t.title}</h2>
-                <div className="task-stats">
-                  <div>
-                    <span>LLM 调用</span>
-                    <b>
-                      {t.calls}
-                      <small> 次</small>
-                    </b>
-                    <small>{t.failed ? `${t.failed} 次失败，已计入统计` : t.active ? `${t.active} 次正在进行` : '全部已记录调用'}</small>
-                  </div>
-                  <div>
-                    <span>输入 Token</span>
-                    <b>{t.input_samples ? number(t.input_tokens) : '—'}</b>
-                    <small>
-                      {t.input_samples} / {t.calls} 次用量已知
-                    </small>
-                  </div>
-                  <div>
-                    <span>输出 Token</span>
-                    <b>{t.output_samples ? number(t.output_tokens) : '—'}</b>
-                    <small>
-                      {t.output_samples} / {t.calls} 次用量已知
-                    </small>
-                  </div>
-                  <div>
-                    <span>估算费用</span>
-                    <b>{t.cost ? yuan(t.cost.cost) : '—'}</b>
-                    <small>{(t.cost && uncertainText(t.cost)) || '按模型单价估算'}</small>
-                  </div>
-                  <div>
-                    <span>调用时间跨度</span>
-                    <b>{duration(t.duration_ms)}</b>
-                    <small>{t.active ? '截至当前' : '首个开始 → 最后结束'}</small>
-                  </div>
+                <h2 className="zh">{t.title}</h2>
+                <div className="facts">
+                  <span>
+                    PROJECT <b className="zh">{t.project_name}</b>
+                  </span>
+                  <span>
+                    MODELS <b>{t.models.join(' · ') || '—'}</b>
+                  </span>
+                  <span>
+                    SPAN <b>{dateTime(t.started)}</b>
+                  </span>
                 </div>
               </header>
-              <div className="detail-tabs">
+              <div className="mx task-stats">
+                <div>
+                  <label>CALLS</label>
+                  <b className="v">{t.calls}</b>
+                  <small className="s">
+                    {t.failed ? `${t.failed} 次失败，已计入统计` : t.active ? `${t.active} 次正在进行` : '全部已记录调用'}
+                  </small>
+                </div>
+                <div>
+                  <label>INPUT</label>
+                  <b className="v">{t.input_samples ? number(t.input_tokens) : '—'}</b>
+                  <small className="s">
+                    {t.input_samples} / {t.calls} 次用量已知
+                  </small>
+                </div>
+                <div>
+                  <label>OUTPUT</label>
+                  <b className="v">{t.output_samples ? number(t.output_tokens) : '—'}</b>
+                  <small className="s">
+                    {t.output_samples} / {t.calls} 次用量已知
+                  </small>
+                </div>
+                <div>
+                  <label>COST</label>
+                  <b className="v" style={{ color: 'var(--amber)' }}>
+                    {t.cost ? yuan(t.cost.cost) : '—'}
+                  </b>
+                  <small className="s">{(t.cost && uncertainText(t.cost)) || '按模型单价估算'}</small>
+                </div>
+                <div>
+                  <label>DURATION</label>
+                  <b className="v">{duration(t.duration_ms)}</b>
+                  <small className="s">{t.active ? '截至当前' : '首个开始 → 最后结束'}</small>
+                </div>
+              </div>
+              <div className="tb detail-tabs">
                 {[
                   ['overview', '对话概览'],
                   ['calls', `调用过程 · ${t.calls}`],
                   ['grouping', '分组信息'],
                 ].map(([v, label]) => (
-                  <button key={v} className={tab === v ? 'active' : ''} onClick={() => setTab(v)}>
+                  <button key={v} type="button" className={tab === v ? 'on active' : ''} aria-pressed={tab === v} onClick={() => setTab(v)}>
                     {label}
                   </button>
                 ))}
               </div>
-              <div className="detail-content task-content">
+              <div className="trn detail-content task-content">
                 {t.missing_records > 0 && (
                   <p className="request-outcome-note">{t.missing_records} 次调用只有摘要，正文尚未保存或未能保存；统计仍包含这些调用。</p>
                 )}
