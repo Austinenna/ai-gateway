@@ -21,6 +21,7 @@ export type RequestRecord = {
   task_id?: string;
   grouping?: WorkBuddyGrouping;
   question_excerpt?: string;
+  headline?: string;
   reply_kind?: string;
   id: string;
   project_id: string;

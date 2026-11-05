@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func buddyHeaders(root, session, turn, agent string) http.Header {
@@ -390,5 +391,36 @@ func TestTaskTitleFindsTranscriptTurnBeyondExcerpt(t *testing.T) {
 	task, question, err := h.g.presentTask([]Record{rec}, false)
 	if err != nil || task.Title != "当前这一轮的问题" || task.TitleKind != "transcript" || question != content {
 		t.Fatalf("title %q kind %q err %v", task.Title, task.TitleKind, err)
+	}
+}
+
+func TestRequestListCarriesHeadline(t *testing.T) {
+	h := newHarness(t)
+	content := "【之前】\n用户：" + strings.Repeat("旧内容", 600) + "\n\n【本轮】\n用户：当前这一轮的问题\n助手：回答"
+	input, _ := json.Marshal(map[string]any{"messages": []any{map[string]any{"role": "user", "content": content}}})
+	now := time.Now().UnixMilli()
+	for i, rec := range []Record{
+		{ID: "transcript", Input: string(input)},
+		{ID: "data", TaskFields: TaskFields{Question: `{"title":"#卡点舞","author":"小P"}`}},
+		{ID: "plain", TaskFields: TaskFields{Question: "普通提问"}},
+	} {
+		rec.ProjectID, rec.Started, rec.State = "p", now-int64(i), "complete"
+		if rec.Input != "" {
+			rec.Question = questionExcerpt(rec.Input)
+		}
+		raw, _ := json.Marshal(rec)
+		if _, err := h.g.db.Exec("INSERT INTO requests(id,project_id,started,summary,record) VALUES(?,?,?,?,?)", rec.ID, rec.ProjectID, rec.Started, "{}", string(raw)); err != nil {
+			t.Fatal(err)
+		}
+		rec.Input = ""
+		h.g.saveMetric(rec)
+	}
+	page := parse[requestPage](t, h.request("GET", "/api/admin/requests?limit=10", nil, "", true))
+	got := map[string]string{}
+	for _, rec := range page.Items {
+		got[rec.ID] = rec.Headline
+	}
+	if got["transcript"] != "当前这一轮的问题" || got["data"] != "#卡点舞" || got["plain"] != "" {
+		t.Fatalf("headlines %v", got)
 	}
 }

@@ -310,7 +310,7 @@ export function Overview({
                     {r.fallback_from ? ' ⇠' : ''}
                   </span>
                   <span className="pj zh">{r.project_name}</span>
-                  <span className="q">{r.question_excerpt || r.diagnostic?.message || r.protocol}</span>
+                  <span className="q">{r.headline || r.question_excerpt || r.diagnostic?.message || r.protocol}</span>
                   <span className="d">{r.state === 'running' ? '…' : (r.duration_ms / 1000).toFixed(2) + 's'}</span>
                 </button>
               ))}

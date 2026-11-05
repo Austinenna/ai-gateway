@@ -213,6 +213,11 @@ func (g *Gateway) listRecords(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, "读取记录失败")
 		return
 	}
+	for i := range items {
+		if items[i].Question != "" {
+			items[i].Headline = g.recordHeadline(r.Context(), items[i])
+		}
+	}
 	page.Items, page.NextCursor = items, next
 	if page.BodySearch == "" {
 		cf := withSearch(f, false)

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -22,6 +23,8 @@ type TaskFields struct {
 	// Generic attribution from X-Gateway-Category / X-Gateway-Task-ID.
 	Category string `json:"category,omitempty"`
 	TaskRef  string `json:"task_ref,omitempty"`
+	// Headline is filled for request lists only: the readable title of a data or transcript question.
+	Headline string `json:"headline,omitempty"`
 }
 type WorkBuddyGrouping struct {
 	Client          string `json:"client"`
@@ -269,6 +272,27 @@ func objectScalars(text string) [][2]string {
 		}
 	}
 	return out
+}
+
+// The saved excerpt stops at 1024 runes; a transcript's current turn may lie beyond it.
+func turnCut(question string) bool {
+	return strings.HasSuffix(question, "…") && strings.Contains(question, "【") && !strings.Contains(question, "【本轮】")
+}
+
+// recordHeadline names a listed request like its task; it is empty when the question reads as-is.
+func (g *Gateway) recordHeadline(ctx context.Context, rec Record) string {
+	question := rec.Question
+	if turnCut(question) {
+		var input string
+		if g.db.QueryRowContext(ctx, "SELECT COALESCE(json_extract(record,'$.input'),'') FROM requests WHERE id=?", rec.ID).Scan(&input) == nil && json.Valid([]byte(input)) {
+			question = questionText(input, true)
+		}
+	}
+	title, _, kind := taskHeadline(question)
+	if kind == "" {
+		return ""
+	}
+	return title
 }
 
 func shortTitle(value string) string {
@@ -576,9 +600,7 @@ func (g *Gateway) presentTask(records []Record, fullQuestion bool) (RequestTask,
 		if task.Grouped && rec.QuestionVersion == 0 {
 			question = workBuddyQuestion(question)
 		}
-		// The saved excerpt stops at 1024 runes; a transcript's current turn may lie beyond it.
-		cut := strings.HasSuffix(question, "…") && strings.Contains(question, "【") && !strings.Contains(question, "【本轮】")
-		if fullQuestion || task.Grouped && (rec.QuestionVersion == 0 || cut) {
+		if fullQuestion || task.Grouped && (rec.QuestionVersion == 0 || turnCut(question)) {
 			input := rec.Input
 			if input == "" {
 				err := g.db.QueryRow("SELECT COALESCE(json_extract(record,'$.input'),'') FROM requests WHERE id=?", rec.ID).Scan(&input)

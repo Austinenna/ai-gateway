@@ -93,7 +93,9 @@ export function RequestList({
                   {r.project_name}
                   {r.task_ref || r.task_id ? ' · 任务' : ''}
                 </div>
-                <div className="q">{r.question_excerpt || r.diagnostic?.message || recordStatus(r) + ' · ' + protocolName(r.protocol)}</div>
+                <div className="q">
+                  {r.headline || r.question_excerpt || r.diagnostic?.message || recordStatus(r) + ' · ' + protocolName(r.protocol)}
+                </div>
               </div>
               <div className="r">
                 <b>{r.state === 'running' ? '…' : secs(r.duration_ms)}</b>
