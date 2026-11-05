@@ -2442,7 +2442,7 @@ function MessageBlock({ label, assistant = false, children }: { label: string; a
   const [expanded, setExpanded] = useState(true);
   const contentId = useId();
   return (
-    <article className={'message' + (assistant ? ' assistant' : '')}>
+    <article className={'message' + (assistant ? ' assistant' : /^system/i.test(label) ? ' system' : '')}>
       <button
         type="button"
         className="message-label message-toggle"

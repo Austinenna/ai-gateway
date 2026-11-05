@@ -250,7 +250,7 @@ export function Inspector({
           <div className="facts">
             {r.connection_name && (
               <span>
-                CONN <b className="zh">{r.connection_name}</b>
+                CONN <b>{r.connection_name}</b>
               </span>
             )}
             {r.upstream_model && (

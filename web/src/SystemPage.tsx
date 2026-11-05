@@ -192,7 +192,7 @@ export function SystemPage({
         <div className="p c12">
           <div className="h">
             STORAGE<span className="zh">数据库占用 · {formatBytes(st.file_bytes)}</span>
-            <span className="r zh">
+            <span className="r">
               下次定时清理 {when(sys.next_cleanup)}
               {st.oldest_body ? ` · 最早正文 ${when(st.oldest_body)}` : ''}
               {st.oldest_summary ? ` · 最早摘要 ${when(st.oldest_summary)}` : ''}
