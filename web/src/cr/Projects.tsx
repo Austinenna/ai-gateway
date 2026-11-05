@@ -1,3 +1,4 @@
+import { yuan } from '../costs';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { LimitUsage } from '../health';
 import { protocolName } from '../connection-protocols';
@@ -37,8 +38,7 @@ const shortProto: Record<string, string> = {
   'deepseek-fetch': 'FETCH',
 };
 // Small amounts keep four decimals so a few cheap calls do not read as ¥0.00.
-// Budgets read in yuan with cents; sub-cent spend shows as ¥0.00.
-const money = (v: number) => '¥' + (v >= 100 ? v.toFixed(1) : v.toFixed(2));
+const money = yuan;
 
 /** Projects is the grant matrix plus limits, access and token panels for one project. */
 export function Projects({

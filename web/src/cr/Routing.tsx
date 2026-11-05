@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { connectionProtocols, modelProtocols, protocolName } from '../connection-protocols';
 import { bucketClass, formatAgo, type ConnectionHealth } from '../health';
-import type { ModelPrice } from '../costs';
+import { dec2, type ModelPrice } from '../costs';
 import { ViewHead } from './Shell';
 
 type Api = (path: string, method?: string, body?: unknown) => Promise<any>;
@@ -46,10 +46,10 @@ const shortProto: Record<string, string> = {
 };
 const allProtocols = ['chat', 'messages', 'dashscope-asr', 'dashscope-tts', 'deepseek-search', 'deepseek-fetch'];
 
-// Short prices keep three significant digits so two-column racks fit; the cell title has the exact value.
+// Short prices keep at most two decimals; the cell title has the exact value.
 function priceText(m: Model, short = false) {
   const p = [...(m.prices || [])].filter((x) => x.effective_from <= Date.now()).sort((a, b) => b.effective_from - a.effective_from)[0];
-  const n = (v: number | null | undefined) => (v == null ? '—' : short ? String(Number(v.toPrecision(3))) : String(v));
+  const n = (v: number | null | undefined) => (v == null ? '—' : short ? dec2(v) : String(v));
   if (!p) return '未定价';
   if (p.audio_per_minute != null) return `¥${n(p.audio_per_minute)}/min`;
   if (p.per_10k_characters != null) return `¥${n(p.per_10k_characters)}/万字`;

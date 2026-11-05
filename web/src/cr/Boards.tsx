@@ -1,3 +1,4 @@
+import { cents, yuan } from '../costs';
 import { useEffect, useState } from 'react';
 import { diagnosticActionName, errorName } from '../monitoring';
 import { bucketClass, type ConnectionHealth } from '../health';
@@ -179,7 +180,6 @@ export function DiagnosticsBoard({
 
 type Proj = { id: string; name: string; monthly_budget?: number | null };
 // Small amounts keep four decimals so a few cheap calls do not read as ¥0.00.
-const yuan = (v: number) => '¥' + (v >= 100 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v.toFixed(4));
 
 /** CostBoard: month, today, forecast and cache, the daily chart and project budgets. */
 type UsageGroup = {
@@ -193,7 +193,7 @@ type UsageGroup = {
   audio_seconds: number;
 };
 const stackColors = ['var(--red)', 'var(--cyan)', 'var(--go)', 'var(--amber)', '#c77dff', 'var(--tx-2)'];
-const fmt = (v: number) => (v < 1 ? v.toFixed(4) : v.toFixed(1));
+const fmt = (v: number) => cents(v);
 const compact = (v: number) => (v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : String(v));
 
 export function CostBoard({
@@ -447,7 +447,7 @@ export function CostBoard({
                   <td className="n">{m.cache_read_tokens ? compact(m.cache_read_tokens) : '—'}</td>
                   <td className="n">{m.output_tokens ? compact(m.output_tokens) : '—'}</td>
                   <td className="n" style={{ color: 'var(--amber)' }}>
-                    {m.cost < 1 ? m.cost.toFixed(4) : m.cost.toFixed(1)}
+                    {cents(m.cost)}
                   </td>
                   <td className="n share">
                     <span className="b" style={{ width: Math.max(2, share * 60) }} />

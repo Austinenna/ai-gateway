@@ -65,12 +65,17 @@ export type UsageReport = {
   budget?: BudgetStatus;
 };
 
-// Small amounts keep enough digits to stay visible; ¥0.0003 should not read as ¥0.00.
+// Amounts always show two decimals; spend below a cent reads <¥0.01 rather than ¥0.00.
 export function yuan(value: number | null | undefined) {
   if (value == null) return '—';
-  const digits = value !== 0 && Math.abs(value) < 0.01 ? 4 : 2;
-  return '¥' + value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: digits });
+  return (value < 0 ? '-' : '') + (value !== 0 && Math.abs(value) < 0.005 ? '<¥0.01' : '¥' + cents(Math.abs(value)));
 }
+
+/** cents formats a number with exactly two decimals and thousands separators. */
+export const cents = (value: number) => value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** dec2 keeps at most two decimals and drops trailing zeros (26.872 → 26.87, 4.00 → 4). */
+export const dec2 = (value: number) => String(Number(value.toFixed(2)));
 
 export const costStatusName = (status?: string) =>
   ({

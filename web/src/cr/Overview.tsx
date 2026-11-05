@@ -1,3 +1,4 @@
+import { yuan } from '../costs';
 import { useEffect, useMemo, useState } from 'react';
 import type { Metrics, RequestRecord } from '../monitoring';
 import { errorName } from '../monitoring';
@@ -39,7 +40,6 @@ const tailTime = (t: number) =>
         .replace('/', '-');
 const secs = (ms?: number | null) => (ms == null ? '—' : (ms / 1000).toFixed(2));
 // Small amounts keep four decimals so a few cheap calls do not read as ¥0.00.
-const yuan = (v: number) => '¥' + (v >= 100 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v.toFixed(4));
 
 function level(code: string) {
   if (
