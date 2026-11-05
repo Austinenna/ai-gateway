@@ -75,6 +75,7 @@ import { type RequestRecord, recordStatus } from './monitoring';
 import { TopBar, Rail, ViewHead, DetailToggle, type CrPage, type RailBadge } from './cr/Shell';
 import { Overview, overviewWindows } from './cr/Overview';
 import { AccessSummary } from './cr/AccessSummary';
+import { JsonText } from './JsonText';
 import { Inspector, RequestList } from './cr/Requests';
 import { Routing } from './cr/Routing';
 import { Projects } from './cr/Projects';
@@ -2477,7 +2478,11 @@ function MessageContent({ content }: { content: unknown }) {
           typeof block.text === 'string'
         )
           return <p key={i}>{block.text}</p>;
-        return <pre key={i}>{readable(block)}</pre>;
+        return (
+          <pre key={i}>
+            <JsonText text={readable(block)} />
+          </pre>
+        );
       })}
     </TextPreview>
   );
@@ -2553,7 +2558,9 @@ function RecordTabContent({
               复制
             </button>
           </div>
-          <pre>{pretty(selected.input || '')}</pre>
+          <pre>
+            <JsonText text={pretty(selected.input || '')} />
+          </pre>
           <div className="raw-data-heading">
             <h3>上游响应 / SSE 事件</h3>
             <button
@@ -2567,7 +2574,9 @@ function RecordTabContent({
               复制
             </button>
           </div>
-          <pre>{pretty(selected.output || '')}</pre>
+          <pre>
+            <JsonText text={pretty(selected.output || '')} />
+          </pre>
         </>
       ) : (
         <RequestTiming record={selected} />
@@ -2640,7 +2649,9 @@ function RecordDetail({
                 复制
               </button>
             </div>
-            <pre>{pretty(selected.input || '')}</pre>
+            <pre>
+              <JsonText text={pretty(selected.input || '')} />
+            </pre>
             <div className="raw-data-heading">
               <h3>上游响应 / SSE 事件</h3>
               <button
@@ -2654,7 +2665,9 @@ function RecordDetail({
                 复制
               </button>
             </div>
-            <pre>{pretty(selected.output || '')}</pre>
+            <pre>
+              <JsonText text={pretty(selected.output || '')} />
+            </pre>
           </>
         ) : (
           <RequestTiming record={selected} />
@@ -2681,7 +2694,9 @@ function Messages({ record, onResponseDetails }: { record: RequestRecord; onResp
             <details>
               <summary>工具调用</summary>
               <TextPreview>
-                <pre>{readable(m.tool_calls)}</pre>
+                <pre>
+                  <JsonText text={readable(m.tool_calls)} />
+                </pre>
               </TextPreview>
             </details>
           )}
@@ -2715,7 +2730,9 @@ function Messages({ record, onResponseDetails }: { record: RequestRecord; onResp
         <details>
           <summary>完整内容（包含工具、思考与其他返回字段）</summary>
           <TextPreview>
-            <pre>{pretty(record.output || '')}</pre>
+            <pre>
+              <JsonText text={pretty(record.output || '')} />
+            </pre>
           </TextPreview>
         </details>
       </MessageBlock>

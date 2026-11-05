@@ -860,3 +860,18 @@
 .cr .trn .message-label,.cr .trn .message-role{color:var(--cyan)}
 .cr .trn .message.assistant .message-label,.cr .trn .message.assistant .message-role{color:var(--go)}
 .cr .trn .message.system .message-label,.cr .trn .message.system .message-role{color:var(--dim)}
+/* Message colouring as in the preview: thinking muted with a rule, tool calls amber, JSON tokens highlighted. */
+.cr .j-key{color:var(--cyan)}
+.cr .j-str{color:var(--go)}
+.cr .j-num{color:var(--amber)}
+.cr .j-lit{color:#c77dff}
+.cr .trn pre,.cr .chat-page pre{color:var(--tx-2)}
+.cr .response-part-thinking .response-text,.cr .chat-thinking p{color:var(--dim);border-left:2px solid var(--line-2);padding-left:10px}
+.cr .response-part-thinking>summary .response-part-label{color:var(--dim)}
+.cr .response-part-tool>summary,.cr .response-part-tool>summary .response-part-label,.cr .response-part-tool>summary code{color:var(--amber);background:none}
+.cr .response-part-text>summary .response-part-label{color:var(--go)}
+.cr .response-part-error>summary .response-part-label{color:var(--red)}
+.cr .response-argument-label,.cr .response-call-id{color:var(--dim);font-size:10.5px}
+.cr .response-part{border:0;border-left:2px solid var(--line-2);padding-left:12px;margin:10px 0;background:none}
+.cr .response-part-tool{border-left-color:var(--amber-2)}
+.cr .response-part-text{border-left-color:var(--go-2)}

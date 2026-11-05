@@ -1,3 +1,4 @@
+import { JsonText } from './JsonText';
 import { useMemo } from 'react';
 import { responseDetails } from './response-details.mjs';
 
@@ -63,7 +64,9 @@ export function ResponseDetails({ output }: { output: string }) {
                     </p>
                   )}
                   <div className="response-argument-label">调用参数</div>
-                  <pre>{args.text}</pre>
+                  <pre>
+                    <JsonText text={args.text} />
+                  </pre>
                   {args.incomplete && (
                     <p className="response-warning">参数不是完整 JSON，按收到的内容展示；可能尚未收齐或格式不符合预期。</p>
                   )}
