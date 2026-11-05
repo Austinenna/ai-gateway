@@ -266,3 +266,14 @@ test('模型指标双向排序、未知值置后，并在刷新与筛选后保�
   await changeMetrics(() => page.getByRole('button', { name: '刷新监控', exact: true }).click());
   await expect(names).toHaveText(['alpha']);
 });
+
+test('总览在矮窗口中可用滚轮滚到底部看板', async ({ page }) => {
+  await page.getByRole('button', { name: /监控明细/ }).click();
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await page.mouse.move(700, 450);
+  await expect.poll(async () => {
+    await page.mouse.wheel(0, 500);
+    return page.locator('.foot-line').evaluate(el => el.getBoundingClientRect().bottom <= innerHeight);
+  }).toBe(true);
+  await expect(page.getByText('项目预算 · 本月')).toBeInViewport();
+});
