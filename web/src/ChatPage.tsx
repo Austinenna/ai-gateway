@@ -294,10 +294,14 @@ export function ChatPage({ active, models, connections, api, refresh, onOpenReco
 
   return (
     <section className="chat-page" hidden={!active} aria-label="对话调试">
-      <div className="chat-controls">
-        <label className="chat-model-select">
-          <span>模型</span>
+      <div className="cform chat-controls">
+        <div className="h">
+          REQUEST<span className="zh">请求 · 管理员调试，不经过项目授权与限速</span>
+        </div>
+        <div className="fld">
+          <label>MODEL · 模型</label>
           <select
+            className="in"
             aria-label="对话模型"
             disabled={busy || !available.length}
             value={selected?.id || ''}
@@ -313,358 +317,358 @@ export function ChatPage({ active, models, connections, api, refresh, onOpenReco
               </option>
             ))}
           </select>
-        </label>
-        {protocols.length > 1 ? (
-          <label className="chat-protocol-select">
-            <span>协议</span>
-            <select aria-label="对话协议" disabled={busy} value={selectedProtocol} onChange={(event) => setProtocol(event.target.value)}>
+        </div>
+        <div className="fld">
+          <label>PROTOCOL · 协议</label>
+          {protocols.length > 1 ? (
+            <div className="proto" role="group" aria-label="对话协议">
               {protocols.map((value) => (
-                <option key={value} value={value}>
+                <button
+                  key={value}
+                  type="button"
+                  className={selectedProtocol === value ? 'on' : ''}
+                  aria-pressed={selectedProtocol === value}
+                  disabled={busy}
+                  onClick={() => setProtocol(value)}
+                >
                   {protocolName(value)}
-                </option>
+                </button>
               ))}
-            </select>
-          </label>
-        ) : (
-          selectedProtocol && (
-            <div className="chat-single-protocol">
-              <span>协议</span>
-              <div>{protocolName(selectedProtocol)}</div>
             </div>
-          )
-        )}
-        <div className="chat-toolbar-actions">
-          <button
-            type="button"
-            className={panel === 'settings' ? 'chat-parameters-open' : ''}
-            disabled={busy}
-            aria-expanded={panel === 'settings'}
-            aria-controls={settingsID}
-            onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
-          >
-            <SlidersHorizontal size={15} />
-            参数{customized && <span className="chat-override-dot" aria-label="已覆盖默认参数" />}
-          </button>
-          <button type="button" className="quiet" disabled={busy} onClick={newConversation}>
-            <SquarePen size={15} />
-            新对话
-          </button>
-        </div>
-      </div>
-      <div className="chat-route">
-        <span>
-          {connection?.name || '选择一个已启用的对话模型'}
-          {connection && (
-            <>
-              <span className="chat-route-divider">/</span>
-              {customized ? '使用本次对话参数' : '沿用模型默认参数'}
-            </>
+          ) : (
+            <div className="proto">
+              <span className="on">{selectedProtocol ? protocolName(selectedProtocol) : '—'}</span>
+            </div>
           )}
-        </span>
-        <span>管理员调试</span>
-      </div>
-      {notice && (
-        <div className="chat-notice" role="status">
-          {notice}
         </div>
-      )}
-      <div className="chat-body">
-        <div className="chat-conversation">
-          <div
-            ref={scroll}
-            id={messagesID}
-            className="chat-messages"
-            role="region"
-            aria-label="对话消息"
-            tabIndex={0}
-            onScroll={(event) => {
-              const element = event.currentTarget,
-                near = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-              followOutput.current = near;
-              setAwayFromBottom(!near);
+        <form
+          className="fld chat-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            send();
+          }}
+        >
+          <label>MESSAGE · 消息</label>
+          <textarea
+            className="in ta"
+            ref={textarea}
+            aria-label="对话消息输入"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={messages.length ? '继续追问，或输入一条测试消息…' : '输入一条消息，测试所选模型…'}
+            rows={3}
+            disabled={!selected}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229 && !busy) {
+                event.preventDefault();
+                send();
+              }
             }}
-          >
-            {!messages.length && (
-              <div className="chat-empty">
-                <MessagesSquare size={30} />
-                <h2>{selected ? '从一条消息开始' : '暂无可对话的模型'}</h2>
-                <p>
-                  {selected
-                    ? '已选择 ' + selected.name + '，输入消息即可开始调试。'
-                    : '启用支持 Chat Completions 或 Messages 的模型后，即可在这里对话。'}
-                </p>
-                {!selected && (
-                  <button type="button" onClick={onConfigure}>
-                    去配置模型
-                    <ArrowRight size={15} />
-                  </button>
-                )}
-              </div>
+          />
+          <div className="fld-opts">
+            <label>OPTIONS · 参数</label>
+            <div className="proto">
+              <span className={parameters.stream ? 'on' : ''}>{parameters.stream ? 'stream' : 'non-stream'}</span>
+              <span>max_tokens {parameters.maxTokens || '默认'}</span>
+              <span>temperature {parameters.temperature || '默认'}</span>
+              {parameters.system && <span>system</span>}
+            </div>
+          </div>
+          <div className="chat-composer-bottom chat-toolbar-actions">
+            {busy ? (
+              <button type="button" className="primary" onClick={() => request.current?.abort()}>
+                <Square size={13} />
+                停止生成
+              </button>
+            ) : (
+              <button type="submit" className="primary" disabled={!selected || !draft.trim()}>
+                发送
+                <ArrowUp size={15} />
+              </button>
             )}
-            {messages.map((message, index) => (
-              <article key={message.id} className={'chat-message chat-message-' + message.role}>
-                <div className="chat-message-heading">
-                  {message.role === 'user' ? (
-                    '你'
-                  ) : (
-                    <>
-                      <span className="chat-avatar">
-                        <Waypoints size={15} />
-                      </span>
-                      <b>{message.model}</b>
-                      <code>{message.alias}</code>
-                      <span className="chat-message-state" role="status">
-                        {responseState(message)}
-                      </span>
-                    </>
-                  )}
-                </div>
-                {message.thinking && (
-                  <details className="chat-thinking">
-                    <summary>思考内容</summary>
-                    <p>{message.thinking}</p>
-                  </details>
-                )}
-                {message.text ? (
-                  <div className="chat-message-text">{message.text}</div>
+            <button
+              type="button"
+              className={panel === 'settings' ? 'chat-parameters-open' : ''}
+              disabled={busy}
+              aria-expanded={panel === 'settings'}
+              aria-controls={settingsID}
+              onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
+            >
+              <SlidersHorizontal size={15} />
+              参数{customized && <span className="chat-override-dot" aria-label="已覆盖默认参数" />}
+            </button>
+            <button type="button" className="quiet" disabled={busy} onClick={newConversation}>
+              <SquarePen size={15} />
+              新对话
+            </button>
+          </div>
+          <p className="chat-route">
+            {connection?.name || '选择一个已启用的对话模型'}
+            {connection && ' · ' + (customized ? '使用本次对话参数' : '沿用模型默认参数')} · Enter 发送，Shift + Enter 换行
+          </p>
+        </form>
+        {notice && (
+          <div className="chat-notice" role="status">
+            {notice}
+          </div>
+        )}
+        <p className="chat-composer-note">调用使用厂商额度并写入请求记录；本页会话在刷新后清空。</p>
+      </div>
+      <div className="cresp">
+        <div className="h">
+          RESPONSE<span className="zh">{rounds ? '已携带 ' + rounds + ' 轮文本上下文' : '新对话 · 尚无上下文'}</span>
+          <span className="r">
+            {awayFromBottom ? (
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  followOutput.current = true;
+                  scroll.current?.scrollTo({ top: scroll.current.scrollHeight });
+                }}
+              >
+                <ArrowDown size={12} />
+                回到底部
+              </button>
+            ) : (
+              <span>{parameters.stream ? '流式输出' : '完整响应'}</span>
+            )}
+          </span>
+        </div>
+        <div
+          ref={scroll}
+          id={messagesID}
+          className="chat-messages"
+          role="region"
+          aria-label="对话消息"
+          tabIndex={0}
+          onScroll={(event) => {
+            const element = event.currentTarget,
+              near = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+            followOutput.current = near;
+            setAwayFromBottom(!near);
+          }}
+        >
+          {!messages.length && (
+            <div className="chat-empty">
+              <MessagesSquare size={30} />
+              <h2>{selected ? '从一条消息开始' : '暂无可对话的模型'}</h2>
+              <p>
+                {selected
+                  ? '已选择 ' + selected.name + '，输入消息即可开始调试。'
+                  : '启用支持 Chat Completions 或 Messages 的模型后，即可在这里对话。'}
+              </p>
+              {!selected && (
+                <button type="button" onClick={onConfigure}>
+                  去配置模型
+                  <ArrowRight size={15} />
+                </button>
+              )}
+            </div>
+          )}
+          {messages.map((message, index) => (
+            <article key={message.id} className={'chat-message chat-message-' + message.role}>
+              <div className="chat-message-heading">
+                {message.role === 'user' ? (
+                  '你'
                 ) : (
-                  message.role === 'assistant' &&
-                  !message.error && (
-                    <p className="chat-empty-reply">
-                      {message.status === 'sending'
-                        ? message.thinking
-                          ? '正在思考，等待正文…'
-                          : '等待模型响应…'
-                        : message.status === 'stopped'
-                          ? '已停止，尚未收到正文。'
-                          : message.toolCalls
-                            ? '模型返回了工具调用，可在请求详情中查看。'
-                            : '模型未返回正文，可在请求详情中查看完整响应。'}
-                    </p>
-                  )
-                )}
-                {message.error && (
-                  <p className="chat-call-error" role="alert">
-                    {message.error}
-                  </p>
-                )}
-                {['length', 'max_tokens'].includes(message.finishReason || '') && (
-                  <p className="chat-limit-note">本次回复已达到最大输出限制。</p>
-                )}
-                {message.role === 'assistant' && (
                   <>
-                    {message.record && (
-                      <div className="chat-message-metrics">
-                        <span>首 Token {firstTiming(message.record)}</span>
-                        <span>耗时 {duration(message.record.duration_ms)}</span>
-                        <span>
-                          Token {number(inputTotal(message.record))} → {number(outputTotal(message.record))}
-                        </span>
-                      </div>
-                    )}
-                    {message.status !== 'sending' && (
-                      <div className="chat-message-actions">
-                        {message.text && (
-                          <button type="button" className="link" onClick={() => void copy(message.text)}>
-                            <Copy size={13} />
-                            复制
-                          </button>
-                        )}
-                        {index === messages.length - 1 && (
-                          <button
-                            type="button"
-                            className="link"
-                            disabled={busy || !selected}
-                            onClick={() => void execute(messages.slice(0, index))}
-                          >
-                            <RotateCcw size={13} />
-                            {message.status === 'error' || message.status === 'interrupted' ? '重试' : '重新生成'}
-                          </button>
-                        )}
-                        {message.requestID && (
-                          <button type="button" className="link" onClick={() => showRequest(message.requestID!)}>
-                            请求详情
-                            <ArrowRight size={13} />
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    <span className="chat-avatar">
+                      <Waypoints size={15} />
+                    </span>
+                    <b>{message.model}</b>
+                    <code>{message.alias}</code>
+                    <span className="chat-message-state" role="status">
+                      {responseState(message)}
+                    </span>
                   </>
                 )}
-              </article>
-            ))}
+              </div>
+              {message.thinking && (
+                <details className="chat-thinking">
+                  <summary>思考内容</summary>
+                  <p>{message.thinking}</p>
+                </details>
+              )}
+              {message.text ? (
+                <div className="chat-message-text">{message.text}</div>
+              ) : (
+                message.role === 'assistant' &&
+                !message.error && (
+                  <p className="chat-empty-reply">
+                    {message.status === 'sending'
+                      ? message.thinking
+                        ? '正在思考，等待正文…'
+                        : '等待模型响应…'
+                      : message.status === 'stopped'
+                        ? '已停止，尚未收到正文。'
+                        : message.toolCalls
+                          ? '模型返回了工具调用，可在请求详情中查看。'
+                          : '模型未返回正文，可在请求详情中查看完整响应。'}
+                  </p>
+                )
+              )}
+              {message.error && (
+                <p className="chat-call-error" role="alert">
+                  {message.error}
+                </p>
+              )}
+              {['length', 'max_tokens'].includes(message.finishReason || '') && (
+                <p className="chat-limit-note">本次回复已达到最大输出限制。</p>
+              )}
+              {message.role === 'assistant' && (
+                <>
+                  {message.record && (
+                    <div className="chat-message-metrics">
+                      <span>首 Token {firstTiming(message.record)}</span>
+                      <span>耗时 {duration(message.record.duration_ms)}</span>
+                      <span>
+                        Token {number(inputTotal(message.record))} → {number(outputTotal(message.record))}
+                      </span>
+                    </div>
+                  )}
+                  {message.status !== 'sending' && (
+                    <div className="chat-message-actions">
+                      {message.text && (
+                        <button type="button" className="link" onClick={() => void copy(message.text)}>
+                          <Copy size={13} />
+                          复制
+                        </button>
+                      )}
+                      {index === messages.length - 1 && (
+                        <button
+                          type="button"
+                          className="link"
+                          disabled={busy || !selected}
+                          onClick={() => void execute(messages.slice(0, index))}
+                        >
+                          <RotateCcw size={13} />
+                          {message.status === 'error' || message.status === 'interrupted' ? '重试' : '重新生成'}
+                        </button>
+                      )}
+                      {message.requestID && (
+                        <button type="button" className="link" onClick={() => showRequest(message.requestID!)}>
+                          请求详情
+                          <ArrowRight size={13} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </article>
+          ))}
+        </div>
+      </div>
+      {panel && (
+        <aside className="chat-panel" id={settingsID} aria-label={panel === 'settings' ? '本次对话参数' : '本次请求'}>
+          <div className="chat-panel-heading">
+            <h2>{panel === 'settings' ? '本次对话参数' : '本次请求'}</h2>
+            <button type="button" className="icon-btn" aria-label="收起对话面板" onClick={() => setPanel(null)}>
+              <X size={17} />
+            </button>
           </div>
-          <div className="chat-composer-area">
-            <div className="chat-context">
-              <span>{rounds ? '已携带 ' + rounds + ' 轮文本上下文' : '新对话 · 尚无上下文'}</span>
-              {awayFromBottom ? (
+          {panel === 'settings' ? (
+            <form
+              className="chat-settings"
+              onSubmit={(event) => {
+                event.preventDefault();
+                applyParameters();
+              }}
+            >
+              <p className="chat-panel-intro">只影响当前对话的后续请求</p>
+              <label className="field">
+                <span>
+                  系统提示词 <small>System prompt</small>
+                </span>
+                <textarea
+                  rows={5}
+                  disabled={busy}
+                  value={parameterDraft.system}
+                  onChange={(event) => setParameterDraft({ ...parameterDraft, system: event.target.value })}
+                  placeholder="例如：回答简洁，优先给出结论。"
+                />
+              </label>
+              <label className="field">
+                <span>
+                  随机性 <small>Temperature</small>
+                </span>
+                <input
+                  aria-label="对话 Temperature"
+                  type="number"
+                  min={0}
+                  max={2}
+                  step="any"
+                  disabled={busy}
+                  value={parameterDraft.temperature}
+                  placeholder={selected?.defaults.temperature == null ? '使用厂商默认值' : '继承模型配置：' + selected.defaults.temperature}
+                  onChange={(event) => setParameterDraft({ ...parameterDraft, temperature: event.target.value })}
+                />
+                <small>留空时沿用所选模型的配置</small>
+              </label>
+              <label className="field">
+                <span>
+                  最大输出 <small>Max tokens</small>
+                </span>
+                <input
+                  aria-label="对话最大输出"
+                  type="number"
+                  min={1}
+                  max={131072}
+                  step={1}
+                  disabled={busy}
+                  value={parameterDraft.maxTokens}
+                  placeholder={
+                    selected?.defaults.max_tokens != null
+                      ? '继承模型配置：' + selected.defaults.max_tokens
+                      : selectedProtocol === 'messages'
+                        ? '网关默认值：1024'
+                        : '使用厂商默认值'
+                  }
+                  onChange={(event) => setParameterDraft({ ...parameterDraft, maxTokens: event.target.value })}
+                />
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  disabled={busy}
+                  checked={parameterDraft.stream}
+                  onChange={(event) => setParameterDraft({ ...parameterDraft, stream: event.target.checked })}
+                />
+                流式输出
+              </label>
+              {parameterError && (
+                <p role="alert" className="chat-call-error">
+                  {parameterError}
+                </p>
+              )}
+              <div className="chat-settings-actions">
+                <button type="submit" disabled={busy}>
+                  应用参数
+                </button>
                 <button
                   type="button"
                   className="link"
+                  disabled={busy}
                   onClick={() => {
-                    followOutput.current = true;
-                    scroll.current?.scrollTo({ top: scroll.current.scrollHeight });
+                    setParameters(defaults());
+                    setParameterDraft(defaults());
+                    setParameterError('');
+                    setNotice('已恢复继承模型配置。');
                   }}
                 >
-                  <ArrowDown size={12} />
-                  回到底部
+                  恢复默认
                 </button>
-              ) : (
-                <span>{parameters.stream ? '流式输出' : '完整响应'}</span>
-              )}
-            </div>
-            <form
-              className="chat-composer"
-              onSubmit={(event) => {
-                event.preventDefault();
-                send();
-              }}
-            >
-              <textarea
-                ref={textarea}
-                aria-label="对话消息输入"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder={messages.length ? '继续追问，或输入一条测试消息…' : '输入一条消息，测试所选模型…'}
-                rows={3}
-                disabled={!selected}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229 && !busy) {
-                    event.preventDefault();
-                    send();
-                  }
-                }}
-              />
-              <div className="chat-composer-bottom">
-                <span>Enter 发送 · Shift + Enter 换行</span>
-                {busy ? (
-                  <button type="button" className="primary" onClick={() => request.current?.abort()}>
-                    <Square size={13} />
-                    停止生成
-                  </button>
-                ) : (
-                  <button type="submit" className="primary" disabled={!selected || !draft.trim()}>
-                    发送
-                    <ArrowUp size={15} />
-                  </button>
-                )}
               </div>
+              <p className="chat-parameter-status">
+                {dirty ? '有未应用的修改' : customized ? '已应用 · 后续请求生效' : '未填写的参数沿用已有配置'}
+              </p>
             </form>
-            <p className="chat-composer-note">调用使用厂商额度并写入请求记录；本页会话在刷新后清空。</p>
-          </div>
-        </div>
-        {panel && (
-          <aside className="chat-panel" id={settingsID} aria-label={panel === 'settings' ? '本次对话参数' : '本次请求'}>
-            <div className="chat-panel-heading">
-              <h2>{panel === 'settings' ? '本次对话参数' : '本次请求'}</h2>
-              <button type="button" className="icon-btn" aria-label="收起对话面板" onClick={() => setPanel(null)}>
-                <X size={17} />
-              </button>
-            </div>
-            {panel === 'settings' ? (
-              <form
-                className="chat-settings"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  applyParameters();
-                }}
-              >
-                <p className="chat-panel-intro">只影响当前对话的后续请求</p>
-                <label className="field">
-                  <span>
-                    系统提示词 <small>System prompt</small>
-                  </span>
-                  <textarea
-                    rows={5}
-                    disabled={busy}
-                    value={parameterDraft.system}
-                    onChange={(event) => setParameterDraft({ ...parameterDraft, system: event.target.value })}
-                    placeholder="例如：回答简洁，优先给出结论。"
-                  />
-                </label>
-                <label className="field">
-                  <span>
-                    随机性 <small>Temperature</small>
-                  </span>
-                  <input
-                    aria-label="对话 Temperature"
-                    type="number"
-                    min={0}
-                    max={2}
-                    step="any"
-                    disabled={busy}
-                    value={parameterDraft.temperature}
-                    placeholder={
-                      selected?.defaults.temperature == null ? '使用厂商默认值' : '继承模型配置：' + selected.defaults.temperature
-                    }
-                    onChange={(event) => setParameterDraft({ ...parameterDraft, temperature: event.target.value })}
-                  />
-                  <small>留空时沿用所选模型的配置</small>
-                </label>
-                <label className="field">
-                  <span>
-                    最大输出 <small>Max tokens</small>
-                  </span>
-                  <input
-                    aria-label="对话最大输出"
-                    type="number"
-                    min={1}
-                    max={131072}
-                    step={1}
-                    disabled={busy}
-                    value={parameterDraft.maxTokens}
-                    placeholder={
-                      selected?.defaults.max_tokens != null
-                        ? '继承模型配置：' + selected.defaults.max_tokens
-                        : selectedProtocol === 'messages'
-                          ? '网关默认值：1024'
-                          : '使用厂商默认值'
-                    }
-                    onChange={(event) => setParameterDraft({ ...parameterDraft, maxTokens: event.target.value })}
-                  />
-                </label>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    disabled={busy}
-                    checked={parameterDraft.stream}
-                    onChange={(event) => setParameterDraft({ ...parameterDraft, stream: event.target.checked })}
-                  />
-                  流式输出
-                </label>
-                {parameterError && (
-                  <p role="alert" className="chat-call-error">
-                    {parameterError}
-                  </p>
-                )}
-                <div className="chat-settings-actions">
-                  <button type="submit" disabled={busy}>
-                    应用参数
-                  </button>
-                  <button
-                    type="button"
-                    className="link"
-                    disabled={busy}
-                    onClick={() => {
-                      setParameters(defaults());
-                      setParameterDraft(defaults());
-                      setParameterError('');
-                      setNotice('已恢复继承模型配置。');
-                    }}
-                  >
-                    恢复默认
-                  </button>
-                </div>
-                <p className="chat-parameter-status">
-                  {dirty ? '有未应用的修改' : customized ? '已应用 · 后续请求生效' : '未填写的参数沿用已有配置'}
-                </p>
-              </form>
-            ) : (
-              active && <ChatRequestPanel key={requestID} id={requestID} api={api} onOpenRecord={onOpenRecord} />
-            )}
-          </aside>
-        )}
-      </div>
+          ) : (
+            active && <ChatRequestPanel key={requestID} id={requestID} api={api} onOpenRecord={onOpenRecord} />
+          )}
+        </aside>
+      )}
     </section>
   );
 }
