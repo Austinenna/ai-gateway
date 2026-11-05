@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { protocolName } from '../connection-protocols';
 import { accessBlock, accessURLs, protocolOrder, type Protocol } from '../ProjectAccessContent';
+import { FilterSelect } from '../FilterSelect';
 
 type Model = { id: string; alias: string; protocols: string[]; enabled: boolean };
 
@@ -60,19 +61,33 @@ export function AccessSummary({
             {protocolName(p)}
           </button>
         ))}
+        <div className="acc-pick">
+          <FilterSelect
+            label="接入模型"
+            value={current?.alias || ''}
+            onChange={setAlias}
+            options={available.map((m) => ({ value: m.alias, label: m.alias }))}
+          />
+        </div>
       </div>
-      <label className="acc-model">
-        <span>MODEL</span>
-        <select aria-label="接入模型" value={current?.alias || ''} onChange={(e) => setAlias(e.target.value)}>
-          {available.map((m) => (
-            <option key={m.id} value={m.alias}>
-              {m.alias}
-            </option>
-          ))}
-        </select>
-        <em>{available.length} 个可用</em>
-      </label>
-      <pre className="acc-code">{shown}</pre>
+
+      <pre className="acc-code">
+        {shown.split('\n').map((line, i) => {
+          const eq = line.indexOf('=');
+          return (
+            <span key={i} className="cfg-line">
+              {line.startsWith('#') || eq < 0 ? (
+                <span className="cm">{line}</span>
+              ) : (
+                <>
+                  <span className="k">{line.slice(0, eq)}</span>=<span className="v">{line.slice(eq + 1)}</span>
+                </>
+              )}
+              {'\n'}
+            </span>
+          );
+        })}
+      </pre>
       <div className="acc-actions">
         <button type="button" className="kb go" onClick={() => copy('current')}>
           复制当前配置

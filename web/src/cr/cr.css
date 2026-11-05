@@ -807,3 +807,16 @@
 .cr .acc-empty{color:var(--dim);font-size:12px}
 .cr .project-ops .confirm-pair{display:inline-flex;gap:6px}
 .cr .project-ops .confirm-pair .kb{width:auto;padding:4px 10px}
+.cr .acc-sum .proto{align-items:center}
+.cr .acc-sum .acc-pick{margin-left:auto}
+.cr .acc-sum .acc-pick .filter-select-trigger{width:auto;max-width:220px;min-height:0;padding:2px 9px;border:1px solid var(--cyan);border-radius:0;background:none;color:var(--cyan);font-family:var(--mono);font-size:11px;gap:6px}
+.cr .acc-sum .acc-pick .filter-select-trigger svg{width:11px;height:11px;color:var(--cyan)}
+.cr .acc-sum .acc-code,.cr .acc-sum pre.acc-code{color:var(--tx);background:#000}
+.cr .acc-code .cm{color:var(--dim)}
+.cr .acc-code .k{color:var(--cyan)}
+.cr .acc-code .v{color:var(--tx)}
+.cr .acc-code .v{color:var(--cyan)}
+.cr .acc-sum .proto .acc-pick,.cr .acc-sum .proto .acc-pick span{border:0;padding:0;color:inherit}
+.cr .acc-code .cfg-line{display:inline}
+.cr .acc-code .v{color:var(--go)}
+.cr .acc-sum .acc-code{color:var(--tx-2)}
