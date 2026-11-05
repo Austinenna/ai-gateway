@@ -46,14 +46,26 @@ const shortProto: Record<string, string> = {
 };
 const allProtocols = ['chat', 'messages', 'dashscope-asr', 'dashscope-tts', 'deepseek-search', 'deepseek-fetch'];
 
-function priceText(m: Model) {
+// Short prices keep three significant digits so two-column racks fit; the cell title has the exact value.
+function priceText(m: Model, short = false) {
   const p = [...(m.prices || [])].filter((x) => x.effective_from <= Date.now()).sort((a, b) => b.effective_from - a.effective_from)[0];
+  const n = (v: number | null | undefined) => (v == null ? '—' : short ? String(Number(v.toPrecision(3))) : String(v));
   if (!p) return '未定价';
-  if (p.audio_per_minute != null) return `¥${p.audio_per_minute}/min`;
-  if (p.per_10k_characters != null) return `¥${p.per_10k_characters}/万字`;
-  if (p.input_per_mtok != null || p.output_per_mtok != null) return `${p.input_per_mtok ?? '—'} · ${p.output_per_mtok ?? '—'}`;
-  if (p.per_call != null) return `¥${p.per_call}/次`;
+  if (p.audio_per_minute != null) return `¥${n(p.audio_per_minute)}/min`;
+  if (p.per_10k_characters != null) return `¥${n(p.per_10k_characters)}/万字`;
+  if (p.input_per_mtok != null || p.output_per_mtok != null) return `${n(p.input_per_mtok)} · ${n(p.output_per_mtok)}`;
+  if (p.per_call != null) return `¥${n(p.per_call)}/次`;
   return '未定价';
+}
+
+function priceTitle(m: Model) {
+  return m.upstream_model + (m.context_window ? ` · 上下文 ${m.context_window.toLocaleString('en-US')} Token` : '');
+}
+
+function shortCount(v: number) {
+  if (v >= 1e6) return Number((v / 1e6).toPrecision(3)) + 'M';
+  if (v >= 1e3) return Number((v / 1e3).toPrecision(3)) + 'K';
+  return String(v);
 }
 
 function healthPill(h?: ConnectionHealth, enabled = true): [string, string] {
@@ -231,12 +243,10 @@ export function Routing({
                   <thead>
                     <tr>
                       <th>ON</th>
-                      <th>ALIAS</th>
-                      <th>UPSTREAM</th>
+                      <th>MODEL</th>
                       <th className="n">¥/M</th>
                       <th className="n">24H</th>
                       <th className="n">TTFT</th>
-                      <th>FALLBACK</th>
                       <th />
                     </tr>
                   </thead>
@@ -258,29 +268,29 @@ export function Routing({
                               }}
                             />
                           </td>
-                          <td style={{ color: usable ? 'var(--tx)' : 'var(--dim)' }}>
-                            {m.alias}
-                            {m.name && m.name !== m.alias && <small className="zh">{m.name}</small>}
-                          </td>
-                          <td>
-                            {m.upstream_model}
+                          <td className="mdl-cell" title={priceTitle(m)}>
+                            <div className="mdl-name" style={{ color: usable ? 'var(--tx)' : 'var(--dim)' }}>
+                              <span>{m.alias}</span>
+                              {m.fallback_model_id ? (
+                                <span className="fb" title={'失败时改用 ' + (aliasByID.get(m.fallback_model_id) || '已删除的模型')}>
+                                  ⇢ {aliasByID.get(m.fallback_model_id) || '已删除'}
+                                </span>
+                              ) : usedAsFallback(m.id) ? (
+                                <span className="fb in" title={`被 ${usedAsFallback(m.id)} 个模型用作备用`}>
+                                  ⇠ ×{usedAsFallback(m.id)}
+                                </span>
+                              ) : null}
+                            </div>
                             <small className="zh">
-                              {m.context_window ? `上下文 ${m.context_window.toLocaleString('en-US')} Token` : '上下文未设置'}
+                              {m.upstream_model} · {m.context_window ? `上下文 ${shortCount(m.context_window)}` : '上下文未设置'}
+                              {m.name && m.name !== m.alias ? ` · ${m.name}` : ''}
                             </small>
                           </td>
-                          <td className="n">{priceText(m)}</td>
+                          <td className="n" title={priceText(m)}>
+                            {priceText(m, true)}
+                          </td>
                           <td className="n">{st?.requests ?? 0}</td>
                           <td className="n">{st?.ttft.p50 == null ? '—' : (st.ttft.p50 / 1000).toFixed(2) + 's'}</td>
-                          <td
-                            style={{ color: m.fallback_model_id ? 'var(--amber)' : 'var(--dim)' }}
-                            title={usedAsFallback(m.id) ? `被 ${usedAsFallback(m.id)} 个模型用作备用` : undefined}
-                          >
-                            {m.fallback_model_id
-                              ? '⇢ ' + (aliasByID.get(m.fallback_model_id) || '已删除')
-                              : usedAsFallback(m.id)
-                                ? `⇠ ×${usedAsFallback(m.id)}`
-                                : '—'}
-                          </td>
                           <td className="row-actions">
                             <span className="model-actions">
                               <button

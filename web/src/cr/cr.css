@@ -891,3 +891,11 @@
 .cr .task-inspector .task-head h2 .title-tag{vertical-align:3px}
 .cr .bud .bud-more{all:unset;cursor:pointer;margin-top:2px;font-size:12px;color:var(--dim)}
 .cr .bud .bud-more:hover{color:var(--go)}
+/* Compact model rows: two racks per row while each fits the five columns, else one. */
+.cr .routing .racks{grid-template-columns:repeat(auto-fit,minmax(min(540px,100%),1fr))}
+.cr .rack .mt td.mdl-cell{width:100%;max-width:0;white-space:normal}
+.cr .rack .mt .mdl-name{display:flex;align-items:baseline;gap:8px;min-width:0}
+.cr .rack .mt .mdl-name>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr .rack .mt .mdl-cell small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr .rack .mt .fb{flex:none;font-size:10px;color:var(--amber);border:1px solid var(--line);padding:0 5px;line-height:15px}
+.cr .rack .mt .fb.in{color:var(--dim)}

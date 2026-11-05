@@ -45,7 +45,8 @@ test('模型上下文窗口保存、回显、公开目录与窄屏显示', async
     await page.reload();
     await page.locator('nav').getByRole('button', { name: /^连接与模型/ }).click();
     const row = page.locator('.rack-models tbody tr').filter({ hasText: '上下文测试模型' });
-    await expect(row).toContainText('上下文 1,048,576 Token');
+    await expect(row).toContainText('上下文 1.05M');
+    await expect(row.locator('.mdl-cell')).toHaveAttribute('title', /上下文 1,048,576 Token/);
     await page.screenshot({ path: resolve(output, 'models-desktop.png') });
     await row.getByRole('button', { name: '编辑', exact: true }).click();
     await expect(window).toHaveValue('1048576');
