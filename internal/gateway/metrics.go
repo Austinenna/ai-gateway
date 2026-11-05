@@ -349,6 +349,19 @@ type metricBucket struct {
 	RPM      float64 `json:"rpm"`
 	// TTFTP50 is the median first-token latency of completed calls in the bucket.
 	TTFTP50 *int64 `json:"ttft_p50,omitempty"`
+	// SpeedP50 is the median output speed (tokens/s) of completed streaming calls.
+	SpeedP50 *float64 `json:"speed_p50,omitempty"`
+}
+
+// ttftHistogram counts streaming first-token latencies in 200 ms bins up to 5 s;
+// the last bin holds everything slower.
+func ttftHistogram(values []float64) []int {
+	const binMS, bins = 200, 26
+	counts := make([]int, bins)
+	for _, v := range values {
+		counts[min(bins-1, int(v/binMS))]++
+	}
+	return counts
 }
 
 func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
@@ -425,6 +438,7 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 	const n = 24
 	buckets := make([]metricBucket, n)
 	bucketTTFT := make([][]int64, n)
+	bucketSpeed := make([][]float64, n)
 	width := float64(now-from+1) / n
 	for i := range buckets {
 		buckets[i].Started = from + int64(float64(i)*width)
@@ -473,6 +487,9 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 		if rec.State == "complete" && rec.FirstToken != nil {
 			bucketTTFT[index] = append(bucketTTFT[index], *rec.FirstToken)
 		}
+		if rec.State == "complete" && rec.OutputTPS != nil {
+			bucketSpeed[index] = append(bucketSpeed[index], *rec.OutputTPS)
+		}
 		recent = append(recent, rec)
 	}
 	for i, values := range bucketTTFT {
@@ -480,6 +497,13 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 			slices.Sort(values)
 			median := values[len(values)/2]
 			buckets[i].TTFTP50 = &median
+		}
+	}
+	for i, values := range bucketSpeed {
+		if len(values) > 0 {
+			slices.Sort(values)
+			median := values[len(values)/2]
+			buckets[i].SpeedP50 = &median
 		}
 	}
 	minutes := float64(now-from) / 60000
@@ -514,5 +538,5 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 		filterOptions[k] = out
 	}
-	writeJSON(w, 200, map[string]any{"from": from, "to": now, "monitoring_since": g.monitoringSince, "summary": agg, "models": groupList, "buckets": buckets, "recent": recent, "options": filterOptions, "metrics_errors": g.metricsErrors.Load(), "dropped_records": g.dropped.Load()})
+	writeJSON(w, 200, map[string]any{"from": from, "to": now, "monitoring_since": g.monitoringSince, "summary": agg, "models": groupList, "buckets": buckets, "ttft_histogram": ttftHistogram(agg.ttft), "recent": recent, "options": filterOptions, "metrics_errors": g.metricsErrors.Load(), "dropped_records": g.dropped.Load()})
 }

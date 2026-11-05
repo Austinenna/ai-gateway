@@ -745,3 +745,9 @@
 .cr .chat-panel button{border:1px solid var(--line-2);background:none;color:var(--tx-2);font-family:var(--mono);font-size:11px}
 .cr .chat-panel button.primary{background:var(--go);border-color:var(--go);color:#000}
 .cr .chat-panel-intro{color:var(--dim);font-family:var(--sans)}
+.cr .lat-p{display:flex;flex-direction:column}
+.cr .lat-p #hist{flex:1 1 0;min-height:150px;height:auto;width:100%;display:block;margin-top:8px}
+.cr .lat-p .legend{display:flex;gap:6px;align-items:center;letter-spacing:0;font-size:10.5px;color:var(--dim)}
+.cr .lat-p .legend i{display:inline-block;width:8px;height:8px}
+.cr .lat-p .lat-stats{display:flex;gap:18px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--dim);font-size:11px}
+.cr .lat-p .lat-stats b{color:var(--tx);font-weight:400}

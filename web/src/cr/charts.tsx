@@ -191,37 +191,62 @@ export function Throughput({ buckets, onHover }: { buckets: Bucket[]; onHover?: 
   );
 }
 
-/** Histogram of TTFT values in 250 ms bins, with p50/p95 markers. */
-export function TtftHistogram({ values }: { values: number[] }) {
-  const [ref, W] = useWidth<SVGSVGElement>();
-  const H = 150,
-    binMs = 250,
-    bins = 24;
-  const counts = Array.from({ length: bins }, () => 0);
-  values.forEach((v) => counts[Math.min(bins - 1, Math.floor(v / binMs))]++);
-  const mx = Math.max(1, ...counts),
-    bw = W / bins;
-  const sorted = [...values].sort((a, b) => a - b);
-  const q = (p: number) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)] : null);
-  const p50 = q(0.5),
-    p95 = q(0.95);
+/** TtftHistogram draws the window's first-token latency distribution (200 ms bins, last bin ≥ 5 s). */
+export function TtftHistogram({ counts, p50, p95 }: { counts: number[]; p50: number | null; p95: number | null }) {
+  const [ref, size] = useSize<SVGSVGElement>();
+  const W = size.w,
+    H = Math.max(140, size.h || 160);
+  const binMs = 200,
+    bins = counts.length || 26,
+    pl = 30,
+    pb = 18,
+    pt = 14;
+  const mx = Math.max(1, ...counts);
+  const step = Math.max(1, Math.ceil(mx / 3));
+  const top = step * 3;
+  const bw = (W - pl) / bins;
+  const y = (v: number) => H - pb - (v / top) * (H - pb - pt);
+  const xOf = (ms: number) => pl + (Math.min(ms, bins * binMs) / binMs) * bw;
+  const p95Bin = p95 == null ? bins : Math.floor(p95 / binMs);
   return (
-    <svg ref={ref} id="hist" viewBox={`0 0 ${W || 1} ${H}`} role="img" aria-label="首字延迟分布">
+    <svg ref={ref} id="hist" viewBox={`0 0 ${W || 1} ${H}`} role="img" aria-label="首个 token 耗时分布">
+      {W > 0 &&
+        [0, 1, 2, 3].map((k) => (
+          <g key={'y' + k}>
+            <line x1={pl} x2={W} y1={y(step * k)} y2={y(step * k)} stroke="var(--line)" />
+            <text x={pl - 6} y={y(step * k) + 3} textAnchor="end" fontSize={9.5} fill="var(--dim)">
+              {step * k}
+            </text>
+          </g>
+        ))}
       {W > 0 &&
         counts.map((c, i) => {
-          const h = (c / mx) * (H - 30);
           const hot = p50 != null && Math.floor(p50 / binMs) === i;
+          const slow = i > p95Bin || i === bins - 1;
           return (
             <rect
               key={i}
-              x={i * bw + 1}
-              y={H - 20 - h}
+              x={pl + i * bw + 1}
+              y={y(c)}
               width={Math.max(1, bw - 2)}
-              height={h}
-              fill={hot ? 'var(--go)' : i >= 16 ? 'var(--amber)' : 'var(--go-2)'}
-            />
+              height={H - pb - y(c)}
+              fill={hot ? 'var(--go)' : slow ? 'var(--amber)' : 'var(--go-2)'}
+            >
+              <title>{`${i === bins - 1 ? '≥5s' : (i * binMs) / 1000 + '–' + ((i + 1) * binMs) / 1000 + 's'} · ${c} 次`}</title>
+            </rect>
           );
         })}
+      {W > 0 &&
+        [0, 1, 2, 3, 4].map((sec) => (
+          <text key={'x' + sec} x={xOf(sec * 1000)} y={H - 4} fontSize={9.5} fill="var(--dim)">
+            {sec}s
+          </text>
+        ))}
+      {W > 0 && (
+        <text x={W - 2} y={H - 4} fontSize={9.5} fill="var(--amber)" textAnchor="end">
+          ≥5s
+        </text>
+      )}
       {W > 0 &&
         (
           [
@@ -231,26 +256,13 @@ export function TtftHistogram({ values }: { values: number[] }) {
         ).map(([v, l]) =>
           v == null ? null : (
             <g key={l}>
-              <line
-                x1={(Math.min(v, bins * binMs) / binMs) * bw}
-                x2={(Math.min(v, bins * binMs) / binMs) * bw}
-                y1={0}
-                y2={H - 20}
-                stroke="var(--tx-2)"
-                strokeDasharray="2 2"
-              />
-              <text x={(Math.min(v, bins * binMs) / binMs) * bw + 4} y={10} fontSize={9.5} fill="var(--tx-2)">
+              <line x1={xOf(v)} x2={xOf(v)} y1={pt - 4} y2={H - pb} stroke="var(--tx-2)" strokeDasharray="2 2" />
+              <text x={Math.min(xOf(v) + 4, W - 60)} y={pt - 4 + (l === 'p95' ? 12 : 0)} fontSize={9.5} fill="var(--tx-2)">
                 {l} {(v / 1000).toFixed(2)}s
               </text>
             </g>
           ),
         )}
-      {W > 0 &&
-        ['0', '1s', '2s', '3s', '4s', '5s+'].map((l, i) => (
-          <text key={l} x={(i * W) / 5.1} y={H - 5} fontSize={9.5} fill="var(--dim)">
-            {l}
-          </text>
-        ))}
     </svg>
   );
 }

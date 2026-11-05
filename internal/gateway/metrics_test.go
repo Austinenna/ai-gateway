@@ -318,3 +318,29 @@ func TestMetricsBucketsReportCompletedTTFTMedian(t *testing.T) {
 		t.Fatal("empty bucket should not report TTFT")
 	}
 }
+
+func TestMetricsBucketSpeedAndTTFTHistogram(t *testing.T) {
+	h := newHarness(t)
+	now := time.Now().UnixMilli()
+	stream := true
+	for i, c := range []struct {
+		ttft  int64
+		speed float64
+	}{{100, 40}, {450, 60}, {7000, 50}} {
+		ttft, speed := c.ttft, c.speed
+		h.g.saveMetric(Record{ID: "s-" + string(rune('a'+i)), Started: now, State: "complete", FirstToken: &ttft, MetricsFields: MetricsFields{MetricsVersion: 1, Stream: &stream, OutputTPS: &speed}})
+	}
+	rr := h.request("GET", "/api/admin/metrics", nil, "", true)
+	h.want(rr, 200)
+	got := parse[struct {
+		Buckets   []metricBucket `json:"buckets"`
+		Histogram []int          `json:"ttft_histogram"`
+	}](t, rr)
+	last := got.Buckets[len(got.Buckets)-1]
+	if last.SpeedP50 == nil || *last.SpeedP50 != 50 {
+		t.Fatalf("bucket speed median: %+v", last)
+	}
+	if len(got.Histogram) != 26 || got.Histogram[0] != 1 || got.Histogram[2] != 1 || got.Histogram[25] != 1 {
+		t.Fatalf("histogram bins: %v", got.Histogram)
+	}
+}

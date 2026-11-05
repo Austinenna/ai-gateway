@@ -81,7 +81,7 @@ export function Overview({
 }) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [tail, setTail] = useState<RequestRecord[]>([]);
-  const [ttfts, setTtfts] = useState<number[]>([]);
+  const [windowSpend, setWindowSpend] = useState<number | null>(null);
   const [fallback, setFallback] = useState<{ total: number; served: number } | null>(null);
   const [spend, setSpend] = useState<{ total: number; byProject: Record<string, number> } | null>(null);
   const [diag, setDiag] = useState<DiagGroup[]>([]);
@@ -91,18 +91,18 @@ export function Overview({
     let disposed = false;
     const load = async () => {
       const from = win === 'all' ? 0 : Date.now() - windowMs[win];
-      const [m, fb, ok, d, u] = await Promise.all([
+      const [m, fb, d, u, w] = await Promise.all([
         api('/admin/metrics?window=' + win),
         api(`/admin/requests?state=fallback&limit=200&from=${from}`),
-        api(`/admin/requests?state=success&limit=200&from=${from}`),
         api('/admin/diagnostics?window=' + (win === 'all' ? 'all' : win)),
         api('/admin/usage?period=month&group_by=project'),
+        api('/admin/usage?' + (win === 'all' ? 'period=all' : 'from=' + from)),
       ]);
       if (disposed) return;
       setMetrics(m);
       const fbItems: RequestRecord[] = fb.items || [];
       setFallback({ total: fb.total ?? fbItems.length, served: fbItems.filter((r) => r.state === 'complete').length });
-      setTtfts(((ok.items || []) as RequestRecord[]).map((r) => r.first_token_ms).filter((v): v is number => typeof v === 'number'));
+      setWindowSpend(w.total?.cost ?? 0);
       setDiag((d.groups || []) as DiagGroup[]);
       setSpend({
         total: u.total?.cost || 0,
@@ -153,6 +153,9 @@ export function Overview({
   const modelRows = [...(metrics?.models || [])].sort((a, b) => b.requests - a.requests);
   const aliasCount = new Map<string, number>();
   modelRows.forEach((m) => aliasCount.set(m.alias, (aliasCount.get(m.alias) || 0) + 1));
+  const histogram = metrics?.ttft_histogram || [];
+  const histTotal = histogram.reduce((a, b) => a + b, 0);
+  const slow = histogram.at(-1) || 0;
   const budgetTotal = projects.reduce((a, p) => a + (p.monthly_budget || 0), 0);
   const monthDays = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const eom = spend ? (spend.total / Math.max(1, new Date().getDate() - 1 + new Date().getHours() / 24)) * monthDays : 0;
@@ -229,7 +232,7 @@ export function Overview({
             <span>p95 {secs(s?.ttft.p95)}s</span>
             <span>{s?.ttft.count ?? 0} 样本</span>
           </div>
-          <Sparkline values={ttfts.slice(-48).reverse()} color="var(--cyan)" />
+          <Sparkline values={(metrics?.buckets || []).filter((b) => b.ttft_p50 != null).map((b) => b.ttft_p50!)} color="var(--cyan)" />
         </div>
         <div className="p c2">
           <div className="h">
@@ -237,10 +240,10 @@ export function Overview({
           </div>
           <div className="kv">{s?.speed.p50 == null ? '—' : s.speed.p50.toFixed(1)}</div>
           <div className="sub">
-            <span>缓存 {s?.cache_ratio == null ? '—' : Math.round(s.cache_ratio * 100) + '%'}</span>
+            <span>缓存 {s?.cache_ratio == null ? '—' : Math.round(s.cache_ratio) + '%'}</span>
             <span>out {(s?.output_tokens ?? 0).toLocaleString()}</span>
           </div>
-          <Segments ratio={s?.cache_ratio ?? 0} />
+          <Sparkline values={(metrics?.buckets || []).filter((b) => b.speed_p50 != null).map((b) => b.speed_p50!)} />
         </div>
         <div className="p c2" onClick={() => onNavigate('requests')} style={{ cursor: 'pointer' }}>
           <div className="h">
@@ -255,11 +258,14 @@ export function Overview({
         </div>
         <div className="p c2" onClick={() => onNavigate('costs')} style={{ cursor: 'pointer' }}>
           <div className="h">
-            SPEND<span className="r">本月</span>
+            SPEND<span className="r">{win.toUpperCase()}</span>
           </div>
-          <div className="kv amber">{spend ? yuan(spend.total) : '—'}</div>
+          <div className="kv amber">{windowSpend == null ? '—' : yuan(windowSpend)}</div>
           <div className="sub">
-            <span>{budgetTotal ? '/ ¥' + budgetTotal : '未设预算'}</span>
+            <span>
+              本月 {spend ? yuan(spend.total) : '—'}
+              {budgetTotal ? ' / ¥' + budgetTotal : ''}
+            </span>
             {spend && <span className={budgetTotal && eom > budgetTotal ? 'dn' : ''}>EOM {yuan(eom)}</span>}
           </div>
           <Segments ratio={budgetTotal && spend ? spend.total / budgetTotal : 0} tone="am" />
@@ -400,11 +406,28 @@ export function Overview({
             </tbody>
           </table>
         </div>
-        <div className="p c4">
+        <div className="p c4 lat-p">
           <div className="h">
-            LATENCY<span className="zh">TTFT 分布 · 最近 {ttfts.length} 次成功</span>
+            LATENCY<span className="zh">首个 token 耗时分布 · {s?.ttft.count ?? 0} 次流式成功</span>
+            <span className="r legend zh">
+              <i style={{ background: 'var(--go)' }} />
+              中位数所在格 <i style={{ background: 'var(--amber)' }} />
+              慢于 p95
+            </span>
           </div>
-          <TtftHistogram values={ttfts} />
+          <TtftHistogram counts={histogram} p50={s?.ttft.p50 ?? null} p95={s?.ttft.p95 ?? null} />
+          <div className="lat-stats">
+            <span>
+              p50 <b>{secs(s?.ttft.p50)}s</b>
+            </span>
+            <span>
+              p95 <b>{secs(s?.ttft.p95)}s</b>
+            </span>
+            <span>
+              ≥5s <b style={{ color: slow ? 'var(--amber)' : undefined }}>{slow}</b> 次
+              {histTotal ? `（${Math.round((slow / histTotal) * 100)}%）` : ''}
+            </span>
+          </div>
         </div>
         <div className="p c3">
           <div className="h">
