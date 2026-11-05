@@ -55,6 +55,7 @@ test.beforeEach(async ({ page }) => {
     return route.fulfill({ json: json ?? {} });
   });
   await page.goto('/');
+  await page.getByRole('button', { name: /监控明细/ }).click();
 });
 
 test('全部范围显示累计统计并保留筛选与刷新', async ({ page }, info) => {
@@ -200,6 +201,7 @@ test('模型指标双向排序、未知值置后，并在刷新与筛选后保�
   });
   await page.clock.install();
   await page.reload();
+  await page.getByRole('button', { name: /监控明细/ }).click();
   const table = page.locator('.monitor-models');
   const names = table.locator('tbody tr td:first-child > :first-child');
   const unrouted = '未路由请求';

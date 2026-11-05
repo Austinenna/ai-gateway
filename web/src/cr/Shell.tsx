@@ -38,7 +38,7 @@ export const crNumber = Object.fromEntries(groups.flatMap(([, p]) => p).map((p, 
 export type RailBadge = { text: string; hot?: boolean };
 
 /** TopBar is the full-width ticker: identity, live counters, clock. */
-export function TopBar({ runtime, mode, host }: { runtime: Runtime | null; mode: string; host: string }) {
+export function TopBar({ runtime, mode, host, extra }: { runtime: Runtime | null; mode: string; host: string; extra?: ReactNode }) {
   const [clock, setClock] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -75,6 +75,7 @@ export function TopBar({ runtime, mode, host }: { runtime: Runtime | null; mode:
         <span className="zh">{mode}</span>
         <span>{host}</span>
       </div>
+      {extra}
       <div className="clock">{clock.toTimeString().slice(0, 8)}</div>
     </header>
   );

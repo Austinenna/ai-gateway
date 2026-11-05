@@ -73,7 +73,7 @@ import { ChatPage } from './ChatPage';
 import { RequestHeader, RequestTiming } from './RequestMetrics';
 import { type RequestRecord, recordStatus } from './monitoring';
 import { TopBar, Rail, ViewHead, type CrPage, type RailBadge } from './cr/Shell';
-import { Overview } from './cr/Overview';
+import { Overview, overviewWindows } from './cr/Overview';
 import { Inspector, RequestList } from './cr/Requests';
 import { Routing } from './cr/Routing';
 import { Projects } from './cr/Projects';
@@ -305,6 +305,8 @@ function App() {
     [testResult, setTestResult] = useState(''),
     [testProtocol, setTestProtocol] = useState('chat'),
     [callProtocol, setCallProtocol] = useState('chat');
+  const [overviewWin, setOverviewWin] = useState('24h');
+  const [monitorDetail, setMonitorDetail] = useState(false);
   const [tester, setTester] = useState(false),
     [callToken, setCallToken] = useState(''),
     [callAlias, setCallAlias] = useState(''),
@@ -904,6 +906,7 @@ function App() {
         <span aria-hidden="true">▶ </span>试调用
       </button>
     ) : null;
+  const showMonitorDetail = monitorDetail || !state.models.length;
   const errorView = error && (
     <div className="error" role="alert">
       {error}
@@ -1022,6 +1025,23 @@ function App() {
         runtime={runtime}
         mode={status.passwordless_enabled ? '本机 · 自动解锁' : '密码登录'}
         host={new URL(state.base_url || location.origin).host}
+        extra={
+          page === 'overview' && (
+            <span className="keys" role="group" aria-label="总览时间范围">
+              {overviewWindows.map(([k, l]) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={overviewWin === k ? 'on' : ''}
+                  aria-pressed={overviewWin === k}
+                  onClick={() => setOverviewWin(k)}
+                >
+                  {l}
+                </button>
+              ))}
+            </span>
+          )
+        }
       />
       <div className="wrap">
         <Rail
@@ -1077,7 +1097,9 @@ function App() {
                       ? 'projects-main'
                       : page === 'diagnostics'
                         ? 'diagnostics-main'
-                        : '')
+                        : page === 'overview'
+                          ? 'overview-main'
+                          : '')
             }
           >
             {errorView}
@@ -1114,14 +1136,17 @@ function App() {
                   selectRecord(id);
                 }}
                 onNavigate={(p) => navigate(p)}
+                win={overviewWin}
+                detailOpen={monitorDetail}
+                onToggleDetail={() => setMonitorDetail((v) => !v)}
               />
             )}
-            {page === 'overview' && (
+            {page === 'overview' && showMonitorDetail && (
               <div className="cr-section-h">
                 DETAIL<span className="zh">监控明细 · 按时间范围、项目、连接、模型筛选</span>
               </div>
             )}
-            {page === 'overview' && (
+            {page === 'overview' && showMonitorDetail && (
               <MonitorOverview
                 projects={state.projects}
                 connections={state.connections}

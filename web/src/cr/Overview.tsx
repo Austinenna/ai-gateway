@@ -4,7 +4,6 @@ import { errorName } from '../monitoring';
 import type { ConnectionHealth } from '../health';
 import { bucketClass } from '../health';
 import { Segments, Sparkline, Throughput, TtftHistogram, type Bucket } from './charts';
-import { ViewHead } from './Shell';
 
 type Api = (path: string, method?: string, body?: unknown) => Promise<any>;
 type Project = { id: string; name: string; monthly_budget?: number | null };
@@ -20,7 +19,7 @@ type DiagGroup = {
   projects: string[];
 };
 
-const windows = [
+export const overviewWindows = [
   ['1h', '1H'],
   ['24h', '24H'],
   ['7d', '7D'],
@@ -58,7 +57,13 @@ export function Overview({
   health,
   onOpenRecord,
   onNavigate,
+  win,
+  detailOpen,
+  onToggleDetail,
 }: {
+  win: string;
+  detailOpen: boolean;
+  onToggleDetail: () => void;
   api: Api;
   projects: Project[];
   connections: Connection[];
@@ -67,7 +72,6 @@ export function Overview({
   onOpenRecord: (id: string) => void;
   onNavigate: (page: 'requests' | 'diagnostics' | 'costs' | 'models' | 'projects') => void;
 }) {
-  const [win, setWin] = useState<string>('24h');
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [tail, setTail] = useState<RequestRecord[]>([]);
   const [ttfts, setTtfts] = useState<number[]>([]);
@@ -177,15 +181,7 @@ export function Overview({
 
   return (
     <div className="cr-v">
-      <ViewHead page="overview" sub={win === 'all' ? '监控开始至今' : '近 ' + windows.find(([k]) => k === win)![1]}>
-        <span className="keys" role="group" aria-label="时间范围">
-          {windows.map(([k, l]) => (
-            <button key={k} type="button" className={win === k ? 'on' : ''} aria-pressed={win === k} onClick={() => setWin(k)}>
-              {l}
-            </button>
-          ))}
-        </span>
-      </ViewHead>
+      <h1 className="sr-only">总览</h1>
       <section className="board">
         <div className="p c2">
           <div className="h">
@@ -413,6 +409,14 @@ export function Overview({
           </div>
         </div>
       </section>
+      <div className="foot-line">
+        <span>
+          CONTROL ROOM · {win === 'all' ? 'ALL' : win.toUpperCase()} · <span className="zh">每 10 秒刷新</span>
+        </span>
+        <button type="button" className="kb" aria-expanded={detailOpen} onClick={onToggleDetail}>
+          <span className="zh">监控明细</span> {detailOpen ? '▴' : '▾'}
+        </button>
+      </div>
       {tip && (
         <div className="tip" style={{ opacity: 1, left: Math.min(tip.x + 12, innerWidth - 320), top: tip.y - 30 }}>
           {tip.text}
