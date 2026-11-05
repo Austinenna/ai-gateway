@@ -40,6 +40,8 @@ bash scripts/start.sh
 
 ## 验证边界
 
+2026-11-05 生产部署项目矩阵列宽修正：版本 `ce689f10d5614b9025414a28fc6cb92ec0165768` 让项目授权矩阵的名称列（200px）与 RATE／CONCURRENCY／BUDGET 统计列（各 150px）定宽，模型较少时空余宽度留在模型列与统计列之间，不再把统计列拉宽。release 为 `ce689f10d5614b9025414a28fc6cb92ec0165768-1793865451`，Linux 二进制 SHA-256 为 `1cd007795822fc0201300ea2487ddeb7114071306a1c2c3467697deee9ca7515`，`gateway.gz` 为 `71b543577a00906f49af1041e4b9126381c2dbb7a11d7678deadfc306e6f8953`。前端单测、构建、Go 竞态回归与浏览器回归 44 项通过。仅前端改动。
+
 2026-11-05 生产部署时间范围联动与缓存命中率修正：版本 `abf82eab99e61a4c68b07ea2dacc7c852f3e3ae0` 让顶栏 1H／24H／7D／ALL 在总览、请求、任务、异常诊断、成本五页共用并联动（请求按 `from` 服务端筛选，任务按最后活动时间筛选，诊断看板与错误明细跟随范围；成本的花费、缓存命中率、按项目／按模型按所选范围统计，每日图、今天、月底预估与预算仍按自然月），默认 24H；并修正成本看板缓存命中率（成本接口 `input_tokens` 不含缓存读取，改为缓存读取占全部输入）。release 为 `abf82eab99e61a4c68b07ea2dacc7c852f3e3ae0-1793863368`，Linux 二进制 SHA-256 为 `5c02019f8b5086c75025ddd5d003b2a2d0258b9243ec61a49b14a45547076ba1`，`gateway.gz` 为 `0cbdd176390bab5f76ab2e2a10f84d5521861be32ce3d0f1f40bfba49e5619f7`。前端单测、构建、Go 竞态回归与浏览器回归 44 项通过。验收：systemd active／enabled，远程二进制哈希一致，`/healthz` 正常，公网首页 200，匿名 `/v1/models` 401。仅前端改动。
 
 2026-11-05 生产部署消息角色配色修正：版本 `c6d051cf11b996f2d6c7db2bf2680ee20b4b4c63` 让请求里携带的历史 ASSISTANT 消息也显示绿色（此前只有本次响应识别为助手），SYSTEM 改为白色。release 为 `c6d051cf11b996f2d6c7db2bf2680ee20b4b4c63-1793862605`，Linux 二进制 SHA-256 为 `9182e9f717a5ab22c34bbf0eb5c389e93fc031bcf6782872f6597f904205946b`，`gateway.gz` 为 `6f0722b05c8904327847d6005b386cbfc70df337374e971f4698d594dfc7969b`。前端单测、构建、Go 竞态回归与浏览器回归 42 项通过。验收：systemd active／enabled，远程二进制哈希一致，`/healthz` 正常，公网首页 200，匿名 `/v1/models` 401。仅前端改动。
