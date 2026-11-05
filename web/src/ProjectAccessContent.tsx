@@ -44,7 +44,7 @@ export function accessBlock(baseURL: string, protocol: Protocol, alias: string, 
     return `# ${protocolName(protocol)} · ${alias}\nTTS_URL=${endpoint}\nAPI_KEY=${token}\nMODEL=${alias}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${ttsExample(alias)}`;
   if (isWebTool(protocol))
     return `# ${protocolName(protocol)} · ${alias}\nURL=${endpoint}\nAPI_KEY=${token}\n\nPOST ${endpoint}\nContent-Type: application/json\nAuthorization: Bearer ${token}\n\n${webToolExample(protocol)}`;
-  return `# ${protocolName(protocol)} · ${alias}\nBASE_URL=${base}\nAPI_KEY=${token}\nMODEL=${alias}`;
+  return `# ${protocolName(protocol)} · ${alias}\nBASE_URL=${base}\nENDPOINT=${endpoint}\nAPI_KEY=${token}\nMODEL=${alias}`;
 }
 
 export function ProjectAccessContent({ project, baseURL, models, resolveToken, saveToken, rotateToken }: Props) {

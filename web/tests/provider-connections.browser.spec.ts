@@ -153,7 +153,7 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
         await modal.getByRole('button',{name:'复制当前模型配置',exact:true}).click();
         await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
         const value=await page.evaluate(()=>navigator.clipboard.readText());
-        expect(value).toBe(`# ${p==='chat'?'Chat Completions':'Anthropic Messages'} · dual-protocol-ui\nBASE_URL=http://127.0.0.1:18318${p==='chat'?'/v1':''}\nAPI_KEY=${project.token}\nMODEL=dual-protocol-ui`);
+        expect(value).toBe(`# ${p==='chat'?'Chat Completions':'Anthropic Messages'} · dual-protocol-ui\nBASE_URL=http://127.0.0.1:18318${p==='chat'?'/v1':''}\nENDPOINT=http://127.0.0.1:18318/v1/${p==='chat'?'chat/completions':'messages'}\nAPI_KEY=${project.token}\nMODEL=dual-protocol-ui`);
       }
       await modal.getByRole('button',{name:'关闭',exact:true}).click();
       await projectRow.locator('td.pjn').click();

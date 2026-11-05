@@ -820,3 +820,10 @@
 .cr .acc-code .cfg-line{display:inline}
 .cr .acc-code .v{color:var(--go)}
 .cr .acc-sum .acc-code{color:var(--tx-2)}
+/* Limit fields: no spinner arrows, hint vertically centred on the right. */
+.cr .fld .in{align-items:center}
+.cr .fld .in input{flex:1;min-width:0;background:none;border:0;outline:0;color:inherit;font:inherit;-moz-appearance:textfield;appearance:textfield}
+.cr .fld .in input::-webkit-inner-spin-button,.cr .fld .in input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.cr .fld .in em{align-self:center;white-space:nowrap}
+.cr input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.cr input[type=number]::-webkit-inner-spin-button,.cr input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}

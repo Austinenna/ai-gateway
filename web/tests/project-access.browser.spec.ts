@@ -54,7 +54,7 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     expect(await modal.evaluate((el, token) => el.textContent!.includes(token), original)).toBe(false);
     await modal.getByRole('button', { name: '复制当前模型配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
-    expect(await clipboard()).toBe(`# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1\nAPI_KEY=${original}\nMODEL=coding`);
+    expect(await clipboard()).toBe(`# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1\nENDPOINT=http://127.0.0.1:18318/v1/chat/completions\nAPI_KEY=${original}\nMODEL=coding`);
     await modal.getByRole('button', { name: '复制全部模型配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
     expect(await clipboard()).toContain('# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1');
@@ -64,7 +64,7 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     await expect(modal.getByRole('radio', { name: '默认模型 coding-fast', exact: true })).toBeChecked();
     await modal.getByRole('button', { name: '复制当前模型配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
-    expect(await clipboard()).toBe(`# Chat Completions · coding-fast\nBASE_URL=http://127.0.0.1:18318/v1\nAPI_KEY=${original}\nMODEL=coding-fast`);
+    expect(await clipboard()).toBe(`# Chat Completions · coding-fast\nBASE_URL=http://127.0.0.1:18318/v1\nENDPOINT=http://127.0.0.1:18318/v1/chat/completions\nAPI_KEY=${original}\nMODEL=coding-fast`);
     await modal.getByRole('tab', { name: 'Anthropic Messages', exact: true }).click();
     await expect(modal.getByRole('radio', { name: '默认模型 writing', exact: true })).toBeChecked();
     await expect(modal.locator('.access-copy-row code').nth(0)).toHaveText('http://127.0.0.1:18318');
@@ -74,7 +74,7 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     expect(await clipboard()).toBe('http://127.0.0.1:18318/v1/messages');
     await modal.getByRole('button', { name: '复制当前模型配置', exact: true }).click();
     await expect(modal.getByRole('status')).toHaveText('完整接入配置已复制');
-    expect(await clipboard()).toBe(`# Anthropic Messages · writing\nBASE_URL=http://127.0.0.1:18318\nAPI_KEY=${original}\nMODEL=writing`);
+    expect(await clipboard()).toBe(`# Anthropic Messages · writing\nBASE_URL=http://127.0.0.1:18318\nENDPOINT=http://127.0.0.1:18318/v1/messages\nAPI_KEY=${original}\nMODEL=writing`);
     await modal.getByRole('tab', { name: 'Chat Completions', exact: true }).click();
   });
 
@@ -122,7 +122,7 @@ test('项目接入信息复制、刷新取回、旧 Token 保存与明确重置'
     expect(await page.locator('body').evaluate((body, token) => body.textContent!.includes(token), original)).toBe(false);
     await panel.getByRole('button', { name: '复制当前配置', exact: true }).click();
     await expect(panel.getByRole('status')).toHaveText('已复制当前配置');
-    expect(await clipboard()).toBe(`# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1\nAPI_KEY=${original}\nMODEL=coding`);
+    expect(await clipboard()).toBe(`# Chat Completions · coding\nBASE_URL=http://127.0.0.1:18318/v1\nENDPOINT=http://127.0.0.1:18318/v1/chat/completions\nAPI_KEY=${original}\nMODEL=coding`);
     await panel.getByRole('button', { name: /^复制全部/ }).click();
     await expect(panel.getByRole('status')).toHaveText('已复制 2 个模型的配置');
     expect(await clipboard()).toContain('MODEL=coding-fast');

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { protocolName } from '../connection-protocols';
-import { accessBlock, accessURLs, protocolOrder, type Protocol } from '../ProjectAccessContent';
+import { accessBlock, protocolOrder, type Protocol } from '../ProjectAccessContent';
 import { FilterSelect } from '../FilterSelect';
 
 type Model = { id: string; alias: string; protocols: string[]; enabled: boolean };
@@ -96,7 +96,7 @@ export function AccessSummary({
           复制全部 {available.length} 个
         </button>
         <span className="acc-note zh" role="status">
-          {notice || '复制时填入完整 Token · 端点 ' + accessURLs(baseURL, protocol).endpoint.replace(/^https?:\/\/[^/]+/, '')}
+          {notice || '复制时填入完整 Token'}
         </span>
       </div>
     </div>
