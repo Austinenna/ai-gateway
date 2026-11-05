@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 
+/** useSize tracks an element's box so SVG charts can fill their panel. */
+export function useSize<T extends HTMLElement | SVGElement>() {
+  const ref = useRef<T>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    if (!ref.current) return;
+    const ro = new ResizeObserver(([e]) => setSize({ w: Math.floor(e.contentRect.width), h: Math.floor(e.contentRect.height) }));
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, size] as const;
+}
+
 /** useWidth tracks an element's width so SVG charts can draw in real pixels. */
 export function useWidth<T extends HTMLElement | SVGElement>() {
   const ref = useRef<T>(null);
@@ -42,8 +55,9 @@ export type Bucket = { started: number; ok: number; failed: number; ttft: number
 
 /** Throughput is the step chart of successful calls with failure bars and a TTFT line. */
 export function Throughput({ buckets, onHover }: { buckets: Bucket[]; onHover?: (text: string | null, x: number, y: number) => void }) {
-  const [ref, W] = useWidth<SVGSVGElement>();
-  const H = 250,
+  const [ref, size] = useSize<SVGSVGElement>();
+  const W = size.w,
+    H = Math.max(200, size.h || 250),
     pl = 34,
     pr = 40,
     pt = 12,
@@ -52,6 +66,7 @@ export function Throughput({ buckets, onHover }: { buckets: Bucket[]; onHover?: 
   const maxReq = Math.max(4, ...buckets.map((b) => b.ok + b.failed));
   const step = Math.pow(10, Math.floor(Math.log10(maxReq)));
   const max = Math.ceil(maxReq / step) * step;
+  const hasTTFT = buckets.some((b) => b.ttft != null);
   const maxT = Math.max(1, ...buckets.map((b) => (b.ttft || 0) / 1000)) * 1.15;
   const iw = (W - pl - pr) / buckets.length,
     ih = H - pt - pb;
@@ -92,9 +107,11 @@ export function Throughput({ buckets, onHover }: { buckets: Bucket[]; onHover?: 
                 <text x={pl - 6} y={yy + 3} textAnchor="end" fontSize={9.5} fill="var(--dim)">
                   {Math.round(max * (1 - i / 4))}
                 </text>
-                <text x={W - pr + 6} y={yy + 3} fontSize={9.5} fill="var(--cyan)">
-                  {(maxT * (1 - i / 4)).toFixed(1)}s
-                </text>
+                {hasTTFT && (
+                  <text x={W - pr + 6} y={yy + 3} fontSize={9.5} fill="var(--cyan)">
+                    {(maxT * (1 - i / 4)).toFixed(1)}s
+                  </text>
+                )}
               </g>
             );
           })}
@@ -115,6 +132,10 @@ export function Throughput({ buckets, onHover }: { buckets: Bucket[]; onHover?: 
               />
             ) : null,
           )}
+          {ttftPts.map((pt, i) => {
+            const [cx, cy] = pt.split(',');
+            return <circle key={'t' + i} cx={cx} cy={cy} r={2} fill="var(--cyan)" pointerEvents="none" />;
+          })}
           {ttftPts.length > 1 && (
             <polyline
               points={ttftPts.join(' ')}

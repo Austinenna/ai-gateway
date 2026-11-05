@@ -28,6 +28,13 @@ export const overviewWindows = [
 const windowMs: Record<string, number> = { '1h': 3600e3, '24h': 86400e3, '7d': 7 * 86400e3 };
 const hhmm = (t: number) => new Date(t).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
 const hms = (t: number) => new Date(t).toLocaleTimeString('zh-CN', { hour12: false });
+// Older entries carry their date so yesterday's calls are not read as today's.
+const tailTime = (t: number) =>
+  new Date(t).toDateString() === new Date().toDateString()
+    ? hms(t)
+    : new Date(t)
+        .toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+        .replace('/', '-');
 const secs = (ms?: number | null) => (ms == null ? '—' : (ms / 1000).toFixed(2));
 // Small amounts keep four decimals so a few cheap calls do not read as ¥0.00.
 const yuan = (v: number) => '¥' + (v >= 100 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v.toFixed(4));
@@ -138,7 +145,7 @@ export function Overview({
         started: b.started,
         ok: Math.max(0, b.requests - b.failed - b.canceled),
         failed: b.failed,
-        ttft: null,
+        ttft: b.ttft_p50 ?? null,
       })),
     [metrics],
   );
@@ -254,94 +261,100 @@ export function Overview({
           <Segments ratio={budgetTotal && spend ? spend.total / budgetTotal : 0} tone="am" />
         </div>
 
-        <div className="p c8">
-          <div className="h">
-            THROUGHPUT<span className="zh">请求吞吐 · {metrics ? buckets.length + ' 个时段' : ''}</span>
-            <span className="r">
-              <span style={{ color: 'var(--go)' }}>■ OK</span> <span style={{ color: 'var(--red)' }}>■ FAIL</span>
-            </span>
+        <div className="col c8">
+          <div className="p thru-p grow">
+            <div className="h">
+              THROUGHPUT<span className="zh">请求吞吐 · {metrics ? buckets.length + ' 个时段' : ''}</span>
+              <span className="r">
+                <span style={{ color: 'var(--go)' }}>■ OK</span> <span style={{ color: 'var(--red)' }}>■ FAIL</span>{' '}
+                <span style={{ color: 'var(--cyan)' }}>┄ TTFT P50</span>
+              </span>
+            </div>
+            <Throughput buckets={buckets} onHover={(text, x, y) => setTip(text ? { text, x, y } : null)} />
           </div>
-          <Throughput buckets={buckets} onHover={(text, x, y) => setTip(text ? { text, x, y } : null)} />
-        </div>
-        <div className="p c4">
-          <div className="h">
-            UPSTREAM<span className="zh">厂商连接 · 48 × 30min</span>
-          </div>
-          <div className="health">
-            {connections.map((c) => {
-              const h = health[c.id];
-              const breaker = h?.breaker_until && h.breaker_until > Date.now();
-              const st = !h ? 'unknown' : h.state;
-              const cls = st === 'ok' ? 'ok' : st === 'unknown' || st === 'disabled' ? '' : st === 'degraded' ? 'am' : 'rd';
-              const total = h ? h.window.ok + h.window.failed + h.window.rate_limited + h.window.auth_failed - h.window.probes : 0;
-              return (
-                <div className="hr" key={c.id} onClick={() => onNavigate('models')} style={{ cursor: 'pointer' }}>
-                  <div className="row">
-                    <span className="zh">{c.name}</span>
-                    <span className={'st ' + cls}>
-                      {breaker
-                        ? `BREAKER ${Math.ceil((h!.breaker_until! - Date.now()) / 1000)}s`
-                        : { ok: 'NOMINAL', degraded: 'DEGRADED', down: 'DOWN', auth: 'KEY FAIL', unknown: 'UNKNOWN', disabled: 'OFF' }[st]}
-                    </span>
-                  </div>
-                  <div className="hr-src zh">
-                    {total > 0
-                      ? `被动 · ${total} 次/${h!.window_minutes}min`
-                      : h?.last_probe
-                        ? `探测 /models ${hhmm(h.last_probe.at)} ${h.last_probe.ok ? 'OK' : 'FAIL'}`
-                        : '暂无调用'}
-                  </div>
-                  <div className="blocks">
-                    {(h?.buckets || Array.from({ length: 48 }, () => null)).map((b, i) => (
-                      <i key={i} className={b ? { ok: '', degraded: 'a', down: 'r', auth: 'k', idle: 'n' }[bucketClass(b)] : 'n'} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="p tail-p">
+            <div className="h">
+              LIVE TAIL<span className="zh">实时请求流</span>
+              <span className="r" style={{ color: 'var(--go)' }}>
+                ● 2s
+              </span>
+            </div>
+            <div className="tail">
+              {tail.map((r) => (
+                <button type="button" className="ln" key={r.id} onClick={() => onOpenRecord(r.id)}>
+                  <span className="t">{tailTime(r.started)}</span>
+                  <span className={statusCls(r)}>{statusText(r)}</span>
+                  <span className="m">
+                    {r.alias || '—'}
+                    {r.fallback_from ? ' ⇠' : ''}
+                  </span>
+                  <span className="pj zh">{r.project_name}</span>
+                  <span className="q">{r.question_excerpt || r.diagnostic?.message || r.protocol}</span>
+                  <span className="d">{r.state === 'running' ? '…' : (r.duration_ms / 1000).toFixed(2) + 's'}</span>
+                </button>
+              ))}
+              {!tail.length && <p className="dimnote zh">还没有调用。</p>}
+            </div>
           </div>
         </div>
-
-        <div className="p c7">
-          <div className="h">
-            LIVE TAIL<span className="zh">实时请求流</span>
-            <span className="r" style={{ color: 'var(--go)' }}>
-              ● 2s
-            </span>
+        <div className="col c4">
+          <div className="p">
+            <div className="h">
+              UPSTREAM<span className="zh">厂商连接 · 48 × 30min</span>
+            </div>
+            <div className="health">
+              {connections.map((c) => {
+                const h = health[c.id];
+                const breaker = h?.breaker_until && h.breaker_until > Date.now();
+                const st = !h ? 'unknown' : h.state;
+                const cls = st === 'ok' ? 'ok' : st === 'unknown' || st === 'disabled' ? '' : st === 'degraded' ? 'am' : 'rd';
+                const total = h ? h.window.ok + h.window.failed + h.window.rate_limited + h.window.auth_failed - h.window.probes : 0;
+                return (
+                  <div className="hr" key={c.id} onClick={() => onNavigate('models')} style={{ cursor: 'pointer' }}>
+                    <div className="row">
+                      <span className="zh">{c.name}</span>
+                      <span className={'st ' + cls}>
+                        {breaker
+                          ? `BREAKER ${Math.ceil((h!.breaker_until! - Date.now()) / 1000)}s`
+                          : { ok: 'NOMINAL', degraded: 'DEGRADED', down: 'DOWN', auth: 'KEY FAIL', unknown: 'UNKNOWN', disabled: 'OFF' }[
+                              st
+                            ]}
+                      </span>
+                    </div>
+                    <div className="hr-src zh">
+                      {total > 0
+                        ? `被动 · ${total} 次/${h!.window_minutes}min`
+                        : h?.last_probe
+                          ? `探测 /models ${hhmm(h.last_probe.at)} ${h.last_probe.ok ? 'OK' : 'FAIL'}`
+                          : '暂无调用'}
+                    </div>
+                    <div className="blocks">
+                      {(h?.buckets || Array.from({ length: 48 }, () => null)).map((b, i) => (
+                        <i key={i} className={b ? { ok: '', degraded: 'a', down: 'r', auth: 'k', idle: 'n' }[bucketClass(b)] : 'n'} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="tail">
-            {tail.map((r) => (
-              <button type="button" className="ln" key={r.id} onClick={() => onOpenRecord(r.id)}>
-                <span className="t">{hms(r.started)}</span>
-                <span className={statusCls(r)}>{statusText(r)}</span>
-                <span className="m">
-                  {r.alias || '—'}
-                  {r.fallback_from ? ' ⇠' : ''}
-                </span>
-                <span className="pj zh">{r.project_name}</span>
-                <span className="q">{r.question_excerpt || r.diagnostic?.message || r.protocol}</span>
-                <span className="d">{r.state === 'running' ? '…' : (r.duration_ms / 1000).toFixed(2) + 's'}</span>
-              </button>
-            ))}
-            {!tail.length && <p className="dimnote zh">还没有调用。</p>}
-          </div>
-        </div>
-        <div className="p c5">
-          <div className="h">
-            ALERTS<span className="zh">需要处理</span>
-            <span className="r">{alerts.length} OPEN</span>
-          </div>
-          <div className="alerts">
-            {alerts.slice(0, 6).map((a) => (
-              <button type="button" className="al" key={a.key} onClick={() => onNavigate(a.go)}>
-                <time>{a.time}</time>
-                <span className={'lv ' + a.level[0]}>{a.level[1]}</span>
-                <p>
-                  <b>{a.title}</b> {a.text}
-                </p>
-              </button>
-            ))}
-            {!alerts.length && <p className="dimnote zh">没有需要处理的事项。</p>}
+          <div className="p grow">
+            <div className="h">
+              ALERTS<span className="zh">需要处理</span>
+              <span className="r">{alerts.length} OPEN</span>
+            </div>
+            <div className="alerts">
+              {alerts.slice(0, 6).map((a) => (
+                <button type="button" className="al" key={a.key} onClick={() => onNavigate(a.go)}>
+                  <time>{a.time}</time>
+                  <span className={'lv ' + a.level[0]}>{a.level[1]}</span>
+                  <p>
+                    <b>{a.title}</b> {a.text}
+                  </p>
+                </button>
+              ))}
+              {!alerts.length && <p className="dimnote zh">没有需要处理的事项。</p>}
+            </div>
           </div>
         </div>
 

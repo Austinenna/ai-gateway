@@ -119,7 +119,7 @@ export type Metrics = {
   monitoring_since: number;
   summary: MetricSummary;
   models: (MetricSummary & { model_id: string; alias: string; connection_id: string; connection_name: string })[];
-  buckets: { started: number; requests: number; failed: number; canceled: number; rpm: number }[];
+  buckets: { started: number; requests: number; failed: number; canceled: number; rpm: number; ttft_p50?: number }[];
   recent: RequestRecord[];
   options: { projects: MetricOption[]; models: MetricOption[]; connections: MetricOption[] };
   metrics_errors: number;

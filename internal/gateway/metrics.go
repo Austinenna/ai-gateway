@@ -7,6 +7,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"time"
@@ -346,6 +347,8 @@ type metricBucket struct {
 	Failed   int     `json:"failed"`
 	Canceled int     `json:"canceled"`
 	RPM      float64 `json:"rpm"`
+	// TTFTP50 is the median first-token latency of completed calls in the bucket.
+	TTFTP50 *int64 `json:"ttft_p50,omitempty"`
 }
 
 func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
@@ -421,6 +424,7 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 	recent := []Record{}
 	const n = 24
 	buckets := make([]metricBucket, n)
+	bucketTTFT := make([][]int64, n)
 	width := float64(now-from+1) / n
 	for i := range buckets {
 		buckets[i].Started = from + int64(float64(i)*width)
@@ -466,7 +470,17 @@ func (g *Gateway) metrics(w http.ResponseWriter, r *http.Request) {
 		} else if rec.State != "running" && rec.State != "complete" {
 			buckets[index].Failed++
 		}
+		if rec.State == "complete" && rec.FirstToken != nil {
+			bucketTTFT[index] = append(bucketTTFT[index], *rec.FirstToken)
+		}
 		recent = append(recent, rec)
+	}
+	for i, values := range bucketTTFT {
+		if len(values) > 0 {
+			slices.Sort(values)
+			median := values[len(values)/2]
+			buckets[i].TTFTP50 = &median
+		}
 	}
 	minutes := float64(now-from) / 60000
 	agg.finish(minutes)

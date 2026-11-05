@@ -299,3 +299,22 @@ func TestMetricsAllTimeIncludesOlderRecordsAndKeepsFilters(t *testing.T) {
 		t.Fatal("RPM or trend does not cover the full collection period")
 	}
 }
+
+func TestMetricsBucketsReportCompletedTTFTMedian(t *testing.T) {
+	h := newHarness(t)
+	now := time.Now().UnixMilli()
+	for i, ttft := range []int64{300, 100, 200} {
+		v := ttft
+		h.g.saveMetric(Record{ID: "ok-" + string(rune('a'+i)), Started: now, State: "complete", FirstToken: &v, MetricsFields: MetricsFields{MetricsVersion: 1}})
+	}
+	slow := int64(9000)
+	h.g.saveMetric(Record{ID: "failed", Started: now, State: "upstream_error", FirstToken: &slow, MetricsFields: MetricsFields{MetricsVersion: 1}})
+	buckets := getMetrics(t, h, "").Buckets
+	last := buckets[len(buckets)-1]
+	if last.TTFTP50 == nil || *last.TTFTP50 != 200 || last.Failed != 1 {
+		t.Fatalf("bucket TTFT median should ignore failures: %+v", last)
+	}
+	if buckets[0].TTFTP50 != nil {
+		t.Fatal("empty bucket should not report TTFT")
+	}
+}
