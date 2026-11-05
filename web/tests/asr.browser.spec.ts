@@ -112,7 +112,8 @@ test('百炼 ASR 配置、原生音频调用、项目授权与转写详情', asy
     await modal.getByRole('button', { name: '关闭', exact: true }).last().click();
     await row.locator('td.pjn').click();
     await page.locator('.project-ops').getByRole('button', { name: 'TEST', exact: true }).click();
-    await modal.getByRole('button', { name: '填入这个项目的凭证', exact: true }).click();
+    await expect(page.getByLabel('网关项目凭证')).toHaveValue(/^gw_/);
+    await expect(modal).toHaveCount(0);
     await page.getByLabel('音频文件', { exact: true }).setInputFiles({ name: 'sample.wav', mimeType: 'audio/wav', buffer: audio });
     await expect(page.getByLabel('消息', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: '发送请求', exact: true }).click();

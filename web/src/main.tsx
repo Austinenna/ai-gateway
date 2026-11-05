@@ -722,6 +722,11 @@ function App() {
     if (p) {
       const token = credentialMemory.current.get(p.id);
       if (p.enabled && token) fillProjectCredential(p, token);
+      // The project is already chosen: fetch its saved token directly instead of asking again.
+      else if (p.enabled && p.has_saved_token)
+        api('/admin/projects/' + p.id + '/credential', 'POST', {})
+          .then((out) => fillProjectCredential(p, out.token))
+          .catch(() => showCredentialGuide(p));
       else showCredentialGuide(p);
       return;
     }

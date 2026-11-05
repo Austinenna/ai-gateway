@@ -158,7 +158,8 @@ test('单连接多协议、同一模型别名与协议选择', async ({ page, co
       await modal.getByRole('button',{name:'关闭',exact:true}).click();
       await projectRow.locator('td.pjn').click();
       await page.locator('.project-ops').getByRole('button',{name:'TEST',exact:true}).click();
-      await modal.getByRole('button',{name:'填入这个项目的凭证',exact:true}).click();
+      await expect(page.getByLabel('网关项目凭证')).toHaveValue(/^gw_/);
+      await expect(modal).toHaveCount(0);
       let trialProtocol='';
       await page.route('**/v1/messages',async route=>{
         trialProtocol='messages'; expect(route.request().postDataJSON().model).toBe('dual-protocol-ui');
