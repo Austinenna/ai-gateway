@@ -910,3 +910,8 @@
 .cr .fr-bars i.ok{height:3px;background:var(--go-2)}
 .cr .fr-read{min-height:18px;margin-top:6px;color:var(--dim);font-size:11.5px}
 .cr .kvs b.warn{color:var(--amber)}
+/* Grant matrix: divider between language models and speech or web tools. */
+.cr .gm th.sep,.cr .gm td.sep{width:28px;min-width:28px;padding:0}
+.cr .gm th.sep{background:transparent!important}
+.cr .gm td.sep{position:relative}
+.cr .gm td.sep::after{content:"";position:absolute;top:0;bottom:-1px;left:13px;width:1px;background:var(--line-2)}

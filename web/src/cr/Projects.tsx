@@ -1,5 +1,5 @@
 import { yuan } from '../costs';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import type { LimitUsage } from '../health';
 import { protocolName } from '../connection-protocols';
 import { Segments } from './charts';
@@ -37,6 +37,7 @@ const shortProto: Record<string, string> = {
   'deepseek-search': 'SEARCH',
   'deepseek-fetch': 'FETCH',
 };
+const isLanguageModel = (m: Model) => m.protocols.some((p) => p === 'chat' || p === 'messages');
 // Small amounts keep four decimals so a few cheap calls do not read as ¥0.00.
 const money = yuan;
 
@@ -94,6 +95,11 @@ export function Projects({
   const byProject = new Map(applications.map((a) => [a.project_id, a]));
   const pending = applications.filter((a) => a.status === 'pending');
   const aliases = new Map(models.map((m) => [m.id, m.alias]));
+  // Language models come first; speech and web tools sit behind a divider.
+  const language = models.filter(isLanguageModel);
+  const others = models.filter((m) => !isLanguageModel(m));
+  const columns = [...language, ...others];
+  const firstOther = language.length ? others[0]?.id : undefined;
   const missingFallback = (p: Project) => [
     ...new Set(
       p.model_ids
@@ -145,17 +151,20 @@ export function Projects({
             <thead>
               <tr>
                 <th className="pjh">PROJECT</th>
-                {models.map((m) => (
-                  <th className="m" key={m.id} title={m.alias + ' · ' + m.protocols.map(protocolName).join(' / ')}>
-                    <div>
-                      {m.alias}
-                      <small>
-                        {m.fallback_model_id
-                          ? '⇢ ' + (aliases.get(m.fallback_model_id) || '?')
-                          : m.protocols.map((p) => shortProto[p] || p).join('·')}
-                      </small>
-                    </div>
-                  </th>
+                {columns.map((m) => (
+                  <Fragment key={m.id}>
+                    {m.id === firstOther && <th className="sep" aria-hidden="true" />}
+                    <th className="m" title={m.alias + ' · ' + m.protocols.map(protocolName).join(' / ')}>
+                      <div>
+                        {m.alias}
+                        <small>
+                          {m.fallback_model_id
+                            ? '⇢ ' + (aliases.get(m.fallback_model_id) || '?')
+                            : m.protocols.map((p) => shortProto[p] || p).join('·')}
+                        </small>
+                      </div>
+                    </th>
+                  </Fragment>
                 ))}
                 <th className="gap" aria-hidden="true" />
                 <th className="st">RATE · NOW</th>
@@ -198,25 +207,28 @@ export function Projects({
                         </span>
                       )}
                     </td>
-                    {models.map((m) => {
+                    {columns.map((m) => {
                       const on = p.model_ids.includes(m.id);
                       const requested = isPending && app!.models.includes(m.alias);
                       const cls = on ? 'on' : requested ? 'req' : fb.has(m.id) ? 'warnc' : !usable(m) ? 'na' : '';
                       return (
-                        <td className="c" key={m.id}>
-                          <button
-                            type="button"
-                            className={'cl ' + cls}
-                            aria-pressed={on}
-                            aria-label={(on ? '取消授权 ' : '授权 ') + p.name + ' 使用 ' + m.alias}
-                            title={fb.has(m.id) ? '已授权模型的备用模型，未授权时回退不可用' : !usable(m) ? '模型或连接已停用' : ''}
-                            disabled={busy || isPending}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggle(p, m);
-                            }}
-                          />
-                        </td>
+                        <Fragment key={m.id}>
+                          {m.id === firstOther && <td className="sep" aria-hidden="true" />}
+                          <td className="c">
+                            <button
+                              type="button"
+                              className={'cl ' + cls}
+                              aria-pressed={on}
+                              aria-label={(on ? '取消授权 ' : '授权 ') + p.name + ' 使用 ' + m.alias}
+                              title={fb.has(m.id) ? '已授权模型的备用模型，未授权时回退不可用' : !usable(m) ? '模型或连接已停用' : ''}
+                              disabled={busy || isPending}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggle(p, m);
+                              }}
+                            />
+                          </td>
+                        </Fragment>
                       );
                     })}
                     <td className="gap" aria-hidden="true" />
