@@ -792,3 +792,4 @@
 .cr .gm th.st{padding:0 10px 10px}
 .cr .gm td.st .seg{width:112px}
 .cr .gm th.gap,.cr .gm td.gap{width:96px;min-width:96px}
+.cr .project-ops .row .kb{width:92px;text-align:center;justify-content:center;flex:none;padding:4px 0}

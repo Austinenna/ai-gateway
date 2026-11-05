@@ -431,13 +431,13 @@ export function Projects({
                   disabled={busy}
                   onClick={() => onSave({ ...selected, enabled: !selected.enabled }, selected.enabled ? '项目已停用' : '项目已启用')}
                 >
-                  {selected.enabled ? 'DISABLE' : 'ENABLE'}
+                  {selected.enabled ? '停用' : '启用'}
                 </button>
               </div>
               <div className="row zh">
                 删除项目：移除授权，历史请求保留
                 <button type="button" className="kb rd" onClick={() => onDelete(selected)}>
-                  DELETE
+                  删除
                 </button>
               </div>
             </div>
