@@ -63,7 +63,7 @@ https://<SERVER_IPV4>/v1
 
 ## 出站代理
 
-网关访问厂商的出站请求由管理页「厂商连接」顶部的出站代理地址和每条连接的「走出站代理」开关决定（见 [当前架构](../current-architecture.md) 3.1）。生产地址设为本机 mihomo（规则模式）的 mixed-port `http://127.0.0.1:7890`，OpenRouter 等境外厂商打开开关，国内厂商直连；直连 OpenRouter 不可达。mihomo 以 `ubuntu` 用户级 systemd 服务 `mihomo.service` 运行，已开启 linger，开机自动启动；未启用 TUN。mihomo 停止时只影响打开开关的连接。
+网关访问厂商的出站请求由管理页「厂商连接」顶部的出站代理地址和每条连接的「走出站代理」开关决定（见 [当前架构](../current-architecture.md) 3.1）。生产环境使用服务器本机的代理服务，境外厂商打开开关，国内厂商直连；代理服务停止时只影响打开开关的连接。具体配置保存在本机私有部署记录中。
 
 systemd 服务不会读取 shell 配置或 `/etc/environment` 中的代理变量。页面未保存代理地址时，网关才按进程环境变量 `HTTPS_PROXY`／`HTTP_PROXY`／`NO_PROXY` 出站；当前生产不设置这些变量。核对网关进程的代理变量：
 
@@ -71,15 +71,15 @@ systemd 服务不会读取 shell 配置或 `/etc/environment` 中的代理变量
 sudo cat /proc/$(systemctl show -p MainPID --value ai-gateway)/environ | tr '\0' '\n' | grep -i proxy
 ```
 
-历史：2026-11-03 曾用 drop-in `/etc/systemd/system/ai-gateway.service.d/proxy.conf` 给整个网关设置 `HTTPS_PROXY=http://127.0.0.1:7890`。2026-11-04 出站代理版本上线、用户在页面保存地址并给 OpenRouter 打开开关且调用验证通过后，删除该 drop-in 并重启：服务 active、健康检查通过，进程代理变量为 0 个。用户随后确认 OpenRouter 调用正常，该备份已于同日删除。
+历史：早期曾用 systemd 环境变量让整个网关走代理；2026-11-04 改为页面配置并验证通过后已移除，当前进程不设置代理变量。
 
 ## 当前网络边界
 
 - `8317`：不开放公网，只允许服务器本机访问
 - `443`：云端防火墙／安全组按来源 IP 放行；Nginx 不再另设来源 IP 白名单
 - `80`：云安全组当前已开放，用于证书验证和跳转
-- `22`：云安全组当前允许 SSH；后续应收紧到个人固定出口 IP
-- UFW：部署检查时为 inactive；云安全组是当前外层防火墙
+- `22`：SSH 运维入口，由云安全组管理
+- 云安全组是当前外层防火墙
 
 ## 数据与初始化
 
