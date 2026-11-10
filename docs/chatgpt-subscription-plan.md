@@ -27,6 +27,8 @@
 
 OpenAI 的 `refresh_token` 是**一次性轮换**的：谁先刷新，另一份就失效。网关如果复制本机 Codex 的登录文件，两边总有一边会被挤掉登录。所以网关单独走一次 OAuth 登录，拿自己的一套令牌，和本机 Codex 互不影响（额度仍共用）。
 
+查证（2026-11-10）：Codex 源码 `codex-rs/login/src/auth/` 处理 `auth.openai.com/oauth/token` 返回的 `refresh_token_reused` 错误（“Your refresh token has already been used to generate a new access token”），提示重新登录；官方 CI/CD 认证文档要求一台机器或一条串行任务流用一份 `auth.json`，不要跨机器或并发共用，并把“另一台机器先轮换了令牌”列为需要重新导入的情况。“各自登录的令牌互相独立”是标准 OAuth 行为，官方文档没有明说，真实联调时验证：网关刷新后本机 Codex 仍可用。
+
 登录方式：
 
 - **本机网关**：管理页点「登录 ChatGPT」，打开 OpenAI 登录页，回调到网关后保存。Codex 的 OAuth 客户端只允许回调到 `localhost:1455`，网关登录时临时监听这个端口，完成后关闭。
