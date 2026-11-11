@@ -55,6 +55,7 @@ import { RequestAdaptations } from './RequestAdaptations';
 import { TextPreview } from './TextPreview';
 import { ToolDefinitions } from './ToolDefinitions';
 import { Sidebar, SidebarToggle, useSidebarState } from './Sidebar';
+import wordmark from './cr/aigateway-wordmark.svg';
 import { responseDetails, responsePlaceholder } from './response-details.mjs';
 import './style.css';
 import './configuration.css';
@@ -960,10 +961,10 @@ function App() {
     return (
       <div className="login-page">
         <div className="login-brand">
-          <span className="brand-icon">
-            <Waypoints size={20} />
+          <span className="login-wordmark">
+            <img src={wordmark} alt="aigateway" />
           </span>
-          AI Gateway <span className="version">v0.1</span>
+          <span className="version">v0.1</span>
         </div>
         <div className="login-grid">
           <section className="login-context">
