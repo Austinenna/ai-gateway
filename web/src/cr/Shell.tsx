@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { formatBytes, formatUptime, type Runtime } from '../health';
+import wordmark from './aigateway-wordmark.svg';
 
 export type CrPage = 'overview' | 'requests' | 'tasks' | 'diagnostics' | 'costs' | 'models' | 'projects' | 'chat' | 'system';
 
@@ -48,8 +49,7 @@ export function TopBar({ runtime, mode, host, extra }: { runtime: Runtime | null
   return (
     <header className="top" role="status" aria-label="网关运行状态">
       <div className="logo">
-        <i />
-        AIGW/01
+        <img src={wordmark} alt="aigateway" />
       </div>
       <div className="ticker">
         <span className="ok">

@@ -13,7 +13,7 @@
 .cr .cr-v button,.cr .top button,.cr .rail button,.cr .vh button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
 .cr .top{display:flex;align-items:stretch;height:44px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(7,9,10,.92);backdrop-filter:blur(8px);z-index:10}
 .cr .logo{display:flex;align-items:center;gap:10px;padding:0 18px;border-right:1px solid var(--line);font-weight:700;letter-spacing:.2em;width:200px}
-.cr .logo i{width:10px;height:10px;background:var(--go);box-shadow:0 0 12px var(--go)}
+.cr .logo img{display:block;height:29px;margin-left:-11px} /* 尺寸规则见 docs/brand */
 .cr .ticker{display:flex;align-items:center;gap:0;flex:1;overflow:hidden}
 .cr .ticker span{padding:0 16px;border-right:1px solid var(--line);height:100%;display:flex;align-items:center;gap:8px;color:var(--tx-2);white-space:nowrap}
 .cr .ticker b{color:var(--tx);font-weight:500}
