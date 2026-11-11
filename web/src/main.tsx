@@ -2,25 +2,16 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Activity,
-  AlertTriangle,
   ArrowRight,
   Check,
   ChevronRight,
   Copy,
-  Database,
   Eye,
-  FlaskConical,
   KeyRound,
-  Layers3,
-  LayoutDashboard,
   LockKeyhole,
-  MessagesSquare,
-  Wallet,
-  Network,
   Plug,
   Plus,
   RefreshCw,
-  Search,
   Send,
   ShieldCheck,
   Terminal,
@@ -35,17 +26,14 @@ import { AsrAudioFields, type AsrAudio } from './AsrAudioFields';
 import { AsrResponseDetails } from './AsrResponseDetails';
 import { asrRequest, asrTestRequest } from './asr.mjs';
 import { DEFAULT_TTS_VOICE, ttsAudioSource, ttsRequest, ttsSummary } from './tts.mjs';
-import { ModelList } from './ModelList';
-import { ConnectionList } from './ConnectionList';
 import { ConnectionProtocolFields } from './ConnectionProtocolFields';
 import { ModelCatalogField } from './ModelCatalogField';
 import { ModelThinkingDefaults, type ModelDefaults } from './ModelThinkingDefaults';
 import { ModelContextWindow } from './ModelContextWindow';
 import { FilterSelect } from './FilterSelect';
-import { recordModelValue, recordProviderValue, requestFilterOptions } from './request-filters';
+import { requestFilterOptions } from './request-filters';
 import { connectionProtocols, defaultModelProtocols, modelProtocols, protocolName, templateEndpoint } from './connection-protocols';
 import { isWebTool, webToolInput, webToolPath, webToolRequest, webToolText } from './web-tools.mjs';
-import { ProjectList, type ProjectApplication } from './ProjectList';
 import { ConnectionDeleteContent } from './ConnectionDeleteContent';
 import { OutboundProxyPanel } from './OutboundProxyPanel';
 import { ResponseDetails } from './ResponseDetails';
@@ -54,7 +42,6 @@ import type { RequestTask } from './request-tasks';
 import { RequestAdaptations } from './RequestAdaptations';
 import { TextPreview } from './TextPreview';
 import { ToolDefinitions } from './ToolDefinitions';
-import { Sidebar, SidebarToggle, useSidebarState } from './Sidebar';
 import wordmark from './cr/aigateway-wordmark.svg';
 import { responseDetails, responsePlaceholder } from './response-details.mjs';
 import './style.css';
@@ -72,7 +59,7 @@ import type { ModelPrice } from './costs';
 import { DiagnosticsPage } from './DiagnosticsPage';
 import { ChatPage } from './ChatPage';
 import { RequestHeader, RequestTiming } from './RequestMetrics';
-import { type RequestRecord, recordStatus } from './monitoring';
+import type { RequestRecord } from './monitoring';
 import { TopBar, Rail, ViewHead, DetailToggle, type CrPage, type RailBadge } from './cr/Shell';
 import { Overview, overviewWindows, windowFrom } from './cr/Overview';
 import { AccessSummary } from './cr/AccessSummary';
@@ -84,9 +71,19 @@ import { CostBoard, DiagnosticsBoard } from './cr/Boards';
 import './cr/cr.css';
 import { SystemPage } from './SystemPage';
 import { Attempts } from './Attempts';
-import { HealthBlocks } from './ConnectionHealthView';
-import { healthLabel, type ConnectionHealth, type Runtime } from './health';
+import type { ConnectionHealth, Runtime } from './health';
 
+type ProjectApplication = {
+  id: string;
+  project_id: string;
+  client: string;
+  protocol: string;
+  models: string[];
+  note: string;
+  created: number;
+  decided: number;
+  status: 'pending' | 'approved' | 'rejected';
+};
 type Conn = {
   id: string;
   name: string;
@@ -157,33 +154,10 @@ const labels: Record<Page, string> = {
   system: '数据与系统',
 };
 // The rail groups pages by what the operator is doing.
-const navGroups: [string, Page[]][] = [
-  ['观测', ['overview', 'requests', 'tasks', 'diagnostics', 'costs']],
-  ['配置', ['connections', 'models', 'projects']],
-  ['工具', ['chat']],
-  ['系统', ['system']],
-];
-const navNumber = Object.fromEntries(navGroups.flatMap(([, pages]) => pages).map((p, i) => [p, String(i + 1).padStart(2, '0')])) as Record<
-  Page,
-  string
->;
-const icons = {
-  overview: LayoutDashboard,
-  chat: MessagesSquare,
-  tasks: Layers3,
-  requests: Activity,
-  diagnostics: AlertTriangle,
-  costs: Wallet,
-  connections: Plug,
-  models: Network,
-  projects: ShieldCheck,
-  system: Database,
-};
 const initialPage = (() => {
   const value = new URLSearchParams(location.search).get('view') as Page | null;
   return value && value in labels ? value : 'overview';
 })();
-const time = (v: number) => new Date(v).toLocaleTimeString('zh-CN', { hour12: false });
 async function api(path: string, method = 'GET', body?: unknown) {
   const res = await fetch('/api' + path, {
     method,
@@ -203,14 +177,6 @@ function Empty({ title, text, action }: { title: string; text: string; action?: 
       <p>{text}</p>
       {action}
     </div>
-  );
-}
-function Badge({ on, children }: { on: boolean; children: React.ReactNode }) {
-  return (
-    <span className={'badge ' + (on ? 'good' : 'muted-badge')}>
-      <span className="dot" />
-      {children}
-    </span>
   );
 }
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -259,7 +225,6 @@ function Modal({
   );
 }
 function App() {
-  const sidebar = useSidebarState();
   const [tasks, setTasks] = useState<RequestTask[]>([]);
   const [status, setStatus] = useState<Status | null>(null),
     [state, setState] = useState(initial),

@@ -31,15 +31,6 @@ export type Runtime = {
   schema_ext: number;
 };
 
-export const healthLabel: Record<ConnectionHealth['state'], string> = {
-  ok: '正常',
-  degraded: '降级',
-  down: '故障',
-  auth: 'Key 失效',
-  unknown: '未知',
-  disabled: '已停用',
-};
-
 /** bucketClass picks the dominant outcome of one 30-minute bucket. */
 export function bucketClass(b: HealthCounts) {
   if (b.auth_failed) return 'auth';

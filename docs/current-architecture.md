@@ -332,9 +332,7 @@ SQLite v9 为连接增加出站代理开关；v10 增加 `model_prices` 表和�
 | [`internal/gateway/local_unlock.go`](../internal/gateway/local_unlock.go) | 临时空白解锁的启用、材料保存及关闭 |
 | [`internal/gateway/delete.go`](../internal/gateway/delete.go) | 配置删除及关联事务 |
 | [`web/src/main.tsx`](../web/src/main.tsx) | 应用状态、五个页面、表单、登录及请求查看／试调用 |
-| [`web/src/ProjectList.tsx`](../web/src/ProjectList.tsx) | 项目权限列表、模型授权与状态展示、接入及管理操作入口 |
 | [`web/src/ProjectAccessContent.tsx`](../web/src/ProjectAccessContent.tsx) | 端点与 Token 复制、协议选择、模型别名、补存与重置 |
-| [`web/src/ModelList.tsx`](../web/src/ModelList.tsx) | 模型列表与窄屏操作布局 |
 | [`web/src/ConnectionDeleteContent.tsx`](../web/src/ConnectionDeleteContent.tsx) | 关联模型列表、单个删除及级联删除确认 |
 | [`web/src/protocol.mjs`](../web/src/protocol.mjs) | 为管理界面提取消息、可见文本和 SSE 数据 |
 | [`web/src/credentials.mjs`](../web/src/credentials.mjs) | 项目凭证格式校验和页面内存暂存 |

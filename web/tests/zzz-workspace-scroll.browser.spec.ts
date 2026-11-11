@@ -43,10 +43,6 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
   const list = page.getByRole('region', { name: '请求列表', exact: true });
   const scrollTop = () => detail.evaluate(el => el.scrollTop);
   const settleWheel = () => page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))));
-  const sidePositions = () => page.locator('.sidebar, .sidebar .brand, .sidebar nav, .sidebar-bottom').evaluateAll(els => els.map(el => {
-    const r = el.getBoundingClientRect();
-    return { x: r.x, y: r.y, width: r.width, height: r.height };
-  }));
   const checkRoot = async () => {
     expect(await page.evaluate(() => ({ y: scrollY, height: document.documentElement.scrollHeight, viewport: innerHeight }))).toEqual({ y: 0, height: page.viewportSize()!.height, viewport: page.viewportSize()!.height });
   };
@@ -57,7 +53,6 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
     if (await expand.isVisible()) await expand.click();
     await detail.evaluate(el => el.scrollTop = 0);
     await list.evaluate(el => el.scrollTop = 0);
-    const positions = await sidePositions();
     const railHead = await page.locator('.rail-head').boundingBox();
     const left = (await page.locator('.request-rail').boundingBox())!;
     const right = (await detail.boundingBox())!;
@@ -72,7 +67,6 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
     expect(await list.evaluate(el => el.scrollTop)).toBe(0);
     expect(await workspace.evaluate(el => el.scrollTop)).toBe(0);
     expect(await page.locator('.rail-head').boundingBox()).toEqual(railHead);
-    expect(await sidePositions()).toEqual(positions);
     await checkRoot();
     await page.screenshot({ path: testInfo.outputPath(`split-${width}-detail-scroll.png`), animations: 'disabled' });
 
@@ -86,7 +80,6 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
     await page.mouse.wheel(0, 600);
     await settleWheel();
     expect(await scrollTop()).toBe(current);
-    expect(await sidePositions()).toEqual(positions);
     for (const bottom of [true, false]) {
       await detail.evaluate((el, end) => el.scrollTop = end ? el.scrollHeight : 0, bottom);
       const boundary = await scrollTop();
@@ -95,7 +88,6 @@ test('请求工作台两栏独立滚动、筛选固定、切换重置，手机�
       await settleWheel();
       expect(await scrollTop()).toBe(boundary);
       expect(await workspace.evaluate(el => el.scrollTop)).toBe(0);
-      expect(await sidePositions()).toEqual(positions);
       await checkRoot();
     }
     await detail.focus();
